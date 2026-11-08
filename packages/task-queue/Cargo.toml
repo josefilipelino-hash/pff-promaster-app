@@ -1,0 +1,15 @@
+[package]
+name = "momento-task-queue"
+description = "Fila de tarefas persistente com prioridades, pausa, retoma e cancelamento."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[dependencies]
+serde.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

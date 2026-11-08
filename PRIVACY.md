@@ -1,0 +1,42 @@
+# Privacidade
+
+O Momento Studio processa fotografias privadas de clientes, incluindo rostos. As regras
+abaixo são requisitos de arquitetura, não opções.
+
+## Regras
+
+1. **Processamento local por omissão.** Importação, análise, IA, edição e exportação
+   correm no computador. A aplicação funciona sem Internet.
+2. **Nada é enviado para fora sem autorização explícita.** As únicas ligações de rede
+   previstas são:
+   - download de modelos de IA, iniciado pelo utilizador, a partir das URLs do
+     `models/manifest.json`, com verificação SHA-256 (sem envio de dados);
+   - publicação de galerias (Fase 7), iniciada pelo utilizador, para o destino que ele
+     configurar.
+   Não existe telemetria, análise de utilização nem relatórios de falhas automáticos.
+3. **Dados faciais** (caixas, landmarks, embeddings) ficam apenas no catálogo do projeto,
+   no disco local, e são eliminados quando o projeto é eliminado. Existe opção para
+   apagar só os dados faciais de um projeto.
+4. **Sem treino externo.** As fotografias nunca são usadas para treinar serviços ou
+   modelos externos. A aprendizagem de preferências (fase futura) é local, opcional,
+   exportável e eliminável.
+5. **Registos (logs)** nunca contêm píxeis, thumbnails, dados faciais nem metadados GPS.
+   Caminhos de ficheiros podem aparecer em registos de erro locais.
+6. **Exportação:** opção para remover GPS e metadados privados; preset “Entrega sem
+   metadados privados”.
+7. **Credenciais** de publicação ficam no porta-chaves do sistema (Keychain no macOS),
+   nunca no catálogo, em ficheiros de texto ou no código.
+8. **Repositório:** fotografias, modelos e credenciais nunca são versionados (garantido
+   pelo `.gitignore`).
+
+## Eliminação
+
+- **Eliminar projeto:** apaga catálogo, cache e dados faciais. Os originais **só** são
+  apagados se o utilizador o pedir explicitamente, com confirmação separada.
+- **Limpar cache:** apaga previews (regeneráveis).
+- **Limpar dados faciais:** apaga rostos, embeddings e pessoas do projeto.
+
+## Encriptação
+
+Na v1 o catálogo não é cifrado (depende da encriptação do disco — FileVault no macOS,
+recomendado). Avaliar SQLCipher numa fase posterior se houver necessidade.

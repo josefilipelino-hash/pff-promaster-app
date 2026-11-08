@@ -1,0 +1,11 @@
+packages:
+  - "apps/*"
+  - "packages/ui"
+  - "packages/localization"
+
+# Proteção da cadeia de fornecimento: não instalar versões publicadas há menos de 7 dias.
+minimumReleaseAge: 10080
+
+# Únicos pacotes autorizados a executar scripts de instalação.
+onlyBuiltDependencies:
+  - esbuild

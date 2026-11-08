@@ -1,0 +1,25 @@
+{
+  "app": {
+    "name": "Momento Studio",
+    "tagline": "Event photography management, culling, editing and delivery"
+  },
+  "foundation": {
+    "phase": "Phase 0 — technical foundation",
+    "notice": "This build contains only the technical foundation. Project creation and photo import arrive in Phase 1.",
+    "diagnostics": "Diagnostics",
+    "appVersion": "App version",
+    "coreVersion": "Core version",
+    "schemaVersion": "Catalog schema version",
+    "platform": "Platform",
+    "loading": "Fetching core information…",
+    "noBackend": "Core unavailable: the interface is running outside the desktop app."
+  },
+  "error": {
+    "io": "Error reading or writing a file.",
+    "database": "Project database error.",
+    "unsupportedFormat": "Unsupported format.",
+    "corrupt": "Invalid or corrupted file.",
+    "catalogTooNew": "This project was created by a newer version of the app.",
+    "other": "An unexpected error occurred."
+  }
+}

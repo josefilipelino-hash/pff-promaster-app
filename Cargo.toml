@@ -1,0 +1,54 @@
+[workspace]
+resolver = "2"
+members = [
+    "apps/desktop/src-tauri",
+    "packages/core-types",
+    "packages/database",
+    "packages/project-management",
+    "packages/metadata",
+    "packages/import-engine",
+    "packages/image-codecs",
+    "packages/raw-engine",
+    "packages/image-processing",
+    "packages/color-management",
+    "packages/ai-analysis",
+    "packages/face-analysis",
+    "packages/presets",
+    "packages/export-engine",
+    "packages/gallery",
+    "packages/album",
+    "packages/task-queue",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.85"
+license = "UNLICENSED"
+publish = false
+authors = ["José Filipe Lino"]
+
+# Versões fixadas na Fase 0. Ver LICENSES.md antes de adicionar dependências.
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+tracing = "0.1"
+rusqlite = { version = "0.40", features = ["bundled"] }
+tempfile = "3"
+tauri = { version = "=2.12.5", features = [] }
+tauri-build = { version = "2.7", features = [] }
+
+momento-core-types = { path = "packages/core-types" }
+momento-database = { path = "packages/database" }
+momento-image-codecs = { path = "packages/image-codecs" }
+momento-task-queue = { path = "packages/task-queue" }
+
+[profile.dev.package."*"]
+# Dependências optimizadas mesmo em debug: descodificação de imagem em debug puro é demasiado lenta.
+opt-level = 2
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"

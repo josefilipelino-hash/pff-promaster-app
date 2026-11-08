@@ -1,0 +1,23 @@
+[package]
+name = "momento-desktop"
+description = "Aplicação desktop Momento Studio (shell Tauri)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[lib]
+name = "momento_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build.workspace = true
+
+[dependencies]
+tauri.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+momento-core-types.workspace = true
+momento-database.workspace = true

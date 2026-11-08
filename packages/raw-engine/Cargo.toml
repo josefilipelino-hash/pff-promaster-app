@@ -1,0 +1,11 @@
+[package]
+name = "momento-raw-engine"
+description = "Descodificação RAW via LibRaw (FFI) e extração de previews embutidas."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[dependencies]

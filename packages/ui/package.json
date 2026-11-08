@@ -1,0 +1,19 @@
+{
+  "name": "@momento/ui",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "react": "^19.2.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vitest": "4.1.12"
+  }
+}

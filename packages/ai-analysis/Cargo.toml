@@ -1,0 +1,11 @@
+[package]
+name = "momento-ai-analysis"
+description = "Análise técnica e por IA local (ONNX Runtime / Core ML)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[dependencies]

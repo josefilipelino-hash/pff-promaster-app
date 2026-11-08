@@ -1,0 +1,11 @@
+[package]
+name = "momento-gallery"
+description = "Gerador de galerias web estáticas."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[dependencies]

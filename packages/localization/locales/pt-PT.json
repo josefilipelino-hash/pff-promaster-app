@@ -1,0 +1,25 @@
+{
+  "app": {
+    "name": "Momento Studio",
+    "tagline": "Gestão, seleção, edição e entrega de fotografia de eventos"
+  },
+  "foundation": {
+    "phase": "Fase 0 — fundação técnica",
+    "notice": "Esta versão contém apenas a fundação técnica. A criação de projetos e a importação de fotografias chegam na Fase 1.",
+    "diagnostics": "Diagnóstico",
+    "appVersion": "Versão da aplicação",
+    "coreVersion": "Versão do núcleo",
+    "schemaVersion": "Versão do esquema do catálogo",
+    "platform": "Plataforma",
+    "loading": "A obter informação do núcleo…",
+    "noBackend": "Núcleo indisponível: a interface está a correr fora da aplicação desktop."
+  },
+  "error": {
+    "io": "Erro ao ler ou escrever um ficheiro.",
+    "database": "Erro na base de dados do projeto.",
+    "unsupportedFormat": "Formato não suportado.",
+    "corrupt": "Ficheiro inválido ou corrompido.",
+    "catalogTooNew": "Este projeto foi criado por uma versão mais recente da aplicação.",
+    "other": "Ocorreu um erro inesperado."
+  }
+}

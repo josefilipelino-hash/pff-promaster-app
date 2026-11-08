@@ -1,0 +1,11 @@
+[package]
+name = "momento-image-processing"
+description = "Pipeline de revelação não destrutiva (CPU f32, depois GPU via wgpu)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[dependencies]

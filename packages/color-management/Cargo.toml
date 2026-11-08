@@ -1,0 +1,11 @@
+[package]
+name = "momento-color-management"
+description = "Gestão de cor ICC via LittleCMS 2 e perfis do sistema."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[dependencies]

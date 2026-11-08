@@ -1,0 +1,75 @@
+# Dependências e builds
+node_modules/
+dist/
+target/
+*.tsbuildinfo
+apps/desktop/src-tauri/gen/schemas/
+
+# Ambiente e credenciais — NUNCA versionar
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.key
+
+# Fotografias e dados de clientes — NUNCA versionar
+*.cr2
+*.cr3
+*.crw
+*.nef
+*.nrw
+*.arw
+*.srf
+*.sr2
+*.raf
+*.rw2
+*.orf
+*.pef
+*.dng
+*.3fr
+*.fff
+*.iiq
+*.srw
+*.x3f
+*.erf
+*.dcr
+*.kdc
+*.mos
+*.mef
+*.mrw
+*.rwl
+*.heic
+*.heif
+*.CR2
+*.CR3
+*.NEF
+*.ARW
+*.RAF
+*.RW2
+*.ORF
+*.DNG
+*.HEIC
+*.JPG
+*.JPEG
+samples/
+test-photos/
+*.momento/
+
+# Pesos de modelos de IA (descarregados por script e verificados por SHA-256)
+models/**/*.onnx
+models/**/*.mlmodel
+models/**/*.mlpackage/
+models/**/*.bin
+models/cache/
+
+# Fixtures geradas (são recriadas por scripts/generate-fixtures)
+tests/fixtures/generated/
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log

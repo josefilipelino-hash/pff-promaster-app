@@ -1,0 +1,5 @@
+{
+  "$comment": "Registo de modelos de IA. Os pesos NÃO são versionados: são descarregados por scripts/download-models (Fase 3) e verificados por SHA-256. Cada entrada exige licença verificada (ver LICENSES.md).",
+  "schemaVersion": 1,
+  "models": []
+}

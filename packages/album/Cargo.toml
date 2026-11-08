@@ -1,0 +1,11 @@
+[package]
+name = "momento-album"
+description = "Motor de paginação e exportação de álbuns."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[dependencies]

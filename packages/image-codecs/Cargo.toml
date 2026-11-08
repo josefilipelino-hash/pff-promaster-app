@@ -1,0 +1,13 @@
+[package]
+name = "momento-image-codecs"
+description = "Deteção de formatos pelo conteúdo e registo extensível de adaptadores (codecs)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+authors.workspace = true
+
+[dependencies]
+momento-core-types.workspace = true
+serde.workspace = true
