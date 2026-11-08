@@ -26,7 +26,54 @@ pub struct ImageProbe {
     pub has_alpha: bool,
 }
 
-/// Imagem descodificada em RGB de 8 bits (Fase 1: miniaturas e previews).
+/// Origem dos píxeis devolvidos por `decode`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum DecodeKind {
+    /// Imagem completa (resolução total ou redução exata da imagem principal).
+    Full,
+    /// Revelação RAW a meia resolução.
+    HalfSize,
+    /// Preview JPEG/bitmap embutida no ficheiro (RAW, PSD, …).
+    EmbeddedPreview,
+}
+
+/// Nível de suporte de um ficheiro concreto.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "level", content = "note")]
+pub enum SupportLevel {
+    /// Todos os dados de imagem podem ser descodificados.
+    Full,
+    /// Só parte é utilizável (ex.: apenas a preview embutida de um RAW cujo formato de
+    /// compressão do sensor não é suportado). A nota explica o motivo.
+    Partial(String),
+}
+
+/// Metadados obtidos pelo próprio adaptador (ex.: LibRaw para RAW). Os campos `None`
+/// são completados pelo leitor EXIF genérico.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodecMetadata {
+    pub orientation: Option<u8>,
+    pub capture_time: Option<String>,
+    pub camera_make: Option<String>,
+    pub camera_model: Option<String>,
+    pub lens: Option<String>,
+    pub iso: Option<u32>,
+    pub exposure_time: Option<f64>,
+    pub f_number: Option<f64>,
+    pub focal_length: Option<f64>,
+    pub focal_length_35mm: Option<u32>,
+    /// Descrição do espaço/perfil de cor (ex.: “sRGB IEC61966-2.1”, “Câmara RGBG”).
+    pub color_space: Option<String>,
+    /// Dimensões da maior preview embutida, se existir.
+    pub embedded_preview: Option<(u32, u32)>,
+    /// Informação técnica (ex.: descodificador LibRaw usado).
+    pub detail: Option<String>,
+    pub support: Option<SupportLevel>,
+}
+
+/// Imagem descodificada em RGB de 8 bits (miniaturas e previews).
 /// O pipeline de revelação em `f32` chega na Fase 4.
 #[derive(Debug, Clone)]
 pub struct DecodedImage {
@@ -36,6 +83,7 @@ pub struct DecodedImage {
     /// Dimensões originais (antes de qualquer redução).
     pub source_width: u32,
     pub source_height: u32,
+    pub kind: DecodeKind,
 }
 
 /// Contrato de um adaptador. As implementações têm de ser `Send + Sync`, porque são
@@ -58,6 +106,35 @@ pub trait ImageCodec: Send + Sync {
         format: FileFormat,
         min_short_edge: Option<u32>,
     ) -> CoreResult<DecodedImage>;
+    /// Metadados próprios do formato. Por omissão, nenhum (usa-se o leitor EXIF genérico).
+    fn metadata(&self, _data: &[u8], _format: FileFormat) -> Option<CodecMetadata> {
+        None
+    }
+}
+
+/// Prefixo das mensagens de erro quando falta o descodificador para um formato reconhecido.
+pub const MISSING_CODEC: &str = "MISSING_CODEC";
+
+fn missing_codec(format: FileFormat) -> CoreError {
+    CoreError::UnsupportedFormat(format!(
+        "{MISSING_CODEC}: sem descodificador para {format:?} nesta plataforma"
+    ))
+}
+
+/// `true` se o erro indica que falta um descodificador (formato reconhecido).
+pub fn is_missing_codec(e: &CoreError) -> bool {
+    matches!(e, CoreError::UnsupportedFormat(m) if m.starts_with(MISSING_CODEC))
+}
+
+/// Executa uma operação de um adaptador convertendo pânicos em erro “corrompido”: um
+/// ficheiro malformado nunca pode terminar a importação nem a aplicação.
+fn guarded<T>(codec: &str, f: impl FnOnce() -> CoreResult<T>) -> CoreResult<T> {
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)) {
+        Ok(r) => r,
+        Err(_) => Err(CoreError::Corrupt(format!(
+            "falha interna do descodificador {codec} (ficheiro malformado)"
+        ))),
+    }
 }
 
 #[derive(Default, Clone)]
@@ -94,15 +171,24 @@ impl CodecRegistry {
     }
 
     /// Tenta cada adaptador por ordem; devolve o primeiro sucesso ou o último erro.
+    /// Se nenhum adaptador existir para o formato nesta compilação/plataforma, devolve
+    /// [`CoreError::UnsupportedFormat`] com o prefixo `MISSING_CODEC`.
     pub fn probe(&self, data: &[u8], format: FileFormat) -> CoreResult<ImageProbe> {
-        let mut last = CoreError::UnsupportedFormat(format!("{format:?}"));
+        let mut last = missing_codec(format);
         for c in self.candidates(format, |c| c.probe) {
-            match c.probe(data, format) {
+            match guarded(c.id(), || c.probe(data, format)) {
                 Ok(p) => return Ok(p),
                 Err(e) => last = e,
             }
         }
         Err(last)
+    }
+
+    /// Metadados do primeiro adaptador que os fornecer.
+    pub fn metadata(&self, data: &[u8], format: FileFormat) -> Option<CodecMetadata> {
+        self.candidates(format, |c| c.probe)
+            .iter()
+            .find_map(|c| guarded(c.id(), || Ok(c.metadata(data, format))).ok().flatten())
     }
 
     pub fn decode(
@@ -111,9 +197,9 @@ impl CodecRegistry {
         format: FileFormat,
         min_short_edge: Option<u32>,
     ) -> CoreResult<DecodedImage> {
-        let mut last = CoreError::UnsupportedFormat(format!("{format:?}"));
+        let mut last = missing_codec(format);
         for c in self.candidates(format, |c| c.decode) {
-            match c.decode(data, format, min_short_edge) {
+            match guarded(c.id(), || c.decode(data, format, min_short_edge)) {
                 Ok(d) => return Ok(d),
                 Err(e) => last = e,
             }
@@ -182,6 +268,42 @@ mod tests {
         assert_eq!(heic, ["imageio", "libheif"]);
         assert!(r.candidates(FileFormat::Psd, |c| c.probe).is_empty());
         assert!(!r.supports_decode(FileFormat::Psd));
+    }
+
+    struct Panicky;
+    impl ImageCodec for Panicky {
+        fn id(&self) -> &'static str {
+            "panicky"
+        }
+        fn capabilities(&self, _: FileFormat) -> CodecCapabilities {
+            CodecCapabilities { probe: true, decode: true, encode: false }
+        }
+        fn probe(&self, _: &[u8], _: FileFormat) -> CoreResult<ImageProbe> {
+            panic!("descodificador com defeito")
+        }
+        fn decode(&self, _: &[u8], _: FileFormat, _: Option<u32>) -> CoreResult<DecodedImage> {
+            panic!("descodificador com defeito")
+        }
+        fn metadata(&self, _: &[u8], _: FileFormat) -> Option<CodecMetadata> {
+            panic!("descodificador com defeito")
+        }
+    }
+
+    #[test]
+    fn panics_in_codecs_become_corrupt_errors() {
+        let mut r = CodecRegistry::new();
+        r.register(Arc::new(Panicky));
+        assert!(matches!(r.probe(&[], FileFormat::Png), Err(CoreError::Corrupt(_))));
+        assert!(matches!(r.decode(&[], FileFormat::Png, None), Err(CoreError::Corrupt(_))));
+        assert!(r.metadata(&[], FileFormat::Png).is_none());
+    }
+
+    #[test]
+    fn missing_codec_is_identifiable() {
+        let r = CodecRegistry::new();
+        let e = r.probe(&[], FileFormat::Heic).unwrap_err();
+        assert!(is_missing_codec(&e));
+        assert!(!is_missing_codec(&CoreError::Corrupt("x".into())));
     }
 
     #[test]

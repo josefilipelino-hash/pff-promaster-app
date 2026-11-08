@@ -29,6 +29,12 @@
   para leitura.
 - Limite de 200 megapíxeis por imagem antes de alocar memória; pânicos em descodificadores
   são isolados e o ficheiro é marcado como falhado.
+- **Código C++ (LibRaw):** acedido só através da camada `shim/` própria, que apanha todas as
+  exceções C++ e expõe estruturas POD; limite de memória da LibRaw de 4 GB por ficheiro.
+  Os pânicos de qualquer adaptador Rust são convertidos em erro “corrompido”. Testado com
+  ficheiros reais malformados (que fizeram falhar outras bibliotecas) e com dados aleatórios
+  com cabeçalhos RAW de 7 fabricantes. Risco residual: um segfault dentro da LibRaw
+  terminaria a aplicação (ver ARCHITECTURE.md D-017).
 - O JPEG truncado e os ficheiros falsos (texto com extensão `.jpg`) dos testes não afetam a
   aplicação.
 

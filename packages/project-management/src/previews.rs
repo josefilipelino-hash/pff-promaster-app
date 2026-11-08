@@ -2,8 +2,9 @@
 //!
 //! - `preview`: 2560 px, gerada uma vez e guardada em cache;
 //! - `full`: resolução total. Para JPEG e PNG serve-se o **próprio original** (o WebView
-//!   descodifica-o e aplica a orientação EXIF e o perfil ICC); para TIFF, que nem todos os
-//!   WebViews mostram, gera-se um JPEG de resolução total em cache.
+//!   descodifica-o e aplica a orientação EXIF e o perfil ICC); para os restantes formatos
+//!   (RAW, TIFF, HEIC, …) gera-se um JPEG de resolução total em cache — no caso dos RAW, é
+//!   aqui que acontece a revelação completa, só quando o utilizador faz zoom a 100 %.
 
 use crate::paths::{CacheLevel, ProjectPaths};
 use momento_core_types::{AssetId, CoreError, CoreResult};
@@ -53,6 +54,7 @@ pub fn ensure(
         return Ok(Servable { path: PathBuf::from(src.path), mime: mime(format) });
     }
     if cached.is_file() {
+        crate::cache::touch(&cached);
         return Ok(Servable { path: cached, mime: "image/jpeg" });
     }
     let data = std::fs::read(&src.path)
@@ -60,5 +62,15 @@ pub fn ensure(
     let spec = if level == CacheLevel::Full { PreviewSpec::FULL } else { PreviewSpec::PREVIEW };
     let jpg = render_preview(registry, &data, format, src.orientation, spec)?;
     write_atomic(&cached, &jpg)?;
+    maybe_prune(paths);
     Ok(Servable { path: cached, mime: "image/jpeg" })
+}
+
+/// Verifica os limites da cache a cada 64 previews novas (em segundo plano).
+fn maybe_prune(paths: &ProjectPaths) {
+    static WRITES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    if WRITES.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % 64 == 63 {
+        let p = paths.clone();
+        std::thread::spawn(move || crate::cache::prune_project(&p));
+    }
 }

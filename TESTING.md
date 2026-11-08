@@ -4,13 +4,14 @@
 
 | Nível | Ferramenta | Onde | Estado (Fase 1) |
 |---|---|---|---|
-| Unitários Rust | `cargo test` | `#[cfg(test)]` em cada crate | ✅ 63 testes |
+| Unitários Rust | `cargo test` | `#[cfg(test)]` em cada crate | ✅ 80 testes |
 | Integração do núcleo | `cargo test` com projetos temporários | `packages/project-management/tests/full_flow.rs` | ✅ 4 testes (até 625 ficheiros) |
-| Unitários TS + componentes | Vitest + Testing Library (jsdom, núcleo simulado) | `apps/desktop/src/**/*.test.ts(x)`, `packages/localization` | ✅ 34 testes |
+| **Ficheiros reais (Fase 2)** | `MOMENTO_SAMPLES_DIR` | `raw-engine/tests/real_samples.rs`, `project-management/tests/real_formats.rs` | ✅ 26 RAW reais + 65 ficheiros de 25 formatos (relatórios em `docs/reports/`) |
+| Unitários TS + componentes | Vitest + Testing Library (jsdom, núcleo simulado) | `apps/desktop/src/**/*.test.ts(x)`, `packages/localization` | ✅ 36 testes |
 | Aplicação real (manual automatizada) | binário release + Xvfb + xdotool | ver “Verificação na aplicação real” | ✅ executada (Linux) |
-| Compilação para Windows | `cargo check --target x86_64-pc-windows-gnu` | todo o workspace | ✅ sem erros nem avisos |
+| Compilação para Windows | `cargo check --target x86_64-pc-windows-gnu` + executável release | todo o workspace, incluindo a LibRaw em C++ | ✅ (executável de 19,9 MB ligado) |
+| Compilação para macOS | `cargo check -p momento-image-codecs --target aarch64-apple-darwin` | adaptador ImageIO | ✅ (o resto, com C/C++, é compilado no CI macOS) |
 | CI | GitHub Actions: macOS 14, Windows 2022, Ubuntu 24.04 | `.github/workflows/ci.yml` | ⏳ configurado, ainda não executado (repositório sem remoto) |
-| Ficheiros reais de câmara | `MOMENTO_SAMPLES_DIR` (fora do Git) | Fase 2 | — aguarda amostras |
 | Regressão de imagem | comparação por tolerância | Fase 4 | — |
 | E2E automático com WebDriver | `tauri-driver` | futuro | — |
 
@@ -68,7 +69,32 @@ plataforma, ecrã inicial, validação do formulário, grelha virtualizada com 3
 secções futuras desativadas, classificação por teclado e em seleção múltipla, filtro
 Favoritas + visualizador, reversão quando o núcleo recusa, paridade de traduções.
 
-## Verificação na aplicação real (2026-11-08)
+## Fase 2 — ficheiros reais
+
+Fontes (públicas, nunca no Git): 40 ficheiros do repositório `metadata-extractor-images`
+(RAW de 15 fabricantes, HEIC/HEIF/AVIF, WebP, PSD, JP2, incluindo ficheiros malformados
+que fizeram falhar outras bibliotecas) + 3 do `rawpy` (NASA, domínio público) + 21
+produzidos por codificadores independentes (ImageMagick/libwebp/OpenJPEG/libtiff, libjxl,
+libavif, OpenEXR 3.5).
+
+Resultados (detalhe em `docs/reports/`):
+- 25/26 RAW com metadados, preview embutida, ½ e revelação total (o 26.º é um RW2 truncado
+  de 368 bytes → “corrompido”);
+- 65 ficheiros pelo caminho da aplicação: 51 importados (46 completos + 5 parciais com
+  explicação), 3 duplicados, 9 “codec em falta” (HEIC/AVIF/PSB no Linux), 2 corrompidos,
+  0 pendentes, nenhuma falha da aplicação;
+- aplicação real (release + Xvfb): relatório com os 4 estados, grelha RAW orientada,
+  painel com bits/cor/descodificador, revelação 100 % de um NEF de 36 MP, selos “Parcial”.
+
+Defeitos encontrados e corrigidos: previews embutidas já rodadas pela câmara (Nikon D70,
+Kodak DCS) rodadas duas vezes; X3F desativado por omissão na LibRaw; o crate `psd` entrava
+em pânico com PSD válidos (substituído por leitor próprio); compilação da LibRaw no
+Windows (`M_PI`); contagem de câmaras documentada sem verificação (corrigida por teste).
+
+Não validado: HEIC/HEIF/AVIF em macOS/Windows (adaptadores compilados, sem execução);
+formatos RAW sem amostra (NRW, SRF/SR2, 3FR/FFF, IIQ, KDC, MRW, MEF, ProRAW, lossy DNG).
+
+## Verificação na aplicação real — Fase 1 (2026-11-08)
 
 Binário release em Linux (WebKitGTK) num ecrã virtual 1440×900, conduzido com `xdotool`
 (cliques e teclado reais), com 529 ficheiros sintéticos de 3000×2000 px:

@@ -9,6 +9,7 @@ members = [
     "packages/import-engine",
     "packages/image-codecs",
     "packages/raw-engine",
+    "packages/raw-engine/libraw-sys",
     "packages/image-processing",
     "packages/color-management",
     "packages/ai-analysis",
@@ -22,7 +23,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 rust-version = "1.85"
 license = "UNLICENSED"
@@ -37,7 +38,9 @@ thiserror = "2.0"
 tracing = "0.1"
 rusqlite = { version = "0.40", features = ["bundled", "backup"] }
 tempfile = "3"
-image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "tiff"] }
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "tiff", "webp", "bmp", "gif", "exr", "hdr", "ico", "pnm", "tga"] }
+jxl-oxide = { version = "0.12.6", default-features = false, features = ["image"] }
+jpeg2k = { version = "0.10.1", default-features = false, features = ["openjp2"] }
 jpeg-decoder = { version = "0.3.2", default-features = false }
 kamadak-exif = "0.6.1"
 blake3 = "1.8"
@@ -58,6 +61,8 @@ momento-image-processing = { path = "packages/image-processing" }
 momento-import-engine = { path = "packages/import-engine" }
 momento-project-management = { path = "packages/project-management" }
 momento-test-fixtures = { path = "packages/test-fixtures" }
+momento-libraw-sys = { path = "packages/raw-engine/libraw-sys" }
+momento-raw-engine = { path = "packages/raw-engine" }
 
 [profile.dev.package."*"]
 # Dependências optimizadas mesmo em debug: descodificação de imagem em debug puro é demasiado lenta.

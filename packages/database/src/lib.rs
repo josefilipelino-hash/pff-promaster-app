@@ -192,6 +192,40 @@ mod tests {
     }
 
     #[test]
+    fn migration_v2_to_v3_preserves_import_items_and_assets() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("catalog.db");
+        {
+            let c = Connection::open(&path).unwrap();
+            migrations::apply(&c, &migrations::CATALOG[..2]).unwrap();
+            c.execute_batch(
+                "INSERT INTO import_session(id, created_at, mode, recursive, state) VALUES(1, 0, 'reference', 1, 'running');
+                 INSERT INTO import_item(session_id, source_path, state) VALUES(1, '/a.jpg', 'pending'), (1, '/b.txt', 'unsupported');
+                 INSERT INTO asset(path, file_name, file_size, content_hash, format, width, height, imported_at)
+                 VALUES('/c.jpg', 'c.jpg', 1, x'00', 'jpeg', 10, 10, 0);",
+            )
+            .unwrap();
+        }
+        let c = Catalog::open(&path).unwrap();
+        assert_eq!(c.schema_version().unwrap(), SCHEMA_VERSION);
+        let pending = c.pending_import_items(momento_core_types::ImportSessionId(1)).unwrap();
+        assert_eq!(pending, vec!["/a.jpg"]);
+        let support: String =
+            c.connection().query_row("SELECT support FROM asset", [], |r| r.get(0)).unwrap();
+        assert_eq!(support, "full", "fotografias antigas ficam com suporte completo");
+        // Novos estados aceites pela restrição CHECK.
+        c.connection()
+            .execute(
+                "UPDATE import_item SET state = 'missing_codec' WHERE source_path = '/a.jpg'",
+                [],
+            )
+            .unwrap();
+        c.connection()
+            .execute("UPDATE import_item SET state = 'corrupt' WHERE source_path = '/b.txt'", [])
+            .unwrap();
+    }
+
+    #[test]
     fn backup_produces_readable_copy() {
         let dir = tempfile::tempdir().unwrap();
         let cat = Catalog::open(&dir.path().join("catalog.db")).unwrap();

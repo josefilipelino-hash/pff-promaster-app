@@ -38,7 +38,13 @@ pub enum ItemState {
     Imported,
     Duplicate,
     AlreadyImported,
+    /// Formato desconhecido ou que não é uma fotografia.
     Unsupported,
+    /// Formato reconhecido, mas sem descodificador nesta plataforma/compilação.
+    MissingCodec,
+    /// Formato reconhecido, mas os dados estão danificados ou incompletos.
+    Corrupt,
+    /// Erro de leitura/escrita (permissões, disco, …).
     Error,
 }
 
@@ -50,6 +56,8 @@ impl ItemState {
             ItemState::Duplicate => "duplicate",
             ItemState::AlreadyImported => "already_imported",
             ItemState::Unsupported => "unsupported",
+            ItemState::MissingCodec => "missing_codec",
+            ItemState::Corrupt => "corrupt",
             ItemState::Error => "error",
         }
     }
@@ -59,6 +67,8 @@ impl ItemState {
             "duplicate" => ItemState::Duplicate,
             "already_imported" => ItemState::AlreadyImported,
             "unsupported" => ItemState::Unsupported,
+            "missing_codec" => ItemState::MissingCodec,
+            "corrupt" => ItemState::Corrupt,
             "error" => ItemState::Error,
             _ => ItemState::Pending,
         }
@@ -83,6 +93,8 @@ pub struct SessionCounts {
     pub duplicate: u64,
     pub already_imported: u64,
     pub unsupported: u64,
+    pub missing_codec: u64,
+    pub corrupt: u64,
     pub error: u64,
 }
 
@@ -233,6 +245,8 @@ impl Catalog {
                 ItemState::Duplicate => c.duplicate += n,
                 ItemState::AlreadyImported => c.already_imported += n,
                 ItemState::Unsupported => c.unsupported += n,
+                ItemState::MissingCodec => c.missing_codec += n,
+                ItemState::Corrupt => c.corrupt += n,
                 ItemState::Error => c.error += n,
             }
         }
@@ -250,7 +264,7 @@ impl Catalog {
             .prepare(
                 "SELECT source_path, state, message FROM import_item
                  WHERE session_id = ?1 AND state NOT IN ('imported', 'pending')
-                 ORDER BY CASE state WHEN 'error' THEN 0 WHEN 'unsupported' THEN 1 ELSE 2 END, id
+                 ORDER BY CASE state WHEN 'corrupt' THEN 0 WHEN 'error' THEN 1 WHEN 'missing_codec' THEN 2 WHEN 'unsupported' THEN 3 ELSE 4 END, id
                  LIMIT ?2",
             )
             .map_err(db_err)?;

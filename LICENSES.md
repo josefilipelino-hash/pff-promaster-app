@@ -18,7 +18,7 @@ para não fechar opções futuras.
 Verificação automática das licenças transitivas com `cargo-deny` e `pnpm licenses list`:
 ainda **não** implementada (adiada para a Fase 2; as licenças diretas foram verificadas manualmente no crates.io e no npm).
 
-## Dependências em uso (Fase 1)
+## Dependências em uso (Fase 2)
 
 ### Rust (diretas)
 
@@ -40,6 +40,23 @@ ainda **não** implementada (adiada para a Fase 2; as licenças diretas foram ve
 | walkdir | 2.5 | Unlicense OR MIT | varrimento de pastas |
 | rayon | 1.12 | MIT OR Apache-2.0 | processamento paralelo |
 | tracing-subscriber / tracing-appender | 0.3 / 0.2 | MIT | registos em ficheiro |
+| **LibRaw** (submódulo, compilada do código-fonte) | 0.22.3 | **CDDL-1.0** (escolhida; dupla com LGPL-2.1) | RAW de câmara |
+| zlib (via libz-sys, estática) | libz-sys 1.1.31 | Zlib (biblioteca) · MIT OR Apache-2.0 (crate) | DNG com compressão deflate |
+| cc (compilação) | 1.10 | MIT OR Apache-2.0 | compila a LibRaw |
+| jxl-oxide | 0.12.6 | MIT OR Apache-2.0 | JPEG XL |
+| jpeg2k + openjp2 (Rust) | 0.10.1 / 0.6.1 | MIT OR Apache-2.0 / BSD-2-Clause | JPEG 2000 |
+| image-webp (via image) | 0.2.4 | MIT OR Apache-2.0 | WebP |
+| objc2-image-io, objc2-core-graphics, objc2-core-foundation (só macOS) | 0.3.2 | Zlib OR Apache-2.0 OR MIT | HEIC/HEIF/AVIF via ImageIO |
+| windows (só Windows) | 0.62.2 | MIT OR Apache-2.0 | HEIC/HEIF/AVIF via WIC |
+
+**LibRaw sob CDDL-1.0:** o copyleft da CDDL aplica-se apenas aos ficheiros da própria
+LibRaw (que não modificamos e cujo código-fonte está disponível no submódulo). Permite a
+ligação estática ao resto da aplicação. Os ficheiros `LICENSE.CDDL` e `COPYRIGHT` da LibRaw
+devem acompanhar qualquer distribuição binária (a incluir no instalador na Fase 9).
+
+**Política de idade das versões (7 dias):** o pnpm aplica-a automaticamente; para o Cargo,
+`scripts/pin-mature-crates.py` fixa no `Cargo.lock` a versão mais recente com pelo menos
+7 dias (aplicado na Fase 2 a 20 crates transitivas).
 
 ### JavaScript/TypeScript (diretas)
 
@@ -70,8 +87,6 @@ builds para macOS e Windows.
 | Concorrência assíncrona | tokio | 1.54 | MIT | quando necessário |
 | Tipos TS gerados | ts-rs | 12 | MIT | 1 |
 | XMP | xmp_toolkit (Adobe XMP Toolkit) | 1.12 | MIT OR Apache-2.0 (toolkit: BSD-3) | 2 |
-| RAW | LibRaw (código-fonte, FFI própria) | ≥ 0.21 | LGPL-2.1 **ou CDDL-1.0 (escolhida)** | 2 |
-| JPEG XL (leitura) | jxl-oxide | 0.12 | MIT OR Apache-2.0 | 2 |
 | macOS ImageIO / Vision / Core ML / AppKit | objc2-image-io, objc2-vision, objc2-core-ml, objc2-app-kit | 0.3 | Zlib OR Apache-2.0 OR MIT (bindings); frameworks do sistema | 2–5 |
 | Gestão de cor | lcms2 (LittleCMS 2) | 6.2 | MIT | 2 |
 | IA | ort (ONNX Runtime 1.31) | 2.0.0-rc.15 | MIT OR Apache-2.0 (ORT: MIT) | 3 |
@@ -79,8 +94,6 @@ builds para macOS e Windows.
 | GPU | wgpu | 30 | MIT OR Apache-2.0 | 9 |
 | JPEG rápido | turbojpeg (libjpeg-turbo) | 1.5 | Unlicense OR MIT (crate); IJG/BSD-3/Zlib | 1–2 se necessário |
 | AVIF (escrita) | ravif | 0.13 | BSD-3-Clause | 6 |
-| TIFF / EXR | tiff / exr | 0.11 / 1.74 | MIT / BSD-3-Clause | 1 / 2 |
-| JPEG 2000 | jpeg2k (OpenJPEG) | 0.10 | MIT OR Apache-2.0 (OpenJPEG: BSD-2) | 2 |
 | SVG | resvg | 0.49 | Apache-2.0 OR MIT | 6 |
 | PDF | pdf-writer / krilla | 0.15 / 0.8 | MIT OR Apache-2.0 | 8 |
 | ZIP | zip | 9 | MIT | 6 |

@@ -75,6 +75,8 @@ export function ImportReport({ summary, onClose }: { summary: ImportSummary; onC
     [t("report.duplicate"), c.duplicate],
     [t("report.alreadyImported"), c.alreadyImported],
     [t("report.unsupported"), c.unsupported],
+    [t("report.missingCodec"), c.missingCodec],
+    [t("report.corrupt"), c.corrupt],
     [t("report.error"), c.error],
     [t("report.pending"), c.pending],
   ];
@@ -100,6 +102,13 @@ export function ImportReport({ summary, onClose }: { summary: ImportSummary; onC
             </div>
           ))}
       </dl>
+      {(c.missingCodec > 0 || c.corrupt > 0 || c.unsupported > 0) && (
+        <ul className="legend">
+          {c.corrupt > 0 && <li><span className="issue-state s-corrupt">{t("itemState.corrupt")}</span> {t("report.corruptHint")}</li>}
+          {c.missingCodec > 0 && <li><span className="issue-state s-missingCodec">{t("itemState.missingCodec")}</span> {t("report.missingCodecHint")}</li>}
+          {c.unsupported > 0 && <li><span className="issue-state s-unsupported">{t("itemState.unsupported")}</span> {t("report.unsupportedHint")}</li>}
+        </ul>
+      )}
       {summary.issues.length > 0 && (
         <>
           <h3 className="section-title">{t("report.details")}</h3>

@@ -15,6 +15,9 @@ export interface PhotoRow {
   flag: number;
   color: Color | null;
   thumb: ThumbState;
+  /** Suporte parcial (ex.: RAW só com preview embutida). */
+  partial: boolean;
+  format: string;
 }
 
 export interface PhotoDetails {
@@ -40,6 +43,12 @@ export interface PhotoDetails {
   focalLength35mm: number | null;
   importedAt: number;
   thumbError: string | null;
+  bitDepth: number | null;
+  colorSpace: string | null;
+  codec: string | null;
+  codecDetail: string | null;
+  embeddedPreview: string | null;
+  partialNote: string | null;
 }
 
 export interface ProjectInfo {
@@ -101,10 +110,12 @@ export interface SessionCounts {
   duplicate: number;
   alreadyImported: number;
   unsupported: number;
+  missingCodec: number;
+  corrupt: number;
   error: number;
 }
 
-export type ItemState = "pending" | "imported" | "duplicate" | "alreadyImported" | "unsupported" | "error";
+export type ItemState = "pending" | "imported" | "duplicate" | "alreadyImported" | "unsupported" | "missingCodec" | "corrupt" | "error";
 
 export interface ImportSummary {
   sessionId: number;

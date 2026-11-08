@@ -1,99 +1,90 @@
 # Estado do projeto
 
-**Última atualização:** 2026-11-08 · **Fase atual:** 1 — Aplicação utilizável · **Estado:** ✅ concluída
-**Versão:** 0.1.0 · **Branch:** `main` · **Plataformas-alvo:** macOS (Apple Silicon e Intel) e Windows 10/11
+**Última atualização:** 2026-11-08 · **Fase atual:** 2 — Formatos e RAW · **Estado:** ✅ concluída
+**Versão:** 0.2.0 · **Branch:** `main` · **Plataformas-alvo:** macOS (Apple Silicon e Intel) e Windows 10/11
 
 ---
 
 ## Resumo
 
-É possível **criar um projeto → importar fotografias → classificá-las → fechar a aplicação
-→ voltar a abrir → encontrar tudo exatamente como foi deixado**. Verificado em testes
-automáticos com 625 ficheiros e na aplicação real (binário release, cliques e teclado
-reais) com 529 fotografias de 3000×2000 px, incluindo um fecho abrupto (`kill -9`).
+O motor de importação passou a ser **multiformato**, com uma arquitetura de 7 adaptadores
+de codecs extensível e RAW através da **LibRaw 0.22.3** compilada do código-fonte. Cada
+ficheiro recebe um estado claro: importado, **suporte parcial** (com explicação),
+**corrompido**, **codec em falta** ou não suportado. Validado com **26 RAW reais de 15
+fabricantes** e **65 ficheiros de 25 formatos** pelo caminho completo da aplicação, e na
+aplicação real (release).
 
-Ainda não lê RAW, não tem IA e não edita (Fases 2, 3 e 4).
+A Fase 1 (projetos, importação, grelha, visualizador, classificação, persistência)
+continua funcional e testada.
 
 ## Funcional (verificado)
 
 | Funcionalidade | Verificação |
 |---|---|
-| Ecrã inicial com projetos recentes (nome, cliente, tipo, data, local, n.º de fotografias, última abertura, aviso de disco desligado, remover da lista) | App real + teste de componente |
-| Novo projeto: nome do evento, noivos/cliente, tipo de evento, data (DD/MM/AAAA), local, pasta dos originais, pasta de trabalho; cria `AAAA-MM-DD_Cliente.momento` | App real + testes Rust/TS |
-| Abrir projeto existente (seletor de pasta) e a partir dos recentes | App real |
-| Importação de JPEG/JPG, PNG e TIFF/TIF: ficheiro, múltiplos ficheiros, pasta, subpastas | Testes Rust + app real (pasta) |
-| Arrastar e largar | Implementado com o evento nativo do Tauri (mesmo código da importação) — **não testado automaticamente** |
-| Formato detetado pelo conteúdo (não pela extensão) | Testes |
-| Duplicados por conteúdo (BLAKE3) e ficheiros já importados | Testes + app real (6 duplicados detetados) |
-| Modo “manter no local” e modo “copiar para a pasta dos originais” (por câmara, com verificação) | Testes |
-| Relatório de importação com motivos; cancelar; retoma automática após fecho | Testes + app real |
-| EXIF: data/hora (+subsegundos, fuso), câmara, objetiva, ISO, velocidade, abertura, focal (+35 mm), n.º de série | Testes + painel na app real |
-| Orientação automática (8 orientações EXIF) em miniaturas, previews e 100 % | Testes + app real |
-| Miniaturas reais em segundo plano, com prioridade para as visíveis e retoma | Testes + app real (533 em ~3 s) |
-| Grelha virtualizada, tamanho ajustável, seleção simples e múltipla (Cmd/Ctrl, Shift, setas, selecionar tudo) | Testes + app real |
-| Visualizador: abrir, zoom (roda, +/−, níveis), ajustar, 100 % em píxeis reais, arrastar, anterior/seguinte, ecrã completo | App real |
-| Classificação 0–5 estrelas, favorita, rejeitada, 5 etiquetas de cor, aplicada à seleção | Testes + app real |
-| Barra lateral: Todas, Favoritas, Rejeitadas, Sem classificação (com contadores) | Testes + app real |
-| Momentos, Pessoas, Exportação: visíveis, **desativados** e marcados “Fase 5/6” (não fingem funcionar) | Teste de componente |
-| Filtros por estrelas mínimas e etiqueta de cor (barra inferior) | Testes |
-| Painel de informação com metadados e classificação | App real |
-| Atalhos de teclado + ajuda (tecla ?) | Testes |
-| Persistência total em SQLite; estado da interface restaurado; cópias de segurança automáticas do catálogo | Testes + app real com `kill -9` |
-| Registos em ficheiro | Implementado |
-| Interface 100 % em português de Portugal (traduções em ficheiros; inglês preparado) | Teste de paridade |
-| Compilação de todo o workspace para Windows | `cargo check --target x86_64-pc-windows-gnu` ✅ |
+| Arquitetura de codecs: deteção pelo conteúdo, registo com prioridades e recurso, metadados e nível de suporte por adaptador, proteção contra pânicos | Testes unitários (22 em `image-codecs`) |
+| RAW (LibRaw 0.22.3): CR2, CR3, CRW, NEF, ARW, RAF (Bayer e X-Trans), RW2, RWL, ORF, PEF, SRW, X3F (incl. Quattro), DCR, DNG (DJI, Leica, Pentax, smartphone) | 25/26 ficheiros reais (o 26.º é truncado → “corrompido”) |
+| RAW: preview embutida primeiro (10–140 ms); preview de ecrã na mesma leitura que a miniatura; revelação total só a 100 % (0,3–9 s) | Relatórios em `docs/reports/` + aplicação real (NEF de 36 MP a 100 %) |
+| RAW: câmara, objetiva, ISO, velocidade, abertura, focal, data, orientação, bits, cor do sensor, preview embutida, descodificador | Painel de informação na aplicação real |
+| Previews já rodadas pela câmara (Nikon D70, Kodak DCS) normalizadas | Verificação visual + teste unitário |
+| RAW com compressão não suportada pela LibRaw (DNG JPEG XL, NEF HE, GoPro) → suporte parcial com preview embutida | Lógica testada; sem amostra real destes casos |
+| WebP, JPEG XL, JPEG 2000, PSD (composto, leitor próprio), BigTIFF, BMP, GIF, OpenEXR, HDR, ICO, PNM/PAM, TGA, JPEG CMYK | Ficheiros reais e de codificadores independentes |
+| Estados: parcial (selo na grelha + explicação), corrompido, codec em falta, não suportado (relatório com legenda) | Testes + aplicação real |
+| Perfil de cor: descrição ICC (v2/v4), espaço linear (HDR), cor do sensor (RAW) | Testes + painel |
+| Cache: limites LRU (previews 10 GB, resolução total 5 GB), miniaturas permanentes | Teste unitário de LRU |
+| Catálogo v3 com migração automática a partir da v2 | Teste de migração |
+| HEIC/HEIF/AVIF no macOS (ImageIO) e Windows (WIC, com indicação das extensões da Store) | **Compilado** para cada plataforma; **não executado** |
+| LibRaw compila para Windows (MinGW) e o executável liga | Compilação cruzada |
 
-## Não funcional / não implementado
+## Não funcional / não validado
 
-- RAW, HEIC, WebP, AVIF e restantes formatos (Fase 2) — registados como “não suportados”.
-- IA, seleção automática, duplicados semelhantes (Fase 3); edição (Fase 4); momentos e
-  pessoas (Fase 5); exportação (Fase 6); galerias (Fase 7); álbuns (Fase 8).
-- Gestão de cor no núcleo (LittleCMS): os perfis ICC são preservados e o WebView gere a cor,
-  mas não há conversão nem soft proofing (Fase 2/6).
-- Relocalizar originais movidos (a miniatura falha com “original não encontrado”).
-- Aviso automático quando o catálogo está num disco de rede.
-- Menus de contexto, desfazer/refazer, tema claro, segundo monitor.
-- Verificação automática de licenças transitivas (`cargo-deny`).
+- **HEIC/HEIF/AVIF**: adaptadores ImageIO e WIC não foram executados (sem macOS/Windows nesta
+  sessão). No Linux aparecem corretamente como “codec em falta”.
+- RAW sem amostra real: NRW, SRF/SR2, 3FR/FFF, IIQ, KDC, MRW, MEF/MOS, ERF, Apple ProRAW,
+  lossy DNG, NEF High Efficiency. A LibRaw suporta a maioria, mas não foram testados.
+- Gestão de cor no núcleo (LittleCMS): ainda não — previews RAW em sRGB pela LibRaw, perfis
+  ICC dos outros formatos preservados para o WebView.
+- IPTC/XMP; relocalização de originais; sincronização de hora entre câmaras (adiadas para a
+  Fase 5 — momentos/câmaras).
+- Isolamento da LibRaw num processo auxiliar (decisão D-017: não nesta fase).
+- Mapeamento de tons para EXR/HDR; animação de GIF/WebP; PSD com compressão ZIP; PSD Lab.
 
-## Arquitetura (sem alterações à arquitetura principal)
+## Arquitetura
 
-Tauri 2.12 + React 19/TypeScript + Rust + SQLite, conforme `ARCHITECTURE.md`. Decisões
-novas desta fase (D-011 a D-015):
-- **D-011** Windows e macOS como plataformas-alvo desde já (CI em ambos, compilação cruzada,
-  só bibliotecas Rust puras nesta fase).
-- **D-012** Trabalho em segundo plano persistido no próprio domínio (`import_item.state`,
-  `asset.thumb_state`) em vez de uma tabela genérica `job`.
-- **D-013** Miniaturas 640 px; previews 2560 px a pedido; 100 %: original (JPEG/PNG) ou
-  JPEG em cache (TIFF).
-- **D-014** JPEG com redução DCT (`jpeg-decoder`) para miniaturas rápidas.
-- **D-015** Classificação na variante principal (preparado para cópias virtuais).
+Sem alterações à arquitetura principal. Decisões novas D-016 a D-023 em `ARCHITECTURE.md`:
+camada C própria sobre a LibRaw; LibRaw no mesmo processo; contrato de codecs com
+metadados/suporte; HEIC/AVIF via codecs do sistema; leitor PSD próprio; preview de ecrã a
+partir da preview embutida; limites LRU; política de 7 dias também para crates Rust.
 
-## Desempenho medido (Linux x86_64, 8 núcleos, ficheiros sintéticos)
+## Desempenho medido (Linux x86_64, 8 núcleos, ficheiros reais)
 
-| Operação | Volume | Tempo |
-|---|---|---|
-| Importação (leitura, deteção, hash, EXIF, gravação) | 625 ficheiros de 1200 px | 0,07 s (release) |
-| Importação na app real | 548 ficheiros de 3000 px (151 MB) | < 1 s |
-| Miniaturas | 622 de 1200 px | 4,6 s |
-| Miniaturas na app real | 533 de 3000 px | ~3 s |
-| Grelha | 3 000 itens | < 200 elementos no DOM (virtualizada) |
-
-Ficheiros sintéticos comprimem muito melhor do que fotografias reais: com JPEG reais de
-24–45 MP (8–25 MB) os tempos serão maiores e dominados pela leitura do disco/cartão.
+| Operação | Resultado |
+|---|---|
+| Importação de 65 ficheiros (≈ 700 MB, 26 RAW) | 1,3 s |
+| Miniaturas (+ previews de ecrã dos RAW) de 51 ficheiros | 3,6 s |
+| Abrir preview de um RAW já importado | 0–1 ms (já em cache) |
+| Revelação total a 100 % | 0,2 s (6 MP) a 9 s (X-Trans 16 MP); 36–45 MP em 4–5 s |
 
 ## Riscos
 
 | Risco | Impacto | Mitigação |
 |---|---|---|
-| Não houve execução em macOS nem Windows reais nesta sessão | Médio | CI em macOS 14 e Windows 2022 pronto; compilação cruzada para Windows sem erros; verificação manual descrita abaixo |
-| Fotografias reais (perfis ICC, CMYK, EXIF de fabricante) não testadas | Médio | Amostras pedidas; testes com `MOMENTO_SAMPLES_DIR` na Fase 2 |
-| Fidelidade de cor na WebView | Médio | ICC preservado; LittleCMS na Fase 2 |
-| Originais em discos externos desligados | Baixo | Projetos marcados “pasta não encontrada”; relocalização na Fase 2 |
-| Teste de fluxo completo demora ~90 s em debug | Baixo | Aceitável no CI; versão release em 12 s |
+| HEIC/AVIF não validados em macOS/Windows | Alto (iPhone = HEIC) | Primeira verificação manual no Mac/PC; adaptadores já compilados |
+| Segfault dentro da LibRaw com ficheiro extremamente malformado | Médio | Exceções isoladas; LibRaw testada por OSS-Fuzz; processo auxiliar se surgir caso real |
+| Build Windows MSVC depende do runtime Visual C++ | Baixo | Avaliar `crt-static` ou incluir o redistribuível no instalador (Fase 9) |
+| Formatos RAW sem amostra | Médio | Pedir amostras; teste `real_formats` pronto |
+| Disco na compilação (LibRaw + 3 alvos ≈ 20 GB de `target/`) | Baixo | Limpar `target/` entre alvos |
+
+## Dependências novas
+
+LibRaw 0.22.3 (CDDL-1.0, submódulo), zlib (libz-sys 1.1.31), cc 1.10, jxl-oxide 0.12.6,
+jpeg2k 0.10.1 + openjp2 0.6.1, image (features webp/bmp/gif/exr/hdr/ico/pnm/tga), objc2-*
+0.3.2 (macOS), windows 0.62.2 (Windows). Ver `LICENSES.md`.
 
 ## Comandos exatos
 
-Preparação de macOS ou Windows: ver [`INSTALLATION.md`](INSTALLATION.md).
+```bash
+git submodule update --init --recursive
+```
 
 ```bash
 pnpm install
@@ -107,29 +98,25 @@ pnpm dev
 ./scripts/check.sh
 ```
 
-```bash
-pnpm build
-```
-
-Gerar 500 fotografias de teste:
+Validar com as tuas fotografias (nada é copiado para o repositório):
 
 ```bash
-cargo run -p momento-test-fixtures --release --bin generate-fixtures -- ~/momento-teste 500 3000
+MOMENTO_SAMPLES_DIR=/caminho/para/fotos cargo test -p momento-project-management --release --test real_formats -- --nocapture
 ```
 
 ## Testes realizados (2026-11-08)
 
 | Verificação | Resultado |
 |---|---|
-| `cargo test --workspace` | ✅ 67/67 (63 unitários + 4 de integração) |
-| `pnpm -r test` | ✅ 34/34 |
-| `pnpm -r typecheck` | ✅ |
-| `cargo clippy --workspace --all-targets -- -D warnings` | ✅ |
-| `cargo fmt --all --check` | ✅ |
-| `cargo check --workspace --all-targets --target x86_64-pc-windows-gnu` | ✅ sem erros nem avisos |
-| Executável Windows (`momento-desktop.exe`, compilação cruzada x86_64-pc-windows-gnu, release) | ✅ gerado: PE32+ GUI x86-64, 14 MB — não executado (sem Windows disponível) |
-| Aplicação real (release, Linux, Xvfb + xdotool) | ✅ fluxo completo; detalhes em `TESTING.md` |
-| macOS / Windows reais | ⏳ não executado (CI configurado) |
+| `cargo test --workspace` | ✅ 86/86 (80 unitários + 6 de integração, 2 deles com ficheiros reais quando `MOMENTO_SAMPLES_DIR` está definido) |
+| `pnpm -r test` | ✅ 36/36 |
+| `pnpm -r typecheck`, `cargo fmt --check`, `cargo clippy -D warnings` | ✅ |
+| 26 RAW reais (`real_samples`) | ✅ 25 completos + 1 corrompido identificado |
+| 65 ficheiros reais (`real_formats`) | ✅ 46 completos, 5 parciais, 3 duplicados, 9 codec em falta, 2 corrompidos, 0 falhas |
+| Aplicação real (release, Linux) | ✅ importação, relatório, grelha RAW, painel, 100 % |
+| `cargo check --workspace --target x86_64-pc-windows-gnu` + executável | ✅ (19,9 MB, com LibRaw) |
+| `cargo check -p momento-image-codecs --target aarch64-apple-darwin` | ✅ (ImageIO) |
+| macOS / Windows reais | ⏳ não executado |
 
 ## Histórico de fases
 
@@ -137,22 +124,23 @@ cargo run -p momento-test-fixtures --release --bin generate-fixtures -- ~/moment
 |---|---|---|
 | 0 — Fundação técnica | ✅ | 2026-11-08 |
 | 1 — Aplicação utilizável | ✅ | 2026-11-08 |
-| 2 — Formatos e RAW | ⏸ próxima | — |
+| 2 — Formatos e RAW | ✅ | 2026-11-08 |
+| 3 — Seleção automática | ⏸ próxima | — |
 
 ## Próximo passo
 
-**Fase 2 — Formatos e RAW**: LibRaw (DNG, CR2, CR3, NEF, ARW, RAF, ORF, RW2…) com preview
-embutida na importação; HEIC/HEIF (ImageIO no macOS, alternativa no Windows); WebP, AVIF,
-JPEG XL, PSD; IPTC/XMP; LittleCMS para previews; relocalização de originais;
-sincronização de hora entre câmaras.
+**Recomendado antes da Fase 3:** uma verificação curta no teu Mac e/ou PC — `pnpm dev`,
+importar uma pasta com RAW das tuas câmaras e fotografias HEIC do iPhone, e confirmar que
+os HEIC aparecem (ImageIO/WIC). É o único ponto relevante desta fase sem validação real.
 
-**Critério de conclusão:** cada formato anunciado tem um ficheiro real verificado em
-`SUPPORTED_FORMATS.md`; importação de RAW com miniatura em < 50 ms por ficheiro (preview
-embutida); CI verde em macOS e Windows.
+**Fase 3 — Seleção automática:** duplicados por semelhança (hash percetual), rajadas e
+sequências, nitidez global, exposição/clipping, comparação lado a lado com zoom
+sincronizado e recomendação explicada por grupo (métricas clássicas primeiro; modelos de
+IA a seguir).
 
-**Pendente do utilizador:**
-1. Repositório GitHub (para o CI correr em macOS e Windows e gerar os instaladores).
-2. 5–10 ficheiros RAW/JPEG reais por câmara que uses (nunca entram no Git).
-3. Nome definitivo da aplicação (o identificador `pt.momentostudio.desktop` define a pasta
-   de dados).
-4. Modelo do Mac e versão do Windows que vais usar.
+**Critério de conclusão da Fase 3:** num conjunto real de ≥ 500 fotografias, grupos de
+rajadas/semelhantes formados e revistos visualmente, recomendação por grupo com explicação,
+comparação lado a lado funcional, sem eliminar nada automaticamente.
+
+**Pendente do utilizador:** repositório GitHub (CI em macOS/Windows); amostras RAW das tuas
+câmaras e HEIC do iPhone; nome definitivo da aplicação.

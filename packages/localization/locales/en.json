@@ -99,10 +99,10 @@
     "copyHint": "Copies to {{path}}, organised by camera, with copy verification. Source files are left untouched.",
     "copyUnavailable": "Unavailable: the project has no originals folder.",
     "recursive": "Include subfolders",
-    "formatsNote": "This version imports JPEG, PNG and TIFF. Other files are listed in the report as unsupported. Duplicate files (same content) are detected and skipped.",
+    "formatsNote": "Imports JPEG, PNG, TIFF/BigTIFF, WebP, JPEG XL, JPEG 2000, PSD/PSB (composite), BMP, GIF, OpenEXR, HDR and camera RAW (LibRaw), plus HEIC/HEIF/AVIF on macOS and Windows. Unsupported, corrupted or codec-less files are listed in the report. Duplicates (same content) are skipped.",
     "dropHere": "Drop here to import",
     "busy": "An import is already running.",
-    "imagesFilter": "Images (JPEG, PNG, TIFF)"
+    "imagesFilter": "Images and RAW"
   },
   "report": {
     "title": "Import finished",
@@ -115,7 +115,12 @@
     "pending": "Not processed",
     "details": "Files not imported",
     "toast_one": "Imported {{count}} photo.",
-    "toast_other": "Imported {{count}} photos."
+    "toast_other": "Imported {{count}} photos.",
+    "missingCodec": "Missing codec",
+    "corrupt": "Corrupted",
+    "corruptHint": "the format was recognised but the data is damaged or incomplete.",
+    "missingCodecHint": "the format was recognised but there is no decoder on this platform (e.g. HEIC/AVIF outside macOS and Windows, or without the Microsoft Store extensions).",
+    "unsupportedHint": "unknown format, or a file that is not a photo."
   },
   "itemState": {
     "pending": "Not processed",
@@ -123,7 +128,9 @@
     "duplicate": "Duplicate",
     "alreadyImported": "Already in project",
     "unsupported": "Unsupported",
-    "error": "Error"
+    "error": "Error",
+    "missingCodec": "Missing codec",
+    "corrupt": "Corrupted"
   },
   "project": {
     "close": "Close project",
@@ -132,7 +139,8 @@
     "noMatches": "No photos match the current filter."
   },
   "grid": {
-    "thumbFailed": "Could not create the thumbnail. See the info panel."
+    "thumbFailed": "Could not create the thumbnail. See the info panel.",
+    "partial": "Partial"
   },
   "viewer": {
     "back": "Grid",
@@ -165,9 +173,17 @@
     "orientationValue": "EXIF {{value}} (applied automatically)",
     "path": "File",
     "copiedFrom": "Copied from",
-    "thumbError": "Thumbnail error",
     "applyToSelection_one": "Rating applies to {{count}} selected photo",
-    "applyToSelection_other": "Rating applies to the {{count}} selected photos"
+    "applyToSelection_other": "Rating applies to the {{count}} selected photos",
+    "bitDepth": "Bit depth",
+    "bits_one": "{{count}} bit",
+    "bits_other": "{{count}} bits",
+    "colorSpace": "Color",
+    "embeddedPreview": "Embedded preview",
+    "codec": "Decoder",
+    "unreadableTitle": "This photo could not be read",
+    "unreadableText": "The file appears to be corrupted or incomplete. The original was not modified.",
+    "partialTitle": "Partial support"
   },
   "rating": {
     "stars_one": "{{count}} star",

@@ -20,5 +20,7 @@ serde.workspace = true
 tracing.workspace = true
 
 [dev-dependencies]
+momento-raw-engine.workspace = true
+image.workspace = true
 momento-test-fixtures.workspace = true
 tempfile.workspace = true

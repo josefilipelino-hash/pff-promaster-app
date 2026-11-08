@@ -1,0 +1,4 @@
+[submodule "packages/raw-engine/libraw-sys/LibRaw"]
+	path = packages/raw-engine/libraw-sys/LibRaw
+	url = https://github.com/LibRaw/LibRaw.git
+	shallow = true

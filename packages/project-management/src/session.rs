@@ -183,7 +183,11 @@ impl ProjectSession {
         if let Err(e) = backup_catalog(&catalog, &paths) {
             tracing::warn!(erro = %e, "cópia de segurança do catálogo falhou");
         }
-        let registry = Arc::new(momento_image_codecs::default_registry());
+        {
+            let p = paths.clone();
+            std::thread::spawn(move || crate::cache::prune_project(&p));
+        }
+        let registry = Arc::new(crate::codecs::full_registry());
         let ev = events.clone();
         let thumbs = ThumbnailService::start(
             paths.clone(),
@@ -285,6 +289,10 @@ impl ProjectSession {
         let mut n = 0;
         self.with_thumbs(|t| n = t.remaining());
         n
+    }
+
+    pub fn cache_stats(&self) -> crate::cache::CacheStats {
+        crate::cache::stats(&self.paths)
     }
 
     pub fn import_running(&self) -> bool {

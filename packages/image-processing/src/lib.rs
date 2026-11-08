@@ -8,4 +8,7 @@
 
 pub mod thumbnail;
 
-pub use thumbnail::{apply_orientation, encode_jpeg, render_preview, write_atomic, PreviewSpec};
+pub use thumbnail::{
+    apply_orientation, encode_jpeg, render_preview, render_preview_and_thumb, write_atomic,
+    PreviewSpec,
+};

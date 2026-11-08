@@ -8,6 +8,8 @@
 //! - [`previews`]: previews e resolução total a pedido;
 //! - [`ProjectSession`]: projeto aberto — catálogo, importações e eventos.
 
+pub mod cache;
+pub mod codecs;
 pub mod paths;
 pub mod previews;
 mod session;

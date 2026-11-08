@@ -36,7 +36,7 @@ visualização individual com zoom · estrelas, escolhida/rejeitada, etiquetas d
 9. `./scripts/check.sh` passa; CI configurado para macOS, Windows e Linux.
 10. `PROJECT_STATUS.md` e `INSTALLATION.md` atualizados.
 
-## Fase 2 — Formatos e RAW
+## Fase 2 — Formatos e RAW ✅ *(concluída 2026-11-08, ver PROJECT_STATUS.md)*
 
 LibRaw (DNG, CR2, CR3, NEF, ARW, RAF, ORF, RW2 e restantes), previews embutidas, HEIC/HEIF
 (ImageIO), WebP, AVIF, JPEG XL, PSD composto, metadados EXIF/IPTC/XMP, perfis ICC

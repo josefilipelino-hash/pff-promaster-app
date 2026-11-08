@@ -98,6 +98,32 @@ pub const CATALOG: &[&str] = &[
         updated_at INTEGER NOT NULL
     ) STRICT;
     "#,
+    // v3 — Fase 2: multiformato (RAW, HEIC, …), nível de suporte e novos estados.
+    r#"
+    ALTER TABLE asset ADD COLUMN bit_depth INTEGER;
+    ALTER TABLE asset ADD COLUMN color_space TEXT;
+    ALTER TABLE asset ADD COLUMN codec TEXT;
+    ALTER TABLE asset ADD COLUMN codec_detail TEXT;
+    ALTER TABLE asset ADD COLUMN embedded_preview TEXT;
+    ALTER TABLE asset ADD COLUMN support TEXT NOT NULL DEFAULT 'full' CHECK (support IN ('full', 'partial'));
+    ALTER TABLE asset ADD COLUMN support_note TEXT;
+
+    CREATE TABLE import_item_v3 (
+        id          INTEGER PRIMARY KEY,
+        session_id  INTEGER NOT NULL REFERENCES import_session(id) ON DELETE CASCADE,
+        source_path TEXT NOT NULL,
+        state       TEXT NOT NULL CHECK (state IN ('pending', 'imported', 'duplicate', 'already_imported',
+                                                   'unsupported', 'missing_codec', 'corrupt', 'error')),
+        asset_id    INTEGER,
+        message     TEXT,
+        UNIQUE (session_id, source_path)
+    ) STRICT;
+    INSERT INTO import_item_v3(id, session_id, source_path, state, asset_id, message)
+        SELECT id, session_id, source_path, state, asset_id, message FROM import_item;
+    DROP TABLE import_item;
+    ALTER TABLE import_item_v3 RENAME TO import_item;
+    CREATE INDEX import_item_by_state ON import_item(session_id, state);
+    "#,
 ];
 
 /// Migrações da biblioteca global (projetos recentes).

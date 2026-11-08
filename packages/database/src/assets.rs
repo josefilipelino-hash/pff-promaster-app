@@ -58,6 +58,14 @@ pub struct NewAsset {
     pub focal_length: Option<f64>,
     pub focal_length_35mm: Option<u32>,
     pub import_session_id: Option<ImportSessionId>,
+    pub bit_depth: Option<u8>,
+    pub color_space: Option<String>,
+    pub codec: Option<String>,
+    pub codec_detail: Option<String>,
+    /// Dimensões da preview embutida (`LxA`), quando existe.
+    pub embedded_preview: Option<String>,
+    /// `None` = suporte completo; `Some(nota)` = parcial, com o motivo.
+    pub partial_note: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -84,6 +92,9 @@ pub struct PhotoRow {
     pub flag: i8,
     pub color: Option<String>,
     pub thumb: ThumbState,
+    /// Suporte parcial (ex.: RAW só com preview embutida).
+    pub partial: bool,
+    pub format: String,
 }
 
 /// Detalhes completos para o painel de informação.
@@ -112,6 +123,12 @@ pub struct PhotoDetails {
     pub focal_length_35mm: Option<u32>,
     pub imported_at: i64,
     pub thumb_error: Option<String>,
+    pub bit_depth: Option<u8>,
+    pub color_space: Option<String>,
+    pub codec: Option<String>,
+    pub codec_detail: Option<String>,
+    pub embedded_preview: Option<String>,
+    pub partial_note: Option<String>,
 }
 
 /// Localização de um original para servir previews.
@@ -144,9 +161,11 @@ impl Catalog {
                         content_hash, format, width, height, orientation, capture_time,
                         capture_offset, camera_make, camera_model, camera_serial, lens, iso,
                         exposure_time, f_number, focal_length, focal_length_35mm,
-                        import_session_id, imported_at)
+                        import_session_id, imported_at, bit_depth, color_space, codec,
+                        codec_detail, embedded_preview, support, support_note)
                      VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
-                            ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)",
+                            ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28,
+                            ?29, ?30)",
                 )
                 .map_err(db_err)?;
             let mut var = tx
@@ -183,7 +202,14 @@ impl Catalog {
                     a.focal_length,
                     a.focal_length_35mm,
                     a.import_session_id.map(|s| s.0),
-                    now
+                    now,
+                    a.bit_depth,
+                    a.color_space,
+                    a.codec,
+                    a.codec_detail,
+                    a.embedded_preview,
+                    if a.partial_note.is_some() { "partial" } else { "full" },
+                    a.partial_note
                 ]);
                 match res {
                     Ok(_) => {
@@ -267,7 +293,7 @@ impl Catalog {
             .connection()
             .prepare(
                 "SELECT a.id, a.file_name, a.capture_time, a.width, a.height, a.orientation,
-                        r.stars, r.flag, r.color, a.thumb_state
+                        r.stars, r.flag, r.color, a.thumb_state, a.support, a.format
                  FROM asset a
                  JOIN variant v ON v.asset_id = a.id AND v.is_master = 1
                  JOIN rating r ON r.variant_id = v.id
@@ -287,6 +313,8 @@ impl Catalog {
                     flag: r.get(7)?,
                     color: r.get(8)?,
                     thumb: ThumbState::from_i64(r.get(9)?),
+                    partial: r.get::<_, String>(10)? == "partial",
+                    format: r.get(11)?,
                 })
             })
             .map_err(db_err)?;
@@ -299,7 +327,8 @@ impl Catalog {
                 "SELECT id, path, source_path, file_name, file_size, format, width, height,
                         orientation, capture_time, capture_offset, camera_make, camera_model,
                         camera_serial, lens, iso, exposure_time, f_number, focal_length,
-                        focal_length_35mm, imported_at, thumb_error
+                        focal_length_35mm, imported_at, thumb_error, bit_depth, color_space,
+                        codec, codec_detail, embedded_preview, support_note
                  FROM asset WHERE id = ?1",
                 [id.0],
                 |r| {
@@ -326,6 +355,12 @@ impl Catalog {
                         focal_length_35mm: r.get(19)?,
                         imported_at: r.get(20)?,
                         thumb_error: r.get(21)?,
+                        bit_depth: r.get(22)?,
+                        color_space: r.get(23)?,
+                        codec: r.get(24)?,
+                        codec_detail: r.get(25)?,
+                        embedded_preview: r.get(26)?,
+                        partial_note: r.get(27)?,
                     })
                 },
             )

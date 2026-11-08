@@ -17,7 +17,10 @@ use momento_core_types::{AssetId, CoreError, CoreResult, ImportSessionId};
 use momento_database::assets::{InsertResult, NewAsset};
 use momento_database::import::{ImportMode, ItemOutcome, ItemState, SessionCounts};
 use momento_database::Catalog;
-use momento_image_codecs::{detect, detect::SNIFF_LEN, format_id, CodecRegistry};
+use momento_image_codecs::{
+    detect, detect::SNIFF_LEN, format_id, is_missing_codec, CodecMetadata, CodecRegistry,
+    FileFormat, FormatFamily, SupportLevel,
+};
 use rayon::prelude::*;
 use serde::Serialize;
 use std::collections::HashSet;
@@ -63,8 +66,8 @@ impl ImportProgress {
             processed: c.total - c.pending,
             imported: c.imported,
             duplicates: c.duplicate + c.already_imported,
-            skipped: c.unsupported,
-            errors: c.error,
+            skipped: c.unsupported + c.missing_codec,
+            errors: c.error + c.corrupt,
         }
     }
 }
@@ -249,12 +252,27 @@ fn process_file_inner(path_str: &str, shared: &Shared) -> CoreResult<Processed> 
     let data = std::fs::read(path)?;
     let ext = path.extension().and_then(|e| e.to_str());
     let Some(det) = detect(&data[..data.len().min(SNIFF_LEN)], ext) else {
-        return Ok(Processed::Skip(ItemState::Unsupported, Some("formato desconhecido".into())));
-    };
-    if !shared.registry.supports_decode(det.format) {
         return Ok(Processed::Skip(
             ItemState::Unsupported,
-            Some(format!("formato {} ainda não suportado", format_id(det.format))),
+            Some("formato desconhecido ou não é uma imagem".into()),
+        ));
+    };
+    match det.format.family() {
+        FormatFamily::Vector | FormatFamily::Document => {
+            return Ok(Processed::Skip(
+                ItemState::Unsupported,
+                Some(format!("{} não é uma fotografia (gráfico/documento)", format_id(det.format))),
+            ));
+        }
+        _ => {}
+    }
+    if !shared.registry.supports_decode(det.format) {
+        return Ok(Processed::Skip(
+            ItemState::MissingCodec,
+            Some(format!(
+                "formato {} reconhecido, mas sem descodificador nesta plataforma",
+                format_id(det.format)
+            )),
         ));
     }
     let hash: [u8; 32] = blake3::hash(&data).into();
@@ -272,10 +290,15 @@ fn process_file_inner(path_str: &str, shared: &Shared) -> CoreResult<Processed> 
         Err(e) => {
             // Libertar o hash: o ficheiro não entrou no catálogo.
             shared.hashes.lock().unwrap_or_else(|e| e.into_inner()).remove(&hash);
-            return Err(e);
+            return Ok(classify_probe_error(e, det.format, data.len()));
         }
     };
+    let codec_meta = shared.registry.metadata(&data, det.format).unwrap_or_default();
+    // EXIF genérico; os valores do adaptador (ex.: LibRaw, mais fiável em RAW) têm prioridade.
     let exif = momento_metadata::read_exif(&data);
+    let exif = merge_metadata(exif, &codec_meta);
+    let codec_id =
+        shared.registry.candidates(det.format, |c| c.decode).first().map(|c| c.id().to_string());
     let file_name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
 
     let (final_path, source_path) = match shared.options.mode {
@@ -319,7 +342,73 @@ fn process_file_inner(path_str: &str, shared: &Shared) -> CoreResult<Processed> 
         focal_length: exif.focal_length,
         focal_length_35mm: exif.focal_length_35mm,
         import_session_id: Some(shared.session),
+        bit_depth: Some(probe.bits_per_sample).filter(|b| *b > 0),
+        color_space: codec_meta.color_space.clone(),
+        codec: codec_id,
+        codec_detail: codec_meta.detail.clone(),
+        embedded_preview: codec_meta
+            .embedded_preview
+            .filter(|(w, h)| *w > 0 && *h > 0)
+            .map(|(w, h)| format!("{w}×{h}")),
+        partial_note: match &codec_meta.support {
+            Some(SupportLevel::Partial(n)) => Some(n.clone()),
+            _ => None,
+        },
     })))
+}
+
+/// Tamanho abaixo do qual um RAW recusado pela LibRaw é tratado como danificado: nenhum
+/// RAW real de câmara tem menos de 256 KB.
+const SMALLEST_PLAUSIBLE_RAW: usize = 256 * 1024;
+
+/// Classifica um erro de leitura do cabeçalho num estado compreensível pelo utilizador.
+fn classify_probe_error(e: CoreError, format: FileFormat, size: usize) -> Processed {
+    if is_missing_codec(&e) {
+        return Processed::Skip(ItemState::MissingCodec, Some(e.to_string()));
+    }
+    match e {
+        CoreError::Corrupt(m) => Processed::Skip(ItemState::Corrupt, Some(m)),
+        CoreError::UnsupportedFormat(m)
+            if format.family() == FormatFamily::Raw && size < SMALLEST_PLAUSIBLE_RAW =>
+        {
+            Processed::Skip(
+                ItemState::Corrupt,
+                Some(format!("ficheiro RAW incompleto ou danificado ({size} bytes): {m}")),
+            )
+        }
+        CoreError::UnsupportedFormat(m) if format.family() == FormatFamily::Raw => Processed::Skip(
+            ItemState::Unsupported,
+            Some(format!("câmara ou variante RAW não suportada pela LibRaw {}: {m}", "0.22.3")),
+        ),
+        CoreError::UnsupportedFormat(m) => Processed::Skip(ItemState::Unsupported, Some(m)),
+        CoreError::Io(e) => Processed::Skip(ItemState::Error, Some(e.to_string())),
+        other => Processed::Skip(ItemState::Corrupt, Some(other.to_string())),
+    }
+}
+
+/// Combina o EXIF genérico com os metadados do adaptador (que têm prioridade).
+fn merge_metadata(
+    mut e: momento_metadata::ExifSummary,
+    c: &CodecMetadata,
+) -> momento_metadata::ExifSummary {
+    if let Some(o) = c.orientation {
+        e.orientation = o;
+    }
+    macro_rules! prefer {
+        ($($f:ident),*) => { $( if c.$f.is_some() { e.$f = c.$f.clone(); } )* };
+    }
+    prefer!(
+        capture_time,
+        camera_make,
+        camera_model,
+        lens,
+        iso,
+        exposure_time,
+        f_number,
+        focal_length,
+        focal_length_35mm
+    );
+    e
 }
 
 /// Processa os itens pendentes de uma sessão. Bloqueia até terminar ou ser cancelada.

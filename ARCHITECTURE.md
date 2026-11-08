@@ -6,7 +6,7 @@
 > Estado das secções: **[implementado]** existe código testado; **[definido]** decisão
 > tomada, sem código; **[a validar]** decisão dependente de prova de conceito.
 
-Versão do documento: Fase 1 · 2026-11-08
+Versão do documento: Fase 2 · 2026-11-08
 
 ---
 
@@ -256,7 +256,19 @@ Ficheiro ─► detect() ─► CodecRegistry ─► adaptador
 
 ---
 
-## 6. Pipeline RAW **[definido]**
+## 6. Pipeline RAW **[implementado na Fase 2 — ver D-016, D-017, D-021]**
+
+Implementação atual (resumo; o desenho original segue abaixo):
+- `packages/raw-engine/libraw-sys`: LibRaw 0.22.3 (submódulo) + `shim/momento_libraw.{h,cpp}`
+  compilados com `cc` (`USE_ZLIB`, `USE_X3FTOOLS`, `LIBRAW_NODLL`, `_USE_MATH_DEFINES`);
+  verificado em Linux (gcc) e por compilação cruzada para Windows (MinGW, com executável
+  ligado). macOS (clang) é verificado no CI.
+- `packages/raw-engine`: `RawFile` (abertura segura, metadados, preview embutida, revelação
+  sRGB 8 bits sem rotação) e `RawCodec` (adaptador do registo).
+- Previews embutidas já rodadas pela câmara (ex.: Nikon D70, Kodak DCS) são detetadas pela
+  proporção e normalizadas para a orientação do sensor.
+- Ficheiros cujo descodificador a LibRaw marca como não suportado (DNG com JPEG XL, NEF
+  High Efficiency, GoPro VC5) são importados com **suporte parcial** (só preview embutida).
 
 ### 6.1 Biblioteca
 
@@ -380,7 +392,12 @@ Desenho original (mantido como objetivo para trabalhos futuros sem estado de dom
 
 ---
 
-## 10. Sistema de plugins / codecs **[implementado: base]**
+## 10. Sistema de plugins / codecs **[implementado — Fase 2: 7 adaptadores]**
+
+Adaptadores registados em `momento_project_management::codecs::full_registry()`: `raster`
+(image), `jxl-oxide`, `psd` (leitor próprio), `openjp2`, `libraw`, `imageio` (macOS), `wic`
+(Windows). Cada operação de um adaptador corre protegida por `catch_unwind`; um erro de um
+adaptador faz o registo tentar o seguinte por prioridade.
 
 - `detect(head, extension)` identifica o formato pelo **conteúdo** (assinaturas). A
   extensão só desambigua dentro do contentor TIFF (NEF/ARW/DNG/PEF/…), devolvendo
@@ -639,3 +656,11 @@ ficheiros a partir do frontend (caminhos sempre resolvidos e verificados no núc
 | D-013 | 2026-11-08 | Miniaturas JPEG 640 px (q82); previews 2560 px a pedido; resolução total: original para JPEG/PNG, JPEG em cache para TIFF | Gerar sempre previews | Importação rápida; disco usado só quando necessário |
 | D-014 | 2026-11-08 | JPEG descodificado com `jpeg-decoder` (redução DCT 1/2–1/8) para miniaturas | Descodificar sempre a resolução total | Miniaturas várias vezes mais rápidas, sem dependências C (libjpeg-turbo fica como opção) |
 | D-015 | 2026-11-08 | A classificação aplica-se à variante principal; a interface expõe o `AssetId` | Classificação no asset | Preparado para cópias virtuais (Fase 4) sem migração de dados |
+| D-016 | 2026-11-08 | LibRaw 0.22.3 como submódulo Git, compilada com `cc`, com uma **camada C própria** (`shim/`) que expõe só estruturas POD e apanha todas as exceções C++ | Crates `libraw-sys`/`rsraw`; bindgen sobre `libraw_data_t` | Independência do layout interno da LibRaw; sem libclang no build; exceções nunca atravessam a FFI |
+| D-017 | 2026-11-08 | LibRaw no mesmo processo (sem processo auxiliar), com exceções C++ convertidas em erros e `catch_unwind` no registo de codecs | Processo auxiliar por ficheiro | Simplicidade e velocidade; risco residual de segfault em ficheiros extremamente malformados (a LibRaw é testada por OSS-Fuzz). A reavaliar se surgir algum caso real |
+| D-018 | 2026-11-08 | Contrato `ImageCodec` alargado com `metadata()` e `SupportLevel` (completo/parcial com nota); registo devolve `MISSING_CODEC` quando não há descodificador | Lógica por formato no importador | O importador não conhece a LibRaw nem formatos; novos codecs não alteram o núcleo |
+| D-019 | 2026-11-08 | HEIC/HEIF/AVIF com codecs do sistema: ImageIO (macOS) e WIC (Windows); nenhum codec HEVC próprio | libheif + libde265 + x265 | Sem patentes HEVC nem GPL; no Windows depende das extensões da Microsoft Store (estado “codec em falta” com indicação) |
+| D-020 | 2026-11-08 | PSD/PSB com leitor próprio da imagem composta | Crate `psd` | O crate `psd` entrava em pânico com PSD válidos (ImageMagick) e não lê PSB |
+| D-021 | 2026-11-08 | Preview de ecrã de RAW = preview embutida da câmara quando tem ≥ 1600 px, gerada **na mesma leitura** que a miniatura; revelação completa só a 100 % | Revelar sempre | Navegação imediata em milhares de RAW; uma só leitura de 40–60 MB por ficheiro |
+| D-022 | 2026-11-08 | Cache com limites LRU: previews 10 GB, resolução total 5 GB, miniaturas sem limite | Sem limite | Projetos de 15 000 RAW não esgotam o disco |
+| D-023 | 2026-11-08 | Política de 7 dias também para crates Rust (`scripts/pin-mature-crates.py`) | Só para npm | Mesma proteção da cadeia de fornecimento nos dois ecossistemas |

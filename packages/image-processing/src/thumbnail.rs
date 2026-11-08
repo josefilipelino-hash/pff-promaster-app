@@ -84,6 +84,39 @@ pub fn render_preview(
     encode_jpeg(&img, spec.quality, decoded.icc_profile.as_deref())
 }
 
+/// Gera a preview (2560 px) e a miniatura (640 px) a partir de **uma** descodificação.
+pub fn render_preview_and_thumb(
+    registry: &CodecRegistry,
+    data: &[u8],
+    format: FileFormat,
+    orientation: u8,
+) -> CoreResult<(Vec<u8>, Vec<u8>)> {
+    let pmax = PreviewSpec::PREVIEW.max_edge.unwrap_or(2560);
+    let p = registry.probe(data, format)?;
+    let (long, short) = (p.width.max(p.height), p.width.min(p.height));
+    let min_short = ((pmax as u64 * short as u64) / long.max(1) as u64).max(1) as u32;
+    let decoded = registry.decode(data, format, Some(min_short))?;
+    let icc = decoded.icc_profile.clone();
+    let fit = |img: &RgbImage, max: u32| {
+        let (w, h) = img.dimensions();
+        if w.max(h) <= max {
+            return img.clone();
+        }
+        let s = max as f64 / w.max(h) as f64;
+        imageops::thumbnail(
+            img,
+            ((w as f64 * s).round() as u32).max(1),
+            ((h as f64 * s).round() as u32).max(1),
+        )
+    };
+    let preview = apply_orientation(fit(&decoded.image, pmax), orientation);
+    let thumb = fit(&preview, PreviewSpec::THUMB.max_edge.unwrap_or(640));
+    Ok((
+        encode_jpeg(&preview, PreviewSpec::PREVIEW.quality, icc.as_deref())?,
+        encode_jpeg(&thumb, PreviewSpec::THUMB.quality, icc.as_deref())?,
+    ))
+}
+
 /// Escrita atómica: ficheiro temporário na mesma pasta + `rename`. Um processo terminado
 /// a meio nunca deixa uma miniatura corrompida no lugar final.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> CoreResult<()> {

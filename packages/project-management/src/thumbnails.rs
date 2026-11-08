@@ -9,8 +9,10 @@ use crate::paths::{CacheLevel, ProjectPaths};
 use momento_core_types::{AssetId, CoreError, CoreResult};
 use momento_database::assets::ThumbState;
 use momento_database::Catalog;
-use momento_image_codecs::{format_from_id, CodecRegistry};
-use momento_image_processing::{render_preview, write_atomic, PreviewSpec};
+use momento_image_codecs::{format_from_id, CodecRegistry, FormatFamily};
+use momento_image_processing::{
+    render_preview, render_preview_and_thumb, write_atomic, PreviewSpec,
+};
 use momento_task_queue::WorkQueue;
 use serde::Serialize;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -40,6 +42,9 @@ pub struct ThumbnailService {
     done: Arc<AtomicU64>,
 }
 
+/// Lado maior mínimo de uma preview embutida para gerar já a preview de 2560 px.
+const RAW_PREVIEW_FROM_EMBEDDED_MIN: u32 = momento_raw_engine::EMBEDDED_GOOD_ENOUGH_LONG_EDGE;
+
 fn generate(
     paths: &ProjectPaths,
     catalog: &Catalog,
@@ -52,8 +57,27 @@ fn generate(
         .ok_or_else(|| CoreError::UnsupportedFormat(src.format.clone()))?;
     let data = std::fs::read(&src.path)
         .map_err(|e| CoreError::Other(format!("original não encontrado ({e})")))?;
+    // RAW com preview embutida grande: numa única leitura gera a miniatura E a preview de
+    // 2560 px, evitando voltar a ler um ficheiro de 40–60 MB quando a fotografia é aberta.
+    let preview_path = paths.cached(CacheLevel::Preview, id);
+    if format.family() == FormatFamily::Raw && !preview_path.is_file() {
+        if let Some((w, h)) = embedded_preview_size(catalog, id) {
+            if w.max(h) >= RAW_PREVIEW_FROM_EMBEDDED_MIN {
+                let (preview, thumb) =
+                    render_preview_and_thumb(registry, &data, format, src.orientation)?;
+                write_atomic(&preview_path, &preview)?;
+                return write_atomic(&paths.cached(CacheLevel::Thumb, id), &thumb);
+            }
+        }
+    }
     let jpg = render_preview(registry, &data, format, src.orientation, PreviewSpec::THUMB)?;
     write_atomic(&paths.cached(CacheLevel::Thumb, id), &jpg)
+}
+
+fn embedded_preview_size(catalog: &Catalog, id: AssetId) -> Option<(u32, u32)> {
+    let s = catalog.photo_details(id).ok()??.embedded_preview?;
+    let (w, h) = s.split_once('×')?;
+    Some((w.parse().ok()?, h.parse().ok()?))
 }
 
 impl ThumbnailService {

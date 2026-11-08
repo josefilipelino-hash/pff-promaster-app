@@ -62,6 +62,11 @@ impl ProjectPaths {
         self.root.join("cache")
     }
 
+    /// Pasta de um nível de cache.
+    pub fn level_dir(&self, level: CacheLevel) -> PathBuf {
+        self.cache().join(level.dir())
+    }
+
     /// Caminho determinístico (sem consulta ao catálogo), dividido em 256 subpastas.
     pub fn cached(&self, level: CacheLevel, id: AssetId) -> PathBuf {
         self.cache()

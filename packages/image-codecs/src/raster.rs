@@ -1,4 +1,5 @@
-//! Adaptador para JPEG, PNG e TIFF (Fase 1).
+//! Adaptador para JPEG, PNG, TIFF/BigTIFF, WebP, BMP, GIF, ICO, PNM/PAM, TGA, OpenEXR e
+//! Radiance HDR.
 //!
 //! - JPEG: `jpeg-decoder` com redução no domínio DCT (1/2, 1/4, 1/8), muito mais rápida
 //!   do que descodificar a resolução total para gerar miniaturas.
@@ -8,7 +9,10 @@
 //! memória, para que um ficheiro malicioso não esgote a RAM.
 
 use crate::detect::FileFormat;
-use crate::registry::{CodecCapabilities, DecodedImage, ImageCodec, ImageProbe};
+use crate::registry::{
+    CodecCapabilities, CodecMetadata, DecodeKind, DecodedImage, ImageCodec, ImageProbe,
+    SupportLevel,
+};
 use image::{DynamicImage, ImageDecoder, RgbImage};
 use momento_core_types::{CoreError, CoreResult};
 use std::io::Cursor;
@@ -18,11 +22,11 @@ pub const MAX_PIXELS: u64 = 200_000_000;
 
 pub struct RasterCodec;
 
-fn corrupt(e: impl std::fmt::Display) -> CoreError {
+pub(crate) fn corrupt(e: impl std::fmt::Display) -> CoreError {
     CoreError::Corrupt(e.to_string())
 }
 
-fn check_size(w: u32, h: u32) -> CoreResult<()> {
+pub(crate) fn check_size(w: u32, h: u32) -> CoreResult<()> {
     if w == 0 || h == 0 {
         return Err(CoreError::Corrupt("dimensões nulas".into()));
     }
@@ -34,8 +38,32 @@ fn check_size(w: u32, h: u32) -> CoreResult<()> {
 
 fn limits() -> image::Limits {
     let mut l = image::Limits::default();
-    l.max_alloc = Some(MAX_PIXELS * 8); // RGBA de 16 bits no pior caso
+    l.max_alloc = Some(MAX_PIXELS * 16); // RGBA f32 no pior caso
     l
+}
+
+/// Formatos tratados pelo crate `image` e o respetivo identificador.
+fn image_format(f: FileFormat) -> Option<image::ImageFormat> {
+    use image::ImageFormat as I;
+    Some(match f {
+        FileFormat::Png => I::Png,
+        FileFormat::Tiff | FileFormat::BigTiff => I::Tiff,
+        FileFormat::WebP => I::WebP,
+        FileFormat::Bmp => I::Bmp,
+        FileFormat::Gif => I::Gif,
+        FileFormat::Ico => I::Ico,
+        FileFormat::Pnm | FileFormat::Pam => I::Pnm,
+        FileFormat::Tga => I::Tga,
+        FileFormat::RadianceHdr => I::Hdr,
+        FileFormat::OpenExr => I::OpenExr,
+        _ => return None,
+    })
+}
+
+fn reader(data: &[u8], f: image::ImageFormat) -> image::ImageReader<Cursor<&[u8]>> {
+    let mut r = image::ImageReader::with_format(Cursor::new(data), f);
+    r.limits(limits());
+    r
 }
 
 impl ImageCodec for RasterCodec {
@@ -48,38 +76,39 @@ impl ImageCodec for RasterCodec {
     }
 
     fn capabilities(&self, format: FileFormat) -> CodecCapabilities {
-        let ok = matches!(format, FileFormat::Jpeg | FileFormat::Png | FileFormat::Tiff);
+        let ok = format == FileFormat::Jpeg || image_format(format).is_some();
         CodecCapabilities { probe: ok, decode: ok, encode: false }
     }
 
     fn probe(&self, data: &[u8], format: FileFormat) -> CoreResult<ImageProbe> {
-        match format {
-            FileFormat::Jpeg => {
-                let mut d = jpeg_decoder::Decoder::new(Cursor::new(data));
-                d.read_info().map_err(corrupt)?;
-                let info = d.info().ok_or_else(|| corrupt("cabeçalho JPEG sem informação"))?;
-                Ok(ImageProbe {
-                    format,
-                    width: info.width as u32,
-                    height: info.height as u32,
-                    bits_per_sample: if info.pixel_format == jpeg_decoder::PixelFormat::L16 {
-                        16
-                    } else {
-                        8
-                    },
-                    has_alpha: false,
-                })
-            }
-            FileFormat::Png => probe_with(
-                image::codecs::png::PngDecoder::new(Cursor::new(data)).map_err(corrupt)?,
+        if format == FileFormat::Jpeg {
+            let mut d = jpeg_decoder::Decoder::new(Cursor::new(data));
+            d.read_info().map_err(corrupt)?;
+            let info = d.info().ok_or_else(|| corrupt("cabeçalho JPEG sem informação"))?;
+            return Ok(ImageProbe {
                 format,
-            ),
-            FileFormat::Tiff => probe_with(
-                image::codecs::tiff::TiffDecoder::new(Cursor::new(data)).map_err(corrupt)?,
-                format,
-            ),
-            other => Err(CoreError::UnsupportedFormat(format!("{other:?}"))),
+                width: info.width as u32,
+                height: info.height as u32,
+                bits_per_sample: if info.pixel_format == jpeg_decoder::PixelFormat::L16 {
+                    16
+                } else {
+                    8
+                },
+                has_alpha: false,
+            });
         }
+        let f = image_format(format)
+            .ok_or_else(|| CoreError::UnsupportedFormat(format!("{format:?}")))?;
+        let d = reader(data, f).into_decoder().map_err(corrupt)?;
+        let (w, h) = d.dimensions();
+        let ct = d.color_type();
+        Ok(ImageProbe {
+            format,
+            width: w,
+            height: h,
+            bits_per_sample: (ct.bits_per_pixel() / ct.channel_count() as u16) as u8,
+            has_alpha: ct.has_alpha(),
+        })
     }
 
     fn decode(
@@ -88,53 +117,92 @@ impl ImageCodec for RasterCodec {
         format: FileFormat,
         min_short_edge: Option<u32>,
     ) -> CoreResult<DecodedImage> {
-        match format {
-            FileFormat::Jpeg => decode_jpeg(data, min_short_edge),
-            FileFormat::Png => decode_with(
-                image::codecs::png::PngDecoder::new(Cursor::new(data)).map_err(corrupt)?,
+        if format == FileFormat::Jpeg {
+            return decode_jpeg(data, min_short_edge);
+        }
+        let f = image_format(format)
+            .ok_or_else(|| CoreError::UnsupportedFormat(format!("{format:?}")))?;
+        let mut d = reader(data, f).into_decoder().map_err(corrupt)?;
+        let (w, h) = d.dimensions();
+        check_size(w, h)?;
+        let icc = d.icc_profile().ok().flatten();
+        let img = DynamicImage::from_decoder(d).map_err(corrupt)?;
+        Ok(DecodedImage {
+            image: flatten_to_rgb8(img),
+            icc_profile: icc,
+            source_width: w,
+            source_height: h,
+            kind: DecodeKind::Full,
+        })
+    }
+
+    fn metadata(&self, data: &[u8], format: FileFormat) -> Option<CodecMetadata> {
+        let mut cmyk = false;
+        let icc = if format == FileFormat::Jpeg {
+            let mut d = jpeg_decoder::Decoder::new(Cursor::new(data));
+            d.read_info().ok()?;
+            cmyk = d.info().is_some_and(|i| i.pixel_format == jpeg_decoder::PixelFormat::CMYK32);
+            d.icc_profile()
+        } else {
+            let mut d = reader(data, image_format(format)?).into_decoder().ok()?;
+            d.icc_profile().ok().flatten()
+        };
+        let color_space = match (&icc, format) {
+            (Some(p), _) => {
+                crate::icc::icc_description(p).unwrap_or_else(|| "Perfil ICC embutido".into())
+            }
+            (None, FileFormat::OpenExr | FileFormat::RadianceHdr) => "Linear (HDR)".into(),
+            (None, _) => "sRGB (sem perfil embutido — assumido)".into(),
+        };
+        let support = match format {
+            FileFormat::OpenExr | FileFormat::RadianceHdr => SupportLevel::Partial(
+                "Imagem HDR: a pré-visualização converte para sRGB e corta os valores acima do branco (sem mapeamento de tons).".into(),
             ),
-            FileFormat::Tiff => decode_with(
-                image::codecs::tiff::TiffDecoder::new(Cursor::new(data)).map_err(corrupt)?,
+            FileFormat::Gif => SupportLevel::Partial("GIF: só o primeiro fotograma é mostrado.".into()),
+            FileFormat::Jpeg if cmyk => SupportLevel::Partial(
+                "JPEG em CMYK: conversão simplificada para RGB (sem gestão de cor); as cores podem não ser exatas.".into(),
             ),
-            other => Err(CoreError::UnsupportedFormat(format!("{other:?}"))),
+            _ => SupportLevel::Full,
+        };
+        Some(CodecMetadata {
+            color_space: Some(color_space),
+            support: Some(support),
+            ..Default::default()
+        })
+    }
+}
+
+fn linear_to_srgb8(v: f32) -> u8 {
+    let v = if v.is_finite() { v.clamp(0.0, 1.0) } else { 0.0 };
+    let s = if v <= 0.003_130_8 { v * 12.92 } else { 1.055 * v.powf(1.0 / 2.4) - 0.055 };
+    (s * 255.0 + 0.5) as u8
+}
+
+/// Converte para RGB 8 bits; transparência composta sobre branco; dados em vírgula
+/// flutuante (EXR/HDR, lineares) convertidos para sRGB.
+pub(crate) fn flatten_to_rgb8(img: DynamicImage) -> RgbImage {
+    match img {
+        DynamicImage::ImageRgb32F(f) => RgbImage::from_fn(f.width(), f.height(), |x, y| {
+            let p = f.get_pixel(x, y).0;
+            image::Rgb([linear_to_srgb8(p[0]), linear_to_srgb8(p[1]), linear_to_srgb8(p[2])])
+        }),
+        DynamicImage::ImageRgba32F(f) => RgbImage::from_fn(f.width(), f.height(), |x, y| {
+            let p = f.get_pixel(x, y).0;
+            let a = if p[3].is_finite() { p[3].clamp(0.0, 1.0) } else { 1.0 };
+            let mix = |c: f32| linear_to_srgb8(c * a + (1.0 - a));
+            image::Rgb([mix(p[0]), mix(p[1]), mix(p[2])])
+        }),
+        img if !img.color().has_alpha() => img.to_rgb8(),
+        img => {
+            let rgba = img.to_rgba8();
+            RgbImage::from_fn(rgba.width(), rgba.height(), |x, y| {
+                let p = rgba.get_pixel(x, y).0;
+                let a = p[3] as u32;
+                let mix = |c: u8| ((c as u32 * a + 255 * (255 - a)) / 255) as u8;
+                image::Rgb([mix(p[0]), mix(p[1]), mix(p[2])])
+            })
         }
     }
-}
-
-fn probe_with(d: impl ImageDecoder, format: FileFormat) -> CoreResult<ImageProbe> {
-    let (w, h) = d.dimensions();
-    let ct = d.color_type();
-    Ok(ImageProbe {
-        format,
-        width: w,
-        height: h,
-        bits_per_sample: (ct.bits_per_pixel() / ct.channel_count() as u16) as u8,
-        has_alpha: ct.has_alpha(),
-    })
-}
-
-fn decode_with(mut d: impl ImageDecoder) -> CoreResult<DecodedImage> {
-    let (w, h) = d.dimensions();
-    check_size(w, h)?;
-    d.set_limits(limits()).map_err(corrupt)?;
-    let icc = d.icc_profile().ok().flatten();
-    let img = DynamicImage::from_decoder(d).map_err(corrupt)?;
-    let rgb = flatten_to_rgb8(img);
-    Ok(DecodedImage { image: rgb, icc_profile: icc, source_width: w, source_height: h })
-}
-
-/// Converte para RGB 8 bits; transparência composta sobre branco.
-fn flatten_to_rgb8(img: DynamicImage) -> RgbImage {
-    if !img.color().has_alpha() {
-        return img.to_rgb8();
-    }
-    let rgba = img.to_rgba8();
-    RgbImage::from_fn(rgba.width(), rgba.height(), |x, y| {
-        let p = rgba.get_pixel(x, y).0;
-        let a = p[3] as u32;
-        let mix = |c: u8| ((c as u32 * a + 255 * (255 - a)) / 255) as u8;
-        image::Rgb([mix(p[0]), mix(p[1]), mix(p[2])])
-    })
 }
 
 fn decode_jpeg(data: &[u8], min_short_edge: Option<u32>) -> CoreResult<DecodedImage> {
@@ -175,7 +243,13 @@ fn decode_jpeg(data: &[u8], min_short_edge: Option<u32>) -> CoreResult<DecodedIm
     };
     let image =
         RgbImage::from_raw(w, h, rgb).ok_or_else(|| corrupt("buffer JPEG inconsistente"))?;
-    Ok(DecodedImage { image, icc_profile: d.icc_profile(), source_width: sw, source_height: sh })
+    Ok(DecodedImage {
+        image,
+        icc_profile: d.icc_profile(),
+        source_width: sw,
+        source_height: sh,
+        kind: DecodeKind::Full,
+    })
 }
 
 #[cfg(test)]

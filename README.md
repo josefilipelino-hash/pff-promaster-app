@@ -4,10 +4,10 @@ Aplicação desktop local para gestão, seleção, edição, exportação e entr
 de casamentos e outros eventos. Pensada para trabalhos de 3 000 a 15 000 fotografias, com
 automatização em cada passo e o controlo final sempre do fotógrafo.
 
-> **Estado atual: Fase 1 concluída (v0.1.0) — aplicação utilizável.** Criar e abrir
-> projetos, importar JPEG/PNG/TIFF (ficheiros, pastas, subpastas, arrastar e largar),
-> miniaturas em segundo plano, grelha, visualizador, classificação e atalhos. Tudo fica
-> guardado em SQLite. Ainda **não** lê RAW nem edita (Fases 2 e 4).
+> **Estado atual: Fase 2 concluída (v0.2.0) — multiformato e RAW.** Projetos, importação,
+> grelha, visualizador e classificação (Fase 1) + RAW de câmara via LibRaw (validado com
+> ficheiros reais de 15 fabricantes), WebP, JPEG XL, JPEG 2000, PSD, EXR e mais, com estados
+> claros para ficheiros parciais, corrompidos ou sem codec. Ainda **não** edita (Fase 4).
 > Ver [`PROJECT_STATUS.md`](PROJECT_STATUS.md).
 
 ![Grelha](docs/screenshots/fase1-grelha.png)
@@ -29,6 +29,10 @@ Tauri 2 · React 19 · TypeScript · Rust · SQLite · LibRaw · LittleCMS 2 · 
 Core ML. Justificação completa em [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Início rápido
+
+```bash
+git submodule update --init --recursive
+```
 
 ```bash
 pnpm install

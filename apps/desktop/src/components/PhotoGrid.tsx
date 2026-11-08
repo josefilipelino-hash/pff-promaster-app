@@ -40,9 +40,16 @@ interface CellProps {
   onClick: (id: number, e: React.MouseEvent) => void;
   onOpen: (id: number) => void;
   failedLabel: string;
+  partialLabel: string;
 }
 
-const Cell = memo(function Cell({ photo, size, token, version, selected, focused, onClick, onOpen, failedLabel }: CellProps) {
+/** Extensão do ficheiro em maiúsculas (ex.: CR3), mostrada no rodapé da célula. */
+export function extLabel(fileName: string): string {
+  const i = fileName.lastIndexOf(".");
+  return i >= 0 ? fileName.slice(i + 1).toUpperCase().slice(0, 5) : "";
+}
+
+const Cell = memo(function Cell({ photo, size, token, version, selected, focused, onClick, onOpen, failedLabel, partialLabel }: CellProps) {
   return (
     <div
       className={`cell${selected ? " selected" : ""}${focused ? " focused" : ""}${photo.flag === -1 ? " rejected" : ""}`}
@@ -63,9 +70,15 @@ const Cell = memo(function Cell({ photo, size, token, version, selected, focused
           <span className="thumb-pending" />
         )}
         {photo.color && <span className={`cell-color c-${photo.color}`} />}
+        {photo.partial && (
+          <span className="cell-partial" title={partialLabel}>
+            {partialLabel}
+          </span>
+        )}
       </div>
       <div className="cell-footer">
         <span className="cell-stars">{photo.stars > 0 ? "★".repeat(photo.stars) : ""}</span>
+        <span className="cell-ext">{extLabel(photo.fileName)}</span>
         <span className={`cell-flag${photo.flag === 1 ? " pick" : photo.flag === -1 ? " reject" : ""}`}>{photo.flag === 1 ? "♥" : photo.flag === -1 ? "✕" : ""}</span>
       </div>
     </div>
@@ -158,6 +171,7 @@ export function PhotoGrid({
             onClick={onClickPhoto}
             onOpen={onOpen}
             failedLabel={t("grid.thumbFailed")}
+            partialLabel={t("grid.partial")}
           />
         ))}
       </div>,

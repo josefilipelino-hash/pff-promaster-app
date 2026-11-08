@@ -19,7 +19,14 @@ import { Toolbar } from "./Toolbar";
 import { Viewer, type ViewerHandle } from "./Viewer";
 
 /** Extensões oferecidas no seletor de ficheiros (a deteção real é feita pelo conteúdo). */
-const IMAGE_EXTENSIONS = ["jpg", "jpeg", "jpe", "png", "tif", "tiff", "JPG", "JPEG", "PNG", "TIF", "TIFF"];
+const BASE_EXTENSIONS = [
+  "jpg", "jpeg", "jpe", "png", "tif", "tiff", "webp", "avif", "heic", "heif", "hif", "jxl", "jp2", "j2k", "jpx",
+  "psd", "psb", "bmp", "gif", "exr", "hdr", "ico", "ppm", "pgm", "pbm", "pnm", "pam", "tga",
+  // RAW
+  "cr2", "cr3", "crw", "nef", "nrw", "arw", "srf", "sr2", "raf", "rw2", "raw", "rwl", "orf", "pef", "dng",
+  "3fr", "fff", "iiq", "x3f", "srw", "erf", "dcr", "kdc", "mos", "mef", "mrw",
+];
+const IMAGE_EXTENSIONS = [...BASE_EXTENSIONS, ...BASE_EXTENSIONS.map((e) => e.toUpperCase())];
 
 function isTyping(target: EventTarget | null): boolean {
   const el = target as HTMLElement | null;

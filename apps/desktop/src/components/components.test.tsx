@@ -76,6 +76,8 @@ const rows = (n: number): PhotoRow[] =>
     flag: i === 1 ? 1 : 0,
     color: null,
     thumb: "ready" as const,
+    partial: i === 2,
+    format: i === 2 ? "cr3" : "jpeg",
   }));
 
 beforeEach(() => {
@@ -185,6 +187,41 @@ describe("ecrã de projeto", () => {
     await act(async () => {});
     expect(useStore.getState().photos[0]!.stars).toBe(0);
     expect(await screen.findByRole("alert")).toBeTruthy();
+  });
+});
+
+describe("formatos e estados (Fase 2)", () => {
+  it("mostra o tipo de ficheiro e o selo de suporte parcial na grelha", async () => {
+    apiMock.listPhotos.mockResolvedValue(rows(5).map((r, i) => (i === 2 ? { ...r, fileName: "IMG_0003.CR3" } : r)));
+    act(() => useStore.getState().setProject(project));
+    render(<App />);
+    await screen.findByText("Casamento Ana & Pedro");
+    await act(async () => {});
+    const cell = document.querySelector('[data-id="3"]')!;
+    expect(cell.textContent).toContain("CR3");
+    expect(cell.textContent).toContain("Parcial");
+    expect(document.querySelectorAll(".cell-partial").length).toBe(1);
+  });
+
+  it("painel de informação explica suporte parcial e ficheiros ilegíveis", async () => {
+    apiMock.listPhotos.mockResolvedValue(rows(3).map((r, i) => (i === 0 ? { ...r, thumb: "failed" as const } : r)));
+    apiMock.photoDetails.mockResolvedValue({
+      id: 1, path: "/f/IMG.NEF", sourcePath: null, fileName: "IMG.NEF", fileSize: 1000, format: "raw-tiff", width: 6000, height: 4000,
+      orientation: 1, captureTime: null, captureOffset: null, cameraMake: "Nikon", cameraModel: "Z 9", cameraSerial: null, lens: null,
+      iso: null, exposureTime: null, fNumber: null, focalLength: null, focalLength35mm: null, importedAt: 0, thumbError: "dados truncados",
+      bitDepth: 14, colorSpace: "Câmara (RGBG, 3 cores)", codec: "libraw", codecDetail: "LibRaw 0.22.3", embeddedPreview: "8256×5504",
+      partialNote: "Só a preview embutida pode ser mostrada.",
+    } as never);
+    act(() => useStore.getState().setProject(project));
+    render(<App />);
+    await screen.findByText("Casamento Ana & Pedro");
+    await act(async () => {});
+    fireEvent.mouseDown(document.querySelector('[data-id="1"]')!);
+    expect(await screen.findByText("Não foi possível ler esta fotografia")).toBeTruthy();
+    expect(screen.getByText("Suporte parcial")).toBeTruthy();
+    expect(screen.getByText("NEF (RAW)")).toBeTruthy();
+    expect(screen.getByText("14 bits")).toBeTruthy();
+    expect(screen.getByText("8256×5504")).toBeTruthy();
   });
 });
 

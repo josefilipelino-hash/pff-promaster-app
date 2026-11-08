@@ -5,6 +5,32 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [0.2.0] — 2026-11-08 — Fase 2: formatos e RAW
+
+### Adicionado
+- RAW via **LibRaw 0.22.3** (submódulo, CDDL-1.0) compilada do código-fonte com camada C
+  própria que isola exceções C++; preview embutida primeiro, revelação a meia resolução ou
+  completa só quando necessário; metadados, bits, cor do sensor e descodificador.
+- Validado com ficheiros reais: Canon CR2/CR3/CRW, Nikon NEF, Sony ARW, Fujifilm RAF
+  (Bayer e X-Trans), Panasonic RW2, Leica RWL/DNG, Olympus/OM ORF, Pentax PEF/DNG,
+  Samsung SRW, Sigma X3F (incl. Quattro), Kodak DCR, DNG de DJI e de smartphone.
+- Novos formatos: WebP, JPEG XL, JPEG 2000, PSD/PSB (imagem composta, leitor próprio),
+  BigTIFF, BMP, GIF, OpenEXR, HDR, ICO, PNM/PAM, TGA.
+- HEIC/HEIF/AVIF: adaptadores ImageIO (macOS) e WIC (Windows) — compilados, a validar.
+- Estados por ficheiro: importado, **suporte parcial** (com explicação), **corrompido**,
+  **codec em falta**, não suportado — no relatório, na grelha (selo “Parcial”) e no painel.
+- Painel de informação: profundidade de bits, perfil/espaço de cor (descrição ICC),
+  descodificador, preview embutida.
+- Cache para milhares de RAW: preview de ecrã gerada na mesma leitura que a miniatura;
+  limites LRU (previews 10 GB, resolução total 5 GB).
+- Testes de capacidade com ficheiros reais (`MOMENTO_SAMPLES_DIR`).
+- Catálogo v3 (migração automática a partir da v2).
+- `scripts/pin-mature-crates.py`: política de 7 dias também para crates Rust.
+
+### Corrigido
+- Previews RAW já rodadas pela câmara eram rodadas duas vezes (Nikon D70, Kodak DCS).
+- Compilação da LibRaw no Windows (constantes `M_PI`) — encontrado por compilação cruzada.
+
 ## [0.1.0] — 2026-11-08 — Fase 1: aplicação utilizável
 
 ### Adicionado

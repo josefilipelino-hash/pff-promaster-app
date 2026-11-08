@@ -15,6 +15,7 @@ momento-image-codecs.workspace = true
 momento-image-processing.workspace = true
 momento-import-engine.workspace = true
 momento-task-queue.workspace = true
+momento-raw-engine.workspace = true
 serde.workspace = true
 tracing.workspace = true
 

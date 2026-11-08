@@ -5,6 +5,16 @@ import { useStore } from "../store";
 import type { Color, PhotoRow } from "../types";
 import { ColorButtons, FlagButtons, Stars } from "./Rating";
 
+/** Nome do formato: para RAW sobre TIFF usa-se a extensão (NEF, ARW, DNG…). */
+export function formatLabel(format: string, fileName: string): string {
+  if (format === "raw-tiff") {
+    const ext = fileName.slice(fileName.lastIndexOf(".") + 1).toUpperCase();
+    return `${ext} (RAW)`;
+  }
+  const raw = ["cr2", "cr3", "crw", "raf", "orf", "rw2", "mrw", "x3f"];
+  return raw.includes(format) ? `${format.toUpperCase()} (RAW)` : format.toUpperCase();
+}
+
 export function InfoPanel({
   photo,
   selectedCount,
@@ -41,7 +51,11 @@ export function InfoPanel({
         [t("info.focal"), formatFocal(d.focalLength, d.focalLength35mm)],
         [t("info.dimensions"), `${photo.width} × ${photo.height} px (${((photo.width * photo.height) / 1e6).toFixed(1).replace(".", ",")} MP)`],
         [t("info.size"), formatBytes(d.fileSize, i18n.language)],
-        [t("info.format"), d.format.toUpperCase()],
+        [t("info.format"), formatLabel(d.format, d.fileName)],
+        [t("info.bitDepth"), d.bitDepth ? t("info.bits", { count: d.bitDepth }) : null],
+        [t("info.colorSpace"), d.colorSpace],
+        [t("info.embeddedPreview"), d.embeddedPreview],
+        [t("info.codec"), d.codec ? [d.codec, d.codecDetail].filter(Boolean).join(" · ") : null],
         [t("info.orientation"), d.orientation === 1 ? t("info.orientationNormal") : t("info.orientationValue", { value: d.orientation })],
       ]
     : [];
@@ -57,10 +71,18 @@ export function InfoPanel({
         <FlagButtons value={photo.flag} onChange={(v) => onRate("flag", v)} />
         <ColorButtons value={photo.color} onChange={(c) => onRate("color", c)} />
       </div>
-      {photo.thumb === "failed" && d?.thumbError && (
-        <p className="form-error">
-          {t("info.thumbError")}: {d.thumbError}
-        </p>
+      {photo.thumb === "failed" && (
+        <div className="notice error" role="alert">
+          <strong>{t("info.unreadableTitle")}</strong>
+          <span>{t("info.unreadableText")}</span>
+          {d?.thumbError && <small>{d.thumbError}</small>}
+        </div>
+      )}
+      {d?.partialNote && (
+        <div className="notice warn">
+          <strong>{t("info.partialTitle")}</strong>
+          <span>{d.partialNote}</span>
+        </div>
       )}
       <dl className="info-list">
         {rows

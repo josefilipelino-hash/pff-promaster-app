@@ -41,7 +41,14 @@ corepack enable
 ## Obter e executar (macOS e Windows)
 
 ```bash
-git clone <URL-do-repositório> momento-studio
+git clone --recurse-submodules <URL-do-repositório> momento-studio
+```
+
+A LibRaw (descodificação RAW) é um submódulo Git. Se o repositório já tiver sido clonado
+sem `--recurse-submodules`:
+
+```bash
+git submodule update --init --recursive
 ```
 
 ```bash
@@ -56,7 +63,9 @@ pnpm install
 pnpm dev
 ```
 
-A primeira execução compila todas as dependências Rust (alguns minutos). Abre a janela
+A primeira execução compila todas as dependências Rust e a LibRaw em C++ (alguns minutos;
+o compilador C++ vem com as Xcode Command Line Tools no macOS e com as Build Tools no
+Windows). Abre a janela
 “Momento Studio” no ecrã inicial.
 
 ## Criar a aplicação instalável
@@ -119,4 +128,6 @@ Apagar a pasta `cache/` de um projeto é seguro: as miniaturas são regeneradas.
 | Janela branca em `pnpm dev` | Vite ainda não arrancou | Aguardar; ver o terminal |
 | `xcrun: error` (macOS) | Faltam as Command Line Tools | `xcode-select --install` |
 | `link.exe not found` (Windows) | Faltam as Build Tools de C++ | Instalar o ponto 1 da preparação Windows |
+| `Código-fonte da LibRaw em falta` | Submódulo não descarregado | `git submodule update --init --recursive` |
+| HEIC/AVIF aparecem como “codec em falta” no Windows | Extensões da Microsoft Store em falta | Instalar “HEIF Image Extensions”, “HEVC Video Extensions” (HEIC) e “AV1 Video Extension” (AVIF) |
 | “Pasta não encontrada” num projeto recente | Disco externo desligado ou projeto movido | Ligar o disco, ou “Abrir projeto…” e escolher a pasta `.momento` |

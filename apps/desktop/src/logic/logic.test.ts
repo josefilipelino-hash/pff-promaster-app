@@ -16,6 +16,8 @@ const photo = (id: number, over: Partial<PhotoRow> = {}): PhotoRow => ({
   flag: 0,
   color: null,
   thumb: "ready",
+  partial: false,
+  format: "jpeg",
   ...over,
 });
 

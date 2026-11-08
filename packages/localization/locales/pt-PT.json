@@ -99,10 +99,10 @@
     "copyHint": "Copia para {{path}}, organizado por câmara, com verificação da cópia. Os originais na origem ficam intactos.",
     "copyUnavailable": "Indisponível: o projeto não tem pasta dos originais definida.",
     "recursive": "Incluir subpastas",
-    "formatsNote": "Nesta versão são importados JPEG, PNG e TIFF. Outros ficheiros são listados no relatório como não suportados. Ficheiros duplicados (mesmo conteúdo) são detetados e ignorados.",
+    "formatsNote": "São importados JPEG, PNG, TIFF/BigTIFF, WebP, JPEG XL, JPEG 2000, PSD/PSB (imagem composta), BMP, GIF, OpenEXR, HDR e RAW de câmara (LibRaw), além de HEIC/HEIF/AVIF no macOS e no Windows. Ficheiros não suportados, corrompidos ou sem codec são listados no relatório. Duplicados (mesmo conteúdo) são ignorados.",
     "dropHere": "Largue aqui para importar",
     "busy": "Já existe uma importação em curso.",
-    "imagesFilter": "Imagens (JPEG, PNG, TIFF)"
+    "imagesFilter": "Imagens e RAW"
   },
   "report": {
     "title": "Importação concluída",
@@ -115,7 +115,12 @@
     "pending": "Por processar",
     "details": "Ficheiros não importados",
     "toast_one": "Importada {{count}} fotografia.",
-    "toast_other": "Importadas {{count}} fotografias."
+    "toast_other": "Importadas {{count}} fotografias.",
+    "missingCodec": "Codec em falta",
+    "corrupt": "Corrompidas",
+    "corruptHint": "o formato foi reconhecido mas os dados estão danificados ou incompletos.",
+    "missingCodecHint": "o formato foi reconhecido mas não há descodificador nesta plataforma (ex.: HEIC/AVIF fora do macOS e do Windows, ou sem as extensões da Microsoft Store).",
+    "unsupportedHint": "formato desconhecido, ou ficheiro que não é uma fotografia."
   },
   "itemState": {
     "pending": "Por processar",
@@ -123,7 +128,9 @@
     "duplicate": "Duplicada",
     "alreadyImported": "Já no projeto",
     "unsupported": "Não suportada",
-    "error": "Erro"
+    "error": "Erro",
+    "missingCodec": "Codec em falta",
+    "corrupt": "Corrompido"
   },
   "project": {
     "close": "Fechar projeto",
@@ -132,7 +139,8 @@
     "noMatches": "Nenhuma fotografia corresponde ao filtro atual."
   },
   "grid": {
-    "thumbFailed": "Não foi possível gerar a miniatura. Veja o painel de informação."
+    "thumbFailed": "Não foi possível gerar a miniatura. Veja o painel de informação.",
+    "partial": "Parcial"
   },
   "viewer": {
     "back": "Grelha",
@@ -165,9 +173,17 @@
     "orientationValue": "EXIF {{value}} (aplicada automaticamente)",
     "path": "Ficheiro",
     "copiedFrom": "Copiado de",
-    "thumbError": "Erro na miniatura",
     "applyToSelection_one": "A classificação aplica-se a {{count}} fotografia selecionada",
-    "applyToSelection_other": "A classificação aplica-se às {{count}} fotografias selecionadas"
+    "applyToSelection_other": "A classificação aplica-se às {{count}} fotografias selecionadas",
+    "bitDepth": "Profundidade",
+    "bits_one": "{{count}} bit",
+    "bits_other": "{{count}} bits",
+    "colorSpace": "Cor",
+    "embeddedPreview": "Preview embutida",
+    "codec": "Descodificador",
+    "unreadableTitle": "Não foi possível ler esta fotografia",
+    "unreadableText": "O ficheiro parece estar corrompido ou incompleto. O original não foi alterado.",
+    "partialTitle": "Suporte parcial"
   },
   "rating": {
     "stars_one": "{{count}} estrela",

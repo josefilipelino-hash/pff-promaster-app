@@ -1,0 +1,19 @@
+[package]
+name = "momento-libraw-sys"
+description = "LibRaw 0.22.3 (submódulo, licença CDDL-1.0) compilada do código-fonte + camada C segura."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+authors.workspace = true
+links = "momento_libraw"
+build = "build.rs"
+# O código-fonte da LibRaw é grande: excluir do pacote o que não é usado na compilação.
+exclude = ["LibRaw/doc", "LibRaw/samples", "LibRaw/RawSpeed*", "LibRaw/GoPro"]
+
+[dependencies]
+libz-sys = { version = "1.1.30", default-features = false, features = ["static"] }
+
+[build-dependencies]
+cc = { version = "1.2", features = ["parallel"] }

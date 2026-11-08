@@ -140,6 +140,15 @@ input:focus, select:focus { outline: none; border-color: var(--accent); }
 @keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 .thumb-failed { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--red); color: var(--red); display: grid; place-items: center; font-weight: 700; }
 .cell-color { position: absolute; right: 6px; bottom: 6px; width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.5); }
+.cell-partial { position: absolute; left: 6px; bottom: 6px; font-size: 10px; background: rgba(226, 185, 59, 0.9); color: #1a1a1a; border-radius: 4px; padding: 1px 5px; font-weight: 600; }
+.cell-ext { color: #6f6f6f; font-size: 10px; letter-spacing: 0.04em; margin-left: auto; margin-right: 6px; }
+.notice { display: flex; flex-direction: column; gap: 4px; border-radius: 8px; padding: 8px 10px; font-size: 12px; border: 1px solid; }
+.notice.warn { border-color: var(--yellow); background: rgba(226, 185, 59, 0.08); }
+.notice.error { border-color: var(--red); background: rgba(229, 72, 77, 0.08); }
+.notice small { color: var(--text-muted); word-break: break-word; }
+.legend { margin: 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); }
+.issue-state.s-corrupt { color: var(--red); }
+.issue-state.s-missingCodec { color: var(--yellow); }
 .cell-footer { height: 22px; display: flex; justify-content: space-between; align-items: center; padding: 0 4px; font-size: 11px; }
 .cell-stars { color: var(--pick); letter-spacing: 1px; }
 .cell-flag.pick { color: var(--pick); }

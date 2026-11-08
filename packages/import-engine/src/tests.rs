@@ -243,3 +243,66 @@ fn project_folder_is_never_imported() {
         collect_files(std::slice::from_ref(&e.root), true, Some(&e.root.join("proj.momento")));
     assert_eq!(files, vec![e.root.join("foto.jpg")]);
 }
+
+/// Fase 2: estados de importação com ficheiros de vários formatos.
+#[test]
+fn states_for_new_formats_missing_codec_and_corrupt() {
+    let e = env();
+    let src = e.root.join("mistura");
+    let img = test_image(200, 150, 3, 1);
+    let enc = |f: image::ImageFormat| {
+        let mut out = std::io::Cursor::new(Vec::new());
+        image::DynamicImage::ImageRgb8(img.clone()).write_to(&mut out, f).unwrap();
+        out.into_inner()
+    };
+    write(&src.join("a.webp"), &enc(image::ImageFormat::WebP)).unwrap();
+    write(&src.join("b.bmp"), &enc(image::ImageFormat::Bmp)).unwrap();
+    write(&src.join("c.gif"), &enc(image::ImageFormat::Gif)).unwrap();
+    write(&src.join("d.tga"), &enc(image::ImageFormat::Tga)).unwrap();
+    // HEIC: cabeçalho ISOBMFF válido, mas sem descodificador nesta plataforma (Linux).
+    let mut heic = vec![0, 0, 0, 24];
+    heic.extend_from_slice(b"ftypheic\0\0\0\0mif1heic");
+    heic.resize(4096, 0);
+    write(&src.join("e.heic"), &heic).unwrap();
+    // RW2 truncado: assinatura Panasonic e mais nada.
+    let mut rw2 = b"IIU\0\x08\0\0\0".to_vec();
+    rw2.resize(2048, 0);
+    write(&src.join("f.rw2"), &rw2).unwrap();
+    // PSD com cabeçalho válido e dados truncados.
+    let mut psd = b"8BPS\0\x01\0\0\0\0\0\0\0\x03\0\0\0\x10\0\0\0\x10\0\x08\0\x03".to_vec();
+    psd.extend_from_slice(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    write(&src.join("g.psd"), &psd).unwrap();
+    write(
+        &src.join("h.svg"),
+        b"<?xml version=\"1.0\"?><svg xmlns=\"http://www.w3.org/2000/svg\"/>",
+    )
+    .unwrap();
+
+    let mut reg = momento_image_codecs::default_registry();
+    reg.register(std::sync::Arc::new(momento_raw_engine::RawCodec::new(
+        momento_image_codecs::default_registry(),
+    )));
+    let o = opts(ImportMode::Reference, true, &e);
+    let mut cat = Catalog::open(&e.catalog).unwrap();
+    let (session, _) = create_session(&mut cat, std::slice::from_ref(&src), &o).unwrap();
+    drop(cat);
+    let c = run_session(&e.catalog, session, &o, &reg, &ImportControl::default(), &|_| {}).unwrap();
+    assert_eq!(c.imported, 4, "{c:?}");
+    assert_eq!(c.missing_codec, 1, "{c:?}");
+    assert_eq!(c.corrupt, 2, "RW2 e PSD truncados: {c:?}");
+    assert_eq!(c.unsupported, 1, "SVG não é fotografia: {c:?}");
+
+    let cat = Catalog::open(&e.catalog).unwrap();
+    let issues = cat.import_session_issues(session, 10).unwrap();
+    let msg = |name: &str| {
+        issues.iter().find(|i| i.source_path.ends_with(name)).unwrap().message.clone().unwrap()
+    };
+    assert!(msg("e.heic").contains("sem descodificador"));
+    assert!(msg("f.rw2").contains("incompleto ou danificado"));
+    assert!(msg("h.svg").contains("não é uma fotografia"));
+    let gif = cat.list_photos().unwrap().into_iter().find(|p| p.file_name == "c.gif").unwrap();
+    assert!(gif.partial, "GIF: só o primeiro fotograma");
+    let d = cat.photo_details(gif.id).unwrap().unwrap();
+    assert_eq!(d.codec.as_deref(), Some("raster"));
+    assert_eq!(d.bit_depth, Some(8));
+}

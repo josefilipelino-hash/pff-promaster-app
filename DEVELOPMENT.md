@@ -14,6 +14,9 @@
 | `./scripts/check.sh` | Todas as verificações (o mesmo que o CI) |
 | `cargo run -p momento-test-fixtures --release --bin generate-fixtures -- <pasta> 500 3000` | Gera 500 fotografias sintéticas (3000 px, EXIF, orientações, duplicados, inválidos) |
 | `cargo test -p momento-project-management --release -- --nocapture` | Fluxo completo com 600 fotografias e tempos medidos |
+| `MOMENTO_SAMPLES_DIR=/pasta cargo test -p momento-raw-engine --release --test real_samples -- --nocapture` | Relatório de capacidade RAW com ficheiros reais (miniaturas em `MOMENTO_REPORT_DIR`) |
+| `MOMENTO_SAMPLES_DIR=/a:/b cargo test -p momento-project-management --release --test real_formats -- --nocapture` | Importação real de todos os formatos pelo caminho da aplicação |
+| `python3 scripts/pin-mature-crates.py` | Fixa crates com menos de 7 dias numa versão mais antiga |
 | `cargo check --workspace --target x86_64-pc-windows-gnu` | Confirma que tudo compila para Windows (requer `gcc-mingw-w64` no Linux) |
 
 ## Convenções
@@ -57,10 +60,10 @@
 
 ## Adicionar um codec
 
-1. Implementar `ImageCodec` num crate adequado (ou novo crate), atrás de uma feature.
-2. Se o formato for novo, acrescentar a assinatura em `image-codecs/src/detect.rs` com teste.
-3. Registar no `CodecRegistry` na inicialização da aplicação.
-4. Atualizar `SUPPORTED_FORMATS.md` — só marcar “testado” com ficheiro real verificado.
+1. Implementar `ImageCodec` (`probe`, `decode`, e opcionalmente `metadata` com
+   `SupportLevel`) num crate adequado. Pânicos e erros ficam isolados pelo registo.
+2. Registá-lo em `packages/project-management/src/codecs.rs`.
+3. Validar com ficheiros reais via `real_formats` e só então atualizar SUPPORTED_FORMATS.md.
 
 ## Multiplataforma (macOS e Windows)
 
