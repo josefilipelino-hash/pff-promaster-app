@@ -12,6 +12,9 @@
 | `pnpm typecheck` | Verificação de tipos TypeScript |
 | `cargo test --workspace` | Testes Rust |
 | `./scripts/check.sh` | Todas as verificações (o mesmo que o CI) |
+| `cargo run -p momento-test-fixtures --release --bin generate-fixtures -- <pasta> 500 3000` | Gera 500 fotografias sintéticas (3000 px, EXIF, orientações, duplicados, inválidos) |
+| `cargo test -p momento-project-management --release -- --nocapture` | Fluxo completo com 600 fotografias e tempos medidos |
+| `cargo check --workspace --target x86_64-pc-windows-gnu` | Confirma que tudo compila para Windows (requer `gcc-mingw-w64` no Linux) |
 
 ## Convenções
 
@@ -58,6 +61,35 @@
 2. Se o formato for novo, acrescentar a assinatura em `image-codecs/src/detect.rs` com teste.
 3. Registar no `CodecRegistry` na inicialização da aplicação.
 4. Atualizar `SUPPORTED_FORMATS.md` — só marcar “testado” com ficheiro real verificado.
+
+## Multiplataforma (macOS e Windows)
+
+- Caminhos sempre `PathBuf`/`Path`; nunca concatenar com `/` em Rust.
+- URLs de imagens só através de `imageUrl()` (`momento://` vs `http://momento.localhost`).
+- Atalhos: usar `keyToAction(e, isMac())` — Cmd no macOS, Ctrl no Windows.
+- Datas: formatar com opções explícitas (`logic/format.ts`), não com `dateStyle`, porque o
+  resultado varia entre motores.
+- Preferir bibliotecas Rust puras; uma dependência C/C++ nova exige verificar a compilação
+  em Windows (CI) antes de ser aceite.
+- Não usar `<input type="date">` (comportamento diferente em cada WebView).
+
+## Atalhos de teclado (Fase 1)
+
+| Tecla | Ação |
+|---|---|
+| 0–5 | Estrelas |
+| P / X / U | Favorita / rejeitada / remover marca |
+| 6 / 7 / 8 / 9 | Etiqueta vermelha / amarela / verde / azul (repetir remove) |
+| ← → ↑ ↓ (Shift) | Mover (alargar seleção) |
+| Cmd/Ctrl+A | Selecionar tudo o que está visível |
+| Enter ou E | Abrir no visualizador |
+| Esc ou G | Voltar à grelha / sair do ecrã completo |
+| Z ou Espaço | Ajustar ↔ 100 % |
+| + / − | Zoom (no visualizador) ou tamanho das miniaturas (na grelha) |
+| F | Ecrã completo |
+| I | Painel de informação |
+| Cmd/Ctrl+Shift+I | Importar ficheiros |
+| ? | Ajuda |
 
 ## Depuração
 

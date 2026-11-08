@@ -4,9 +4,15 @@ Aplicação desktop local para gestão, seleção, edição, exportação e entr
 de casamentos e outros eventos. Pensada para trabalhos de 3 000 a 15 000 fotografias, com
 automatização em cada passo e o controlo final sempre do fotógrafo.
 
-> **Estado atual: Fase 0 — fundação técnica.** A aplicação abre e mostra diagnóstico do
-> núcleo, mas **ainda não cria projetos nem importa fotografias** (Fase 1).
+> **Estado atual: Fase 1 concluída (v0.1.0) — aplicação utilizável.** Criar e abrir
+> projetos, importar JPEG/PNG/TIFF (ficheiros, pastas, subpastas, arrastar e largar),
+> miniaturas em segundo plano, grelha, visualizador, classificação e atalhos. Tudo fica
+> guardado em SQLite. Ainda **não** lê RAW nem edita (Fases 2 e 4).
 > Ver [`PROJECT_STATUS.md`](PROJECT_STATUS.md).
+
+![Grelha](docs/screenshots/fase1-grelha.png)
+
+Plataformas-alvo: **macOS** (Apple Silicon e Intel) e **Windows 10/11**.
 
 ## Princípios
 
@@ -26,6 +32,9 @@ Core ML. Justificação completa em [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ```bash
 pnpm install
+```
+
+```bash
 pnpm dev
 ```
 

@@ -11,7 +11,7 @@ todos os critérios estão verificados e registados em `PROJECT_STATUS.md`.
 - Base de: catálogo SQLite com migrações, deteção de formatos por assinatura, contrato de
   codecs, modelo da fila de tarefas, envelope da receita de edição, i18n.
 
-## Fase 1 — Aplicação utilizável
+## Fase 1 — Aplicação utilizável ✅ *(concluída 2026-11-08, ver PROJECT_STATUS.md)*
 
 Criar projeto · importar JPEG/PNG/TIFF (ficheiros, pastas recursivas, arrastar e largar) ·
 deteção de duplicados exatos (BLAKE3) · thumbnails em segundo plano · grelha virtualizada ·
@@ -33,7 +33,7 @@ visualização individual com zoom · estrelas, escolhida/rejeitada, etiquetas d
 7. Fechar e reabrir preserva tudo; terminar o processo durante a importação e reabrir
    retoma-a.
 8. Originais intactos: hash antes = hash depois (teste automático).
-9. `./scripts/check.sh` passa; CI verde em macOS e Linux.
+9. `./scripts/check.sh` passa; CI configurado para macOS, Windows e Linux.
 10. `PROJECT_STATUS.md` e `INSTALLATION.md` atualizados.
 
 ## Fase 2 — Formatos e RAW
@@ -79,8 +79,11 @@ PDF/JPEG/TIFF.
 
 ## Fase 9 — Otimização e distribuição
 
-GPU (wgpu), Apple Silicon, Windows 10/11, projetos grandes, recuperação, testes de carga,
-instaladores.
+GPU (wgpu), otimização Apple Silicon, projetos grandes, recuperação, testes de carga,
+assinatura de instaladores.
+
+> **Windows** deixou de ser tarefa da Fase 9: por decisão do utilizador (D-011), Windows e
+> macOS são plataformas-alvo desde a Fase 1 — CI, compilação cruzada e instalador NSIS.
 
 ## Mais tarde
 

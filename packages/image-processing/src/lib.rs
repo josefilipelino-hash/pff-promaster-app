@@ -1,8 +1,11 @@
 //! # momento-image-processing
 //!
-//! Pipeline de revelação não destrutiva (CPU f32, depois GPU via wgpu).
+//! Fase 1: geração de miniaturas e previews a partir dos originais — redução de escala,
+//! orientação EXIF e codificação JPEG com o perfil ICC original preservado (o WebView
+//! faz a gestão de cor das imagens com perfil embutido).
 //!
-//! **Estado:** reservado — sem implementação. Entra em desenvolvimento na Fase 4
-//! (ver `ROADMAP.md`). A responsabilidade deste módulo está descrita em
-//! `ARCHITECTURE.md`. Não expõe API pública até essa fase, para que nenhuma parte da
-//! aplicação dependa de funcionalidade inexistente.
+//! O pipeline de revelação não destrutivo em `f32` (ARCHITECTURE.md §5) chega na Fase 4.
+
+pub mod thumbnail;
+
+pub use thumbnail::{apply_orientation, encode_jpeg, render_preview, write_atomic, PreviewSpec};

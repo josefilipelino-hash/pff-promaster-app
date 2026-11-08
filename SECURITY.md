@@ -12,14 +12,25 @@
 | Fuga de credenciais | Keychain do sistema; `.env` ignorado; nenhuma credencial no código ou no Git |
 | Perda de dados por falha | SQLite WAL, transações, escrita atómica, backups do catálogo |
 
-## Configuração atual (Fase 0)
+## Configuração atual (Fase 1)
 
-- CSP: `default-src 'self'; img-src 'self' asset: data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost`
+- CSP: `default-src 'self'; img-src 'self' momento: http://momento.localhost asset: data: blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost`
   (`'unsafe-inline'` em estilos é necessário para estilos dinâmicos do React; scripts
-  inline continuam proibidos). O protocolo `momento:` será acrescentado em `img-src` na
-  Fase 1.
-- Capabilities: `apps/desktop/src-tauri/capabilities/default.json` — apenas `core:default`.
-- Comandos expostos: `app_info` (só leitura, sem argumentos).
+  inline continuam proibidos).
+- Capabilities (`apps/desktop/src-tauri/capabilities/default.json`): `core:default`,
+  `core:window:allow-set-fullscreen`, `core:window:allow-is-fullscreen` (ecrã completo) e
+  `dialog:allow-open` (seletores de ficheiros/pastas nativos). Não há acesso genérico ao
+  sistema de ficheiros a partir da interface.
+- **Protocolo de imagens `momento://`**: serve apenas ficheiros identificados por
+  `token do projeto + nível + ID numérico`; nunca aceita caminhos (teste
+  `parses_only_valid_paths` rejeita `../`). O token muda a cada abertura de projeto.
+- Comandos expostos: ver `apps/desktop/src-tauri/src/commands.rs`. Caminhos recebidos
+  (importação, abrir projeto) são validados no núcleo; os originais são sempre abertos só
+  para leitura.
+- Limite de 200 megapíxeis por imagem antes de alocar memória; pânicos em descodificadores
+  são isolados e o ficheiro é marcado como falhado.
+- O JPEG truncado e os ficheiros falsos (texto com extensão `.jpg`) dos testes não afetam a
+  aplicação.
 
 ## Comunicar problemas
 

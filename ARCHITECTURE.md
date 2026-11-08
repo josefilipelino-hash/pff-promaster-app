@@ -6,7 +6,7 @@
 > Estado das secções: **[implementado]** existe código testado; **[definido]** decisão
 > tomada, sem código; **[a validar]** decisão dependente de prova de conceito.
 
-Versão do documento: Fase 0 · 2026-11-08
+Versão do documento: Fase 1 · 2026-11-08
 
 ---
 
@@ -142,11 +142,13 @@ Workspace Cargo com um crate por responsabilidade. Regras:
 |---|---|---|
 | core-types | IDs tipados, erros, `EditRecipe` | 0 **[implementado]** |
 | database | Abertura, pragmas, migrações, repositórios | 0 **[implementado: base]** |
-| task-queue | Prioridades, estados, executor persistente | 0 modelo **[implementado]**, executor na Fase 1 |
-| image-codecs | Deteção por assinatura, contrato de adaptadores, registo | 0 **[implementado: base]** |
-| project-management | Projetos, estados, pastas, arquivo | 1 |
-| import-engine | Importação, cópia verificada, retoma | 1 |
-| metadata | EXIF/IPTC/XMP | 1–2 |
+| task-queue | `WorkQueue` com prioridade + modelo de estados | 1 **[implementado]** |
+| image-codecs | Deteção por assinatura, adaptadores, registo; JPEG/PNG/TIFF | 1 **[implementado]** |
+| project-management | Projetos, pastas, cópias de segurança, miniaturas em segundo plano, previews, sessão | 1 **[implementado]** |
+| import-engine | Importação, duplicados, cópia verificada, retoma | 1 **[implementado]** |
+| metadata | EXIF (Fase 1 **[implementado]**); IPTC/XMP (Fase 2) | 1–2 |
+| image-processing | Miniaturas/previews, orientação, escrita atómica (Fase 1 **[implementado]**); revelação (Fase 4) | 1–4 |
+| test-fixtures | Gerador de imagens sintéticas com EXIF para testes | 1 **[implementado]** |
 | raw-engine | LibRaw | 2 |
 | color-management | LittleCMS | 2 e 6 |
 | image-processing | Pipeline de revelação | 4 |
@@ -349,7 +351,18 @@ Estrutura em `<projeto>.momento/cache/` (pode ser apagada; é sempre regeneráve
 
 ---
 
-## 9. Filas de processamento **[modelo implementado; executor na Fase 1]**
+## 9. Filas de processamento **[implementado na Fase 1, ver D-012]**
+
+Implementação atual:
+- **Importação:** pool rayon (metade dos núcleos) processa ficheiros; um único escritor grava
+  em lotes de até 32 itens ou a cada 250 ms. Cancelar termina a sessão; fechar a aplicação
+  **suspende-a** e ela é retomada na próxima abertura.
+- **Miniaturas:** `WorkQueue` partilhada por N−1 threads; a grelha envia os IDs visíveis
+  (`prioritize_thumbnails`) que passam à frente; uma thread grava os resultados em lote e
+  emite eventos para a interface a cada ~150 ms. Pânicos num descodificador são apanhados
+  (`catch_unwind`) e a miniatura fica marcada como falhada.
+
+Desenho original (mantido como objetivo para trabalhos futuros sem estado de domínio):
 
 - Tabela `job` no catálogo (persistente): tipo, payload JSON, prioridade, estado,
   progresso, tentativas, último erro, timestamps.
@@ -620,4 +633,9 @@ ficheiros a partir do frontend (caminhos sempre resolvidos e verificados no núc
 | D-007 | 2026-11-08 | ONNX Runtime + backends Apple opcionais | Só Core ML, só ORT | Mantém o Windows; aproveita o Neural Engine |
 | D-008 | 2026-11-08 | Previews via protocolo URI próprio | base64/JSON, servidor HTTP local | Desempenho; sem porta de rede aberta |
 | D-009 | 2026-11-08 | pnpm com `minimumReleaseAge` de 7 dias | Sem restrição | Proteção contra pacotes comprometidos recém-publicados |
-| D-010 | 2026-11-08 | Nome provisório “Momento Studio”, identificador `pt.momentostudio.desktop` | — | Mudar o identificador depois altera a pasta de dados da aplicação; decidir antes da Fase 1 terminar |
+| D-010 | 2026-11-08 | Nome provisório “Momento Studio”, identificador `pt.momentostudio.desktop` | — | Mudar o identificador depois altera a pasta de dados da aplicação; continua por confirmar pelo utilizador |
+| D-011 | 2026-11-08 | **Windows e macOS são plataformas-alvo desde já** (pedido do utilizador), não na Fase 9 | Windows só na Fase 9 | CI em Windows a partir da Fase 1; preferência por bibliotecas Rust puras; caminhos sempre `PathBuf`; URL de imagens por plataforma; atalhos Cmd/Ctrl |
+| D-012 | 2026-11-08 | Persistência dos trabalhos em segundo plano no próprio domínio (`import_item.state`, `asset.thumb_state`) em vez de uma tabela genérica `job` | Tabela `job` genérica | Retoma após falha sem infraestrutura extra; a tabela `job` só será criada se surgir trabalho sem estado de domínio próprio |
+| D-013 | 2026-11-08 | Miniaturas JPEG 640 px (q82); previews 2560 px a pedido; resolução total: original para JPEG/PNG, JPEG em cache para TIFF | Gerar sempre previews | Importação rápida; disco usado só quando necessário |
+| D-014 | 2026-11-08 | JPEG descodificado com `jpeg-decoder` (redução DCT 1/2–1/8) para miniaturas | Descodificar sempre a resolução total | Miniaturas várias vezes mais rápidas, sem dependências C (libjpeg-turbo fica como opção) |
+| D-015 | 2026-11-08 | A classificação aplica-se à variante principal; a interface expõe o `AssetId` | Classificação no asset | Preparado para cópias virtuais (Fase 4) sem migração de dados |

@@ -1,6 +1,6 @@
 [package]
 name = "momento-database"
-description = "Catálogo SQLite por projeto: abertura segura, pragmas e migrações versionadas."
+description = "Catálogo SQLite por projeto e biblioteca global: pragmas, migrações e repositórios."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -11,6 +11,8 @@ authors.workspace = true
 [dependencies]
 momento-core-types.workspace = true
 rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

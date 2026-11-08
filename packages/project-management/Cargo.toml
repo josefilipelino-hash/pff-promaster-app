@@ -1,6 +1,6 @@
 [package]
 name = "momento-project-management"
-description = "Ciclo de vida dos projetos: criação, estados, pastas, arquivo."
+description = "Projetos: criação, abertura, pastas, cópias de segurança, miniaturas em segundo plano e importação."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,3 +9,17 @@ publish.workspace = true
 authors.workspace = true
 
 [dependencies]
+momento-core-types.workspace = true
+momento-database.workspace = true
+momento-image-codecs.workspace = true
+momento-image-processing.workspace = true
+momento-import-engine.workspace = true
+momento-task-queue.workspace = true
+serde.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+momento-test-fixtures.workspace = true
+tempfile.workspace = true
+image.workspace = true
+rayon.workspace = true

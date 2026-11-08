@@ -1,8 +1,16 @@
 //! # momento-task-queue
 //!
-//! Na Fase 0 este crate define apenas o **modelo** da fila (prioridades e máquina de
-//! estados), que será persistido na tabela `job` do catálogo. O executor (tokio para
-//! I/O + rayon para CPU) é implementado na Fase 1. Ver ARCHITECTURE.md §9.
+//! - [`WorkQueue`]: fila em memória partilhada por várias threads de trabalho, com
+//!   prioridade para itens urgentes (ex.: miniaturas visíveis no ecrã), sem duplicados
+//!   e com encerramento limpo.
+//! - Modelo de estados de tarefas ([`JobState`], [`Priority`]) para a futura tabela `job`.
+//!
+//! Persistência na Fase 1: cada trabalho guarda o seu estado no próprio domínio
+//! (`import_item.state`, `asset.thumb_state`), o que permite retomar após falha sem uma
+//! tabela genérica. Ver ARCHITECTURE.md §9.
+
+mod work_queue;
+pub use work_queue::WorkQueue;
 
 use serde::{Deserialize, Serialize};
 

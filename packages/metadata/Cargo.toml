@@ -1,6 +1,6 @@
 [package]
 name = "momento-metadata"
-description = "Leitura de EXIF/IPTC/XMP e escrita de sidecars XMP."
+description = "Leitura de metadados EXIF (e, mais tarde, IPTC/XMP)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,3 +9,8 @@ publish.workspace = true
 authors.workspace = true
 
 [dependencies]
+kamadak-exif.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+momento-test-fixtures.workspace = true

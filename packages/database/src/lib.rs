@@ -1,39 +1,68 @@
 //! # momento-database
 //!
-//! Catálogo SQLite (um ficheiro por projeto). Responsabilidades na Fase 0:
+//! Catálogo SQLite (um ficheiro por projeto) e biblioteca global (projetos recentes).
 //!
-//! - abrir/criar o catálogo com os pragmas corretos (WAL, chaves estrangeiras);
-//! - aplicar migrações sequenciais controladas por `PRAGMA user_version`;
-//! - recusar abrir um catálogo criado por uma versão mais recente da aplicação.
+//! - abertura com pragmas corretos (WAL, chaves estrangeiras, `busy_timeout`);
+//! - migrações sequenciais controladas por `PRAGMA user_version`;
+//! - recusa de catálogos criados por versões mais recentes;
+//! - repositórios: [`project`], [`assets`], [`import`], [`ui_state`];
+//! - [`library`]: base global de projetos recentes.
 //!
-//! O esquema completo (asset, variant, rating, …) é introduzido por migrações nas fases
-//! seguintes — ver ARCHITECTURE.md §4. Nunca se edita uma migração já publicada: cria-se
-//! uma nova.
+//! Nunca se edita uma migração já publicada: cria-se uma nova no fim da lista.
+
+pub mod assets;
+pub mod import;
+pub mod library;
+pub mod migrations;
+pub mod project;
+pub mod ui_state;
 
 use momento_core_types::{CoreError, CoreResult};
 use rusqlite::Connection;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Migrações por ordem. O índice + 1 é a versão resultante.
-const MIGRATIONS: &[&str] = &[
-    // v1 — Fase 0: metadados do próprio catálogo.
-    r#"
-    CREATE TABLE catalog_info (
-        key   TEXT PRIMARY KEY NOT NULL,
-        value TEXT NOT NULL
-    ) STRICT;
-    "#,
-];
+pub use rusqlite;
 
-/// Versão de esquema que esta compilação conhece.
-pub const SCHEMA_VERSION: u32 = MIGRATIONS.len() as u32;
+/// Versão de esquema do catálogo que esta compilação conhece.
+pub const SCHEMA_VERSION: u32 = migrations::CATALOG.len() as u32;
 
-fn db_err(e: rusqlite::Error) -> CoreError {
+pub(crate) fn db_err(e: rusqlite::Error) -> CoreError {
     CoreError::Database(e.to_string())
 }
 
+/// Segundos desde 1970 (UTC).
+pub fn now_unix() -> i64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or(0)
+}
+
+/// Milissegundos desde 1970 (UTC).
+pub fn now_millis() -> i64 {
+    SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
+}
+
+/// Abre uma ligação com os pragmas comuns e aplica as migrações indicadas.
+pub(crate) fn open_with_migrations(path: &Path, list: &[&str]) -> CoreResult<Connection> {
+    let conn = Connection::open(path).map_err(db_err)?;
+    configure(&conn)?;
+    migrations::apply(&conn, list)?;
+    Ok(conn)
+}
+
+fn configure(conn: &Connection) -> CoreResult<()> {
+    conn.execute_batch(
+        "PRAGMA journal_mode = WAL;
+         PRAGMA synchronous = NORMAL;
+         PRAGMA foreign_keys = ON;
+         PRAGMA busy_timeout = 10000;",
+    )
+    .map_err(db_err)
+}
+
+/// Catálogo de um projeto.
 pub struct Catalog {
     conn: Connection,
+    path: Option<PathBuf>,
 }
 
 impl Catalog {
@@ -42,61 +71,64 @@ impl Catalog {
     /// O ficheiro tem de estar num disco local (interno ou externo USB/Thunderbolt). O
     /// modo WAL do SQLite não é seguro em partilhas de rede (SMB/NFS/AFP).
     pub fn open(path: &Path) -> CoreResult<Self> {
+        let conn = open_with_migrations(path, migrations::CATALOG)?;
+        Ok(Catalog { conn, path: Some(path.to_path_buf()) })
+    }
+
+    /// Milissegundos desde 1970 (UTC).
+    pub fn now_millis() -> i64 {
+        SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as i64).unwrap_or(0)
+    }
+
+    /// Abre uma ligação adicional a um catálogo já migrado (leitores, workers).
+    /// Falha se o catálogo não estiver na versão atual.
+    pub fn open_existing(path: &Path) -> CoreResult<Self> {
         let conn = Connection::open(path).map_err(db_err)?;
-        Self::init(conn)
+        configure(&conn)?;
+        let v = migrations::user_version(&conn)?;
+        if v != SCHEMA_VERSION {
+            return Err(CoreError::Database(format!(
+                "catálogo na versão {v}, esperado {SCHEMA_VERSION}"
+            )));
+        }
+        Ok(Catalog { conn, path: Some(path.to_path_buf()) })
     }
 
     /// Catálogo em memória, para testes.
     pub fn open_in_memory() -> CoreResult<Self> {
-        Self::init(Connection::open_in_memory().map_err(db_err)?)
+        let conn = Connection::open_in_memory().map_err(db_err)?;
+        configure(&conn)?;
+        migrations::apply(&conn, migrations::CATALOG)?;
+        Ok(Catalog { conn, path: None })
     }
 
-    fn init(conn: Connection) -> CoreResult<Self> {
-        conn.execute_batch(
-            "PRAGMA journal_mode = WAL;
-             PRAGMA synchronous = NORMAL;
-             PRAGMA foreign_keys = ON;
-             PRAGMA busy_timeout = 5000;",
-        )
-        .map_err(db_err)?;
-        let mut cat = Catalog { conn };
-        cat.migrate()?;
-        Ok(cat)
+    pub fn path(&self) -> Option<&Path> {
+        self.path.as_deref()
     }
 
     pub fn schema_version(&self) -> CoreResult<u32> {
-        self.conn.query_row("PRAGMA user_version", [], |r| r.get::<_, u32>(0)).map_err(db_err)
+        migrations::user_version(&self.conn)
     }
 
     pub fn journal_mode(&self) -> CoreResult<String> {
         self.conn.query_row("PRAGMA journal_mode", [], |r| r.get(0)).map_err(db_err)
     }
 
-    fn migrate(&mut self) -> CoreResult<()> {
-        let current = self.schema_version()?;
-        if current > SCHEMA_VERSION {
-            return Err(CoreError::CatalogTooNew { found: current, supported: SCHEMA_VERSION });
-        }
-        for (i, sql) in MIGRATIONS.iter().enumerate().skip(current as usize) {
-            let target = i as u32 + 1;
-            let tx = self.conn.transaction().map_err(db_err)?;
-            tx.execute_batch(sql).map_err(db_err)?;
-            // user_version não aceita parâmetros; `target` é um inteiro interno.
-            tx.execute_batch(&format!("PRAGMA user_version = {target};")).map_err(db_err)?;
-            tx.execute(
-                "INSERT INTO catalog_info(key, value) VALUES('core_version_last_migration', ?1)
-                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-                [momento_core_types::CORE_VERSION],
-            )
-            .map_err(db_err)?;
-            tx.commit().map_err(db_err)?;
-        }
-        Ok(())
-    }
-
-    /// Acesso à ligação para os repositórios dos outros módulos (a partir da Fase 1).
     pub fn connection(&self) -> &Connection {
         &self.conn
+    }
+
+    pub fn connection_mut(&mut self) -> &mut Connection {
+        &mut self.conn
+    }
+
+    /// Cópia de segurança consistente do catálogo (API de backup online do SQLite),
+    /// sem bloquear a aplicação.
+    pub fn backup_to(&self, dest: &Path) -> CoreResult<()> {
+        let mut dst = Connection::open(dest).map_err(db_err)?;
+        let backup = rusqlite::backup::Backup::new(&self.conn, &mut dst).map_err(db_err)?;
+        backup.run_to_completion(256, std::time::Duration::from_millis(0), None).map_err(db_err)?;
+        Ok(())
     }
 }
 
@@ -122,7 +154,11 @@ mod tests {
         assert_eq!(cat.schema_version().unwrap(), SCHEMA_VERSION);
         let n: i64 = cat
             .connection()
-            .query_row("SELECT count(*) FROM catalog_info", [], |r| r.get(0))
+            .query_row(
+                "SELECT count(*) FROM catalog_info WHERE key='core_version_last_migration'",
+                [],
+                |r| r.get(0),
+            )
             .unwrap();
         assert_eq!(n, 1);
     }
@@ -140,5 +176,28 @@ mod tests {
             Err(e) => panic!("erro inesperado: {e}"),
             Ok(_) => panic!("devia recusar catálogo mais recente"),
         }
+    }
+
+    #[test]
+    fn migrates_v1_catalog_to_current() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("catalog.db");
+        {
+            let c = Connection::open(&path).unwrap();
+            migrations::apply(&c, &migrations::CATALOG[..1]).unwrap();
+            assert_eq!(migrations::user_version(&c).unwrap(), 1);
+        }
+        let cat = Catalog::open(&path).unwrap();
+        assert_eq!(cat.schema_version().unwrap(), SCHEMA_VERSION);
+    }
+
+    #[test]
+    fn backup_produces_readable_copy() {
+        let dir = tempfile::tempdir().unwrap();
+        let cat = Catalog::open(&dir.path().join("catalog.db")).unwrap();
+        let dest = dir.path().join("backup.db");
+        cat.backup_to(&dest).unwrap();
+        let copy = Catalog::open_existing(&dest).unwrap();
+        assert_eq!(copy.schema_version().unwrap(), SCHEMA_VERSION);
     }
 }

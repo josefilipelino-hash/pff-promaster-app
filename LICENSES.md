@@ -16,9 +16,9 @@ para não fechar opções futuras.
 | Sem licença clara | Proibido |
 
 Verificação automática das licenças transitivas com `cargo-deny` e `pnpm licenses list`:
-prevista para a Fase 1.
+ainda **não** implementada (adiada para a Fase 2; as licenças diretas foram verificadas manualmente no crates.io e no npm).
 
-## Dependências em uso (Fase 0)
+## Dependências em uso (Fase 1)
 
 ### Rust (diretas)
 
@@ -30,8 +30,16 @@ prevista para a Fase 1.
 | SQLite (via libsqlite3-sys 0.38) | 3.x | Domínio público | base de dados |
 | serde, serde_json | 1.0 | MIT OR Apache-2.0 | serialização |
 | thiserror | 2.0 | MIT OR Apache-2.0 | erros |
-| tracing | 0.1 | MIT | registos (declarada, uso na Fase 1) |
+| tracing | 0.1 | MIT | registos |
 | tempfile (testes) | 3 | MIT OR Apache-2.0 | testes |
+| tauri-plugin-dialog | 2.8.4 | Apache-2.0 OR MIT | seletores de ficheiros/pastas nativos |
+| image (features jpeg, png, tiff) | 0.25.10 | MIT OR Apache-2.0 | descodificação PNG/TIFF, codificação JPEG |
+| jpeg-decoder | 0.3.2 | MIT OR Apache-2.0 | JPEG com redução DCT (miniaturas rápidas) |
+| kamadak-exif | 0.6 | BSD-2-Clause | leitura de EXIF |
+| blake3 | 1.8 | CC0-1.0 OR Apache-2.0 | hash de conteúdo (duplicados, verificação de cópias) |
+| walkdir | 2.5 | Unlicense OR MIT | varrimento de pastas |
+| rayon | 1.12 | MIT OR Apache-2.0 | processamento paralelo |
+| tracing-subscriber / tracing-appender | 0.3 / 0.2 | MIT | registos em ficheiro |
 
 ### JavaScript/TypeScript (diretas)
 
@@ -48,16 +56,19 @@ prevista para a Fase 1.
 | @testing-library/react / dom | 16.3.3 / 10.4.2 | MIT |
 | jsdom | 27.4.0 | MIT |
 | @types/react, @types/react-dom | 19.3.0 | MIT |
+| @tauri-apps/plugin-dialog | 2.8.4 | MIT OR Apache-2.0 |
+| zustand | 5.0.16 | MIT |
+
+Todas as dependências da Fase 1 são Rust puro ou JavaScript: **nenhuma biblioteca C/C++
+precisa de ser compilada** (exceto o SQLite incluído no `rusqlite`), o que simplifica os
+builds para macOS e Windows.
 
 ## Dependências planeadas (verificadas na Fase 0, adicionadas na fase indicada)
 
 | Componente | Crate/biblioteca | Versão verificada | Licença | Fase |
 |---|---|---|---|---|
-| Descodificação raster | image | 0.25 | MIT OR Apache-2.0 | 1 |
-| Hash | blake3 | 1.8 | CC0-1.0 OR Apache-2.0 | 1 |
-| Concorrência | tokio / rayon | 1.54 / 1.12 | MIT | 1 |
+| Concorrência assíncrona | tokio | 1.54 | MIT | quando necessário |
 | Tipos TS gerados | ts-rs | 12 | MIT | 1 |
-| EXIF | kamadak-exif | 0.6 | BSD-2-Clause | 1 |
 | XMP | xmp_toolkit (Adobe XMP Toolkit) | 1.12 | MIT OR Apache-2.0 (toolkit: BSD-3) | 2 |
 | RAW | LibRaw (código-fonte, FFI própria) | ≥ 0.21 | LGPL-2.1 **ou CDDL-1.0 (escolhida)** | 2 |
 | JPEG XL (leitura) | jxl-oxide | 0.12 | MIT OR Apache-2.0 | 2 |

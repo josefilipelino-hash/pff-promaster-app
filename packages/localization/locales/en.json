@@ -1,18 +1,220 @@
 {
   "app": {
     "name": "Momento Studio",
-    "tagline": "Event photography management, culling, editing and delivery"
-  },
-  "foundation": {
-    "phase": "Phase 0 — technical foundation",
-    "notice": "This build contains only the technical foundation. Project creation and photo import arrive in Phase 1.",
-    "diagnostics": "Diagnostics",
-    "appVersion": "App version",
-    "coreVersion": "Core version",
-    "schemaVersion": "Catalog schema version",
-    "platform": "Platform",
-    "loading": "Fetching core information…",
+    "tagline": "Event photography management, culling, editing and delivery",
     "noBackend": "Core unavailable: the interface is running outside the desktop app."
+  },
+  "common": {
+    "loading": "Loading…",
+    "opening": "Opening…",
+    "cancel": "Cancel",
+    "close": "Close",
+    "choose": "Choose…",
+    "creating": "Creating…"
+  },
+  "home": {
+    "newProject": "New project",
+    "openProject": "Open project…",
+    "openTitle": "Choose the project folder (.momento)",
+    "recent": "Recent projects",
+    "noRecent": "No projects yet. Create the first one with “New project”.",
+    "photoCount_one": "{{count}} photo",
+    "photoCount_other": "{{count}} photos",
+    "lastOpened": "opened {{date}}",
+    "unavailable": "Folder not found (disk disconnected or project moved)",
+    "forget": "Remove from list",
+    "forgetHint": "Removes the project from the recent list. No files are deleted.",
+    "core": "core",
+    "schema": "schema"
+  },
+  "eventType": {
+    "wedding": "Wedding",
+    "baptism": "Baptism",
+    "communion": "Communion",
+    "corporate": "Corporate event",
+    "session": "Photo session",
+    "concert": "Concert",
+    "social": "Social photography",
+    "other": "Other"
+  },
+  "newProject": {
+    "title": "New project",
+    "name": "Event name",
+    "namePlaceholder": "E.g. Ana & Pedro's wedding",
+    "client": "Couple / client",
+    "clientPlaceholder": "E.g. Ana & Pedro",
+    "eventType": "Event type",
+    "date": "Date",
+    "datePlaceholder": "DD/MM/YYYY",
+    "invalidDate": "Invalid date. Use the DD/MM/YYYY format.",
+    "location": "Location",
+    "locationPlaceholder": "E.g. Quinta da Regaleira, Sintra",
+    "originalsDir": "Originals folder",
+    "originalsPlaceholder": "Optional",
+    "originalsHint": "Destination for photos when you choose “Copy to originals folder” on import. Leave empty to keep files where they are.",
+    "workDir": "Working folder",
+    "workPlaceholder": "Folder where the project will be created",
+    "workHint": "Must be on a local disk (internal or external), not a network share.",
+    "willCreate": "Project folder to be created: {{path}}",
+    "create": "Create project",
+    "required": "Enter the event name and the working folder."
+  },
+  "sidebar": {
+    "label": "Project navigation",
+    "library": "Photos",
+    "upcoming": "Coming soon",
+    "moments": "Moments",
+    "people": "People",
+    "export": "Export",
+    "phase": "Phase {{phase}}",
+    "availableIn": "Available in development Phase {{phase}}"
+  },
+  "collection": {
+    "all": "All",
+    "picks": "Picks",
+    "rejects": "Rejected",
+    "unrated": "Unrated"
+  },
+  "filter": {
+    "minStars": "Filter by stars",
+    "anyStars": "Any rating",
+    "color": "Filter by color label",
+    "onlyColor": "Show only {{color}} label"
+  },
+  "import": {
+    "files": "Import files…",
+    "filesHint": "Import one or more files (Mod+Shift+I)",
+    "folder": "Import folder…",
+    "folderHint": "Import one or more folders, including subfolders",
+    "title": "Import photos",
+    "start": "Import",
+    "selected_one": "{{count}} item selected:",
+    "selected_other": "{{count}} items selected:",
+    "andMore_one": "and {{count}} more",
+    "andMore_other": "and {{count}} more",
+    "modeLabel": "Originals",
+    "reference": "Keep in current location",
+    "referenceHint": "Files are not copied or modified; the project stores their location.",
+    "copy": "Copy to originals folder",
+    "copyHint": "Copies to {{path}}, organised by camera, with copy verification. Source files are left untouched.",
+    "copyUnavailable": "Unavailable: the project has no originals folder.",
+    "recursive": "Include subfolders",
+    "formatsNote": "This version imports JPEG, PNG and TIFF. Other files are listed in the report as unsupported. Duplicate files (same content) are detected and skipped.",
+    "dropHere": "Drop here to import",
+    "busy": "An import is already running.",
+    "imagesFilter": "Images (JPEG, PNG, TIFF)"
+  },
+  "report": {
+    "title": "Import finished",
+    "titleCancelled": "Import cancelled",
+    "imported": "Imported",
+    "duplicate": "Duplicates (same content)",
+    "alreadyImported": "Already in project",
+    "unsupported": "Unsupported",
+    "error": "Errors",
+    "pending": "Not processed",
+    "details": "Files not imported",
+    "toast_one": "Imported {{count}} photo.",
+    "toast_other": "Imported {{count}} photos."
+  },
+  "itemState": {
+    "pending": "Not processed",
+    "imported": "Imported",
+    "duplicate": "Duplicate",
+    "alreadyImported": "Already in project",
+    "unsupported": "Unsupported",
+    "error": "Error"
+  },
+  "project": {
+    "close": "Close project",
+    "emptyTitle": "No photos in this project yet",
+    "emptyHint": "Import a folder or files, or drag them onto this window.",
+    "noMatches": "No photos match the current filter."
+  },
+  "grid": {
+    "thumbFailed": "Could not create the thumbnail. See the info panel."
+  },
+  "viewer": {
+    "back": "Grid",
+    "position": "{{index}} of {{total}}",
+    "prev": "Previous",
+    "next": "Next",
+    "fit": "Fit",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fullscreen": "Full screen",
+    "loadFailed": "Could not open this photo.",
+    "loadingFull": "Loading full resolution…"
+  },
+  "info": {
+    "none": "Select a photo to see its information.",
+    "title": "Information",
+    "captured": "Date and time",
+    "unknown": "Unknown",
+    "camera": "Camera",
+    "lens": "Lens",
+    "iso": "ISO",
+    "shutter": "Shutter speed",
+    "aperture": "Aperture",
+    "focal": "Focal length",
+    "dimensions": "Dimensions",
+    "size": "Size",
+    "format": "Format",
+    "orientation": "Orientation",
+    "orientationNormal": "Normal",
+    "orientationValue": "EXIF {{value}} (applied automatically)",
+    "path": "File",
+    "copiedFrom": "Copied from",
+    "thumbError": "Thumbnail error",
+    "applyToSelection_one": "Rating applies to {{count}} selected photo",
+    "applyToSelection_other": "Rating applies to the {{count}} selected photos"
+  },
+  "rating": {
+    "stars_one": "{{count}} star",
+    "stars_other": "{{count}} stars",
+    "setStars_one": "Set {{count}} star",
+    "setStars_other": "Set {{count}} stars",
+    "pick": "Pick",
+    "reject": "Reject"
+  },
+  "color": {
+    "red": "red",
+    "yellow": "yellow",
+    "green": "green",
+    "blue": "blue",
+    "purple": "purple"
+  },
+  "status": {
+    "photos_one": "{{count}} photo",
+    "photos_other": "{{count}} photos",
+    "visible_one": "{{count}} visible",
+    "visible_other": "{{count}} visible",
+    "selected_one": "{{count}} selected",
+    "selected_other": "{{count}} selected",
+    "importing": "Importing {{done}} of {{total}}",
+    "cancelImport": "Cancel",
+    "scanning": "Looking for files…",
+    "thumbnails": "Creating thumbnails ({{remaining}} left)",
+    "thumbSize": "Thumbnail size"
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "stars": "Set 0 to 5 stars",
+    "pick": "Mark as pick",
+    "reject": "Mark as rejected",
+    "unflag": "Remove pick/reject",
+    "colors": "Red / yellow / green / blue label (repeat to remove)",
+    "move": "Move between photos",
+    "extend": "Extend selection",
+    "selectAll": "Select all visible photos",
+    "open": "Open in viewer",
+    "close": "Back to grid / exit full screen",
+    "toggleZoom": "Toggle fit and 100 %",
+    "zoom": "Zoom in / out (thumbnail size in grid)",
+    "fullscreen": "Full screen",
+    "info": "Show/hide info panel",
+    "import": "Import files",
+    "help": "Show this help"
   },
   "error": {
     "io": "Error reading or writing a file.",
@@ -20,6 +222,6 @@
     "unsupportedFormat": "Unsupported format.",
     "corrupt": "Invalid or corrupted file.",
     "catalogTooNew": "This project was created by a newer version of the app.",
-    "other": "An unexpected error occurred."
+    "other": "The operation could not be completed."
   }
 }

@@ -1,8 +1,17 @@
 //! # momento-project-management
 //!
-//! Ciclo de vida dos projetos: criação, estados, pastas, arquivo.
+//! Camada de serviço usada pela aplicação desktop (e pelos testes de integração):
 //!
-//! **Estado:** reservado — sem implementação. Entra em desenvolvimento na Fase 1
-//! (ver `ROADMAP.md`). A responsabilidade deste módulo está descrita em
-//! `ARCHITECTURE.md`. Não expõe API pública até essa fase, para que nenhuma parte da
-//! aplicação dependa de funcionalidade inexistente.
+//! - [`paths`]: estrutura de uma pasta de projeto `<nome>.momento/`;
+//! - [`create_project`] / [`ProjectSession::open`]: criação e abertura;
+//! - [`thumbnails::ThumbnailService`]: miniaturas em segundo plano com prioridade;
+//! - [`previews`]: previews e resolução total a pedido;
+//! - [`ProjectSession`]: projeto aberto — catálogo, importações e eventos.
+
+pub mod paths;
+pub mod previews;
+mod session;
+pub mod thumbnails;
+
+pub use paths::ProjectPaths;
+pub use session::*;

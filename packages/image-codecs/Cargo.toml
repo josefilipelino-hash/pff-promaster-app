@@ -11,3 +11,8 @@ authors.workspace = true
 [dependencies]
 momento-core-types.workspace = true
 serde.workspace = true
+image.workspace = true
+jpeg-decoder.workspace = true
+
+[dev-dependencies]
+momento-test-fixtures.workspace = true

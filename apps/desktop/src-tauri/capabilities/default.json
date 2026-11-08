@@ -1,7 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissões mínimas da janela principal. Cada plugin/comando novo tem de ser adicionado aqui explicitamente.",
+  "description": "Permissões mínimas da janela principal. Cada permissão nova tem de ser justificada aqui.",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-set-fullscreen",
+    "core:window:allow-is-fullscreen",
+    "dialog:allow-open"
+  ]
 }

@@ -6,6 +6,8 @@
 pub mod ids;
 pub mod recipe;
 
+pub use ids::*;
+
 use serde::{Deserialize, Serialize};
 
 /// Versão do núcleo, exposta à interface e gravada nos catálogos.

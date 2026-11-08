@@ -1,18 +1,220 @@
 {
   "app": {
     "name": "Momento Studio",
-    "tagline": "Gestão, seleção, edição e entrega de fotografia de eventos"
-  },
-  "foundation": {
-    "phase": "Fase 0 — fundação técnica",
-    "notice": "Esta versão contém apenas a fundação técnica. A criação de projetos e a importação de fotografias chegam na Fase 1.",
-    "diagnostics": "Diagnóstico",
-    "appVersion": "Versão da aplicação",
-    "coreVersion": "Versão do núcleo",
-    "schemaVersion": "Versão do esquema do catálogo",
-    "platform": "Plataforma",
-    "loading": "A obter informação do núcleo…",
+    "tagline": "Gestão, seleção, edição e entrega de fotografia de eventos",
     "noBackend": "Núcleo indisponível: a interface está a correr fora da aplicação desktop."
+  },
+  "common": {
+    "loading": "A carregar…",
+    "opening": "A abrir…",
+    "cancel": "Cancelar",
+    "close": "Fechar",
+    "choose": "Escolher…",
+    "creating": "A criar…"
+  },
+  "home": {
+    "newProject": "Novo projeto",
+    "openProject": "Abrir projeto…",
+    "openTitle": "Escolher a pasta do projeto (.momento)",
+    "recent": "Projetos recentes",
+    "noRecent": "Ainda não existem projetos. Crie o primeiro com “Novo projeto”.",
+    "photoCount_one": "{{count}} fotografia",
+    "photoCount_other": "{{count}} fotografias",
+    "lastOpened": "aberto em {{date}}",
+    "unavailable": "Pasta não encontrada (disco desligado ou projeto movido)",
+    "forget": "Remover da lista",
+    "forgetHint": "Remove o projeto da lista de recentes. Não apaga nenhum ficheiro.",
+    "core": "núcleo",
+    "schema": "esquema"
+  },
+  "eventType": {
+    "wedding": "Casamento",
+    "baptism": "Batizado",
+    "communion": "Comunhão",
+    "corporate": "Evento corporativo",
+    "session": "Sessão fotográfica",
+    "concert": "Concerto",
+    "social": "Fotografia social",
+    "other": "Outro"
+  },
+  "newProject": {
+    "title": "Novo projeto",
+    "name": "Nome do evento",
+    "namePlaceholder": "Ex.: Casamento Ana & Pedro",
+    "client": "Noivos / cliente",
+    "clientPlaceholder": "Ex.: Ana & Pedro",
+    "eventType": "Tipo de evento",
+    "date": "Data",
+    "datePlaceholder": "DD/MM/AAAA",
+    "invalidDate": "Data inválida. Use o formato DD/MM/AAAA.",
+    "location": "Local",
+    "locationPlaceholder": "Ex.: Quinta da Regaleira, Sintra",
+    "originalsDir": "Pasta dos originais",
+    "originalsPlaceholder": "Opcional",
+    "originalsHint": "Destino das fotografias quando escolher “Copiar para a pasta dos originais” na importação. Pode deixar vazio e manter os ficheiros onde estão.",
+    "workDir": "Pasta de trabalho",
+    "workPlaceholder": "Pasta onde o projeto será criado",
+    "workHint": "Tem de estar num disco local (interno ou externo), não numa partilha de rede.",
+    "willCreate": "Será criada a pasta do projeto: {{path}}",
+    "create": "Criar projeto",
+    "required": "Indique o nome do evento e a pasta de trabalho."
+  },
+  "sidebar": {
+    "label": "Navegação do projeto",
+    "library": "Fotografias",
+    "upcoming": "Brevemente",
+    "moments": "Momentos",
+    "people": "Pessoas",
+    "export": "Exportação",
+    "phase": "Fase {{phase}}",
+    "availableIn": "Disponível na Fase {{phase}} do desenvolvimento"
+  },
+  "collection": {
+    "all": "Todas",
+    "picks": "Favoritas",
+    "rejects": "Rejeitadas",
+    "unrated": "Sem classificação"
+  },
+  "filter": {
+    "minStars": "Filtrar por estrelas",
+    "anyStars": "Todas as estrelas",
+    "color": "Filtrar por etiqueta de cor",
+    "onlyColor": "Mostrar só etiqueta {{color}}"
+  },
+  "import": {
+    "files": "Importar ficheiros…",
+    "filesHint": "Importar um ou vários ficheiros (Mod+Shift+I)",
+    "folder": "Importar pasta…",
+    "folderHint": "Importar uma ou várias pastas, com subpastas",
+    "title": "Importar fotografias",
+    "start": "Importar",
+    "selected_one": "{{count}} item selecionado:",
+    "selected_other": "{{count}} itens selecionados:",
+    "andMore_one": "e mais {{count}}",
+    "andMore_other": "e mais {{count}}",
+    "modeLabel": "Originais",
+    "reference": "Manter no local atual",
+    "referenceHint": "Os ficheiros não são copiados nem alterados; o projeto guarda a sua localização.",
+    "copy": "Copiar para a pasta dos originais",
+    "copyHint": "Copia para {{path}}, organizado por câmara, com verificação da cópia. Os originais na origem ficam intactos.",
+    "copyUnavailable": "Indisponível: o projeto não tem pasta dos originais definida.",
+    "recursive": "Incluir subpastas",
+    "formatsNote": "Nesta versão são importados JPEG, PNG e TIFF. Outros ficheiros são listados no relatório como não suportados. Ficheiros duplicados (mesmo conteúdo) são detetados e ignorados.",
+    "dropHere": "Largue aqui para importar",
+    "busy": "Já existe uma importação em curso.",
+    "imagesFilter": "Imagens (JPEG, PNG, TIFF)"
+  },
+  "report": {
+    "title": "Importação concluída",
+    "titleCancelled": "Importação cancelada",
+    "imported": "Importadas",
+    "duplicate": "Duplicadas (mesmo conteúdo)",
+    "alreadyImported": "Já existiam no projeto",
+    "unsupported": "Não suportadas",
+    "error": "Com erro",
+    "pending": "Por processar",
+    "details": "Ficheiros não importados",
+    "toast_one": "Importada {{count}} fotografia.",
+    "toast_other": "Importadas {{count}} fotografias."
+  },
+  "itemState": {
+    "pending": "Por processar",
+    "imported": "Importada",
+    "duplicate": "Duplicada",
+    "alreadyImported": "Já no projeto",
+    "unsupported": "Não suportada",
+    "error": "Erro"
+  },
+  "project": {
+    "close": "Fechar projeto",
+    "emptyTitle": "Ainda não há fotografias neste projeto",
+    "emptyHint": "Importe uma pasta ou ficheiros, ou arraste-os para esta janela.",
+    "noMatches": "Nenhuma fotografia corresponde ao filtro atual."
+  },
+  "grid": {
+    "thumbFailed": "Não foi possível gerar a miniatura. Veja o painel de informação."
+  },
+  "viewer": {
+    "back": "Grelha",
+    "position": "{{index}} de {{total}}",
+    "prev": "Anterior",
+    "next": "Seguinte",
+    "fit": "Ajustar",
+    "zoomIn": "Aumentar",
+    "zoomOut": "Reduzir",
+    "fullscreen": "Ecrã completo",
+    "loadFailed": "Não foi possível abrir esta fotografia.",
+    "loadingFull": "A carregar resolução total…"
+  },
+  "info": {
+    "none": "Selecione uma fotografia para ver a informação.",
+    "title": "Informação",
+    "captured": "Data e hora",
+    "unknown": "Desconhecida",
+    "camera": "Câmara",
+    "lens": "Objetiva",
+    "iso": "ISO",
+    "shutter": "Velocidade",
+    "aperture": "Abertura",
+    "focal": "Distância focal",
+    "dimensions": "Dimensões",
+    "size": "Tamanho",
+    "format": "Formato",
+    "orientation": "Orientação",
+    "orientationNormal": "Normal",
+    "orientationValue": "EXIF {{value}} (aplicada automaticamente)",
+    "path": "Ficheiro",
+    "copiedFrom": "Copiado de",
+    "thumbError": "Erro na miniatura",
+    "applyToSelection_one": "A classificação aplica-se a {{count}} fotografia selecionada",
+    "applyToSelection_other": "A classificação aplica-se às {{count}} fotografias selecionadas"
+  },
+  "rating": {
+    "stars_one": "{{count}} estrela",
+    "stars_other": "{{count}} estrelas",
+    "setStars_one": "Atribuir {{count}} estrela",
+    "setStars_other": "Atribuir {{count}} estrelas",
+    "pick": "Favorita",
+    "reject": "Rejeitada"
+  },
+  "color": {
+    "red": "vermelha",
+    "yellow": "amarela",
+    "green": "verde",
+    "blue": "azul",
+    "purple": "roxa"
+  },
+  "status": {
+    "photos_one": "{{count}} fotografia",
+    "photos_other": "{{count}} fotografias",
+    "visible_one": "{{count}} visível",
+    "visible_other": "{{count}} visíveis",
+    "selected_one": "{{count}} selecionada",
+    "selected_other": "{{count}} selecionadas",
+    "importing": "A importar {{done}} de {{total}}",
+    "cancelImport": "Cancelar",
+    "scanning": "A procurar ficheiros…",
+    "thumbnails": "A gerar miniaturas ({{remaining}} em falta)",
+    "thumbSize": "Tamanho das miniaturas"
+  },
+  "shortcuts": {
+    "title": "Atalhos de teclado",
+    "stars": "Atribuir 0 a 5 estrelas",
+    "pick": "Marcar como favorita",
+    "reject": "Marcar como rejeitada",
+    "unflag": "Remover favorita/rejeitada",
+    "colors": "Etiqueta vermelha / amarela / verde / azul (repetir remove)",
+    "move": "Mover entre fotografias",
+    "extend": "Alargar a seleção",
+    "selectAll": "Selecionar todas as fotografias visíveis",
+    "open": "Abrir no visualizador",
+    "close": "Voltar à grelha / sair do ecrã completo",
+    "toggleZoom": "Alternar entre ajustar e 100 %",
+    "zoom": "Aumentar / reduzir (miniaturas na grelha)",
+    "fullscreen": "Ecrã completo",
+    "info": "Mostrar/ocultar o painel de informação",
+    "import": "Importar ficheiros",
+    "help": "Mostrar esta ajuda"
   },
   "error": {
     "io": "Erro ao ler ou escrever um ficheiro.",
@@ -20,6 +222,6 @@
     "unsupportedFormat": "Formato não suportado.",
     "corrupt": "Ficheiro inválido ou corrompido.",
     "catalogTooNew": "Este projeto foi criado por uma versão mais recente da aplicação.",
-    "other": "Ocorreu um erro inesperado."
+    "other": "Não foi possível concluir a operação."
   }
 }
