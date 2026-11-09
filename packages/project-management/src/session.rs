@@ -19,6 +19,9 @@ use momento_database::people::{FaceRef, PersonRow};
 use momento_database::project::ProjectRecord;
 use momento_database::Catalog;
 use momento_image_codecs::CodecRegistry;
+pub use momento_image_processing::develop::auto::{
+    AiDenoise, AutoOptions, AutoReport, Intensity as AutoIntensity,
+};
 pub use momento_image_processing::develop::{
     Quality as RenderQuality, Settings as DevelopSettings,
 };
@@ -80,6 +83,10 @@ pub trait SessionEvents: Send + Sync {
     fn analysis(&self, _p: &AnalysisProgress) {}
     /// Edições gravadas (as miniaturas destas chaves mudaram).
     fn edits_changed(&self, _keys: &[i64]) {}
+    /// Fila da edição automática.
+    fn auto_edit(&self, _p: &crate::auto_edit::AutoEditProgress) {}
+    /// AI Denoise de uma fotografia no editor.
+    fn ai_denoise(&self, _p: &crate::auto_edit::AiDenoiseProgress) {}
 }
 
 /// Estado de edição + ajustes já interpretados (a interface trabalha com `settings`).
@@ -110,7 +117,7 @@ pub fn set_model_search_paths(paths: Vec<PathBuf>) {
     let _ = MODEL_PATHS.set(paths);
 }
 
-fn models_dir() -> Option<PathBuf> {
+pub(crate) fn models_dir() -> Option<PathBuf> {
     momento_face_analysis::find_models_dir(MODEL_PATHS.get().map(Vec::as_slice).unwrap_or(&[]))
 }
 
@@ -211,10 +218,20 @@ pub struct ProjectSession {
     catalog: Mutex<Catalog>,
     registry: Arc<CodecRegistry>,
     thumbs: Mutex<Option<ThumbnailService>>,
-    events: Arc<dyn SessionEvents>,
+    pub(crate) events: Arc<dyn SessionEvents>,
     import: Mutex<Option<RunningImport>>,
     analysis: Mutex<Option<AnalysisService>>,
-    edits: crate::edit::EditService,
+    pub(crate) edits: crate::edit::EditService,
+    /// Modelo do AI Denoise (carregado na primeira utilização).
+    pub(crate) denoiser: std::sync::OnceLock<Option<Arc<momento_face_analysis::Denoiser>>>,
+    /// AI Denoise pedido pelo editor (só o mais recente) e se há um cálculo em curso.
+    #[allow(clippy::type_complexity)]
+    pub(crate) ai_next:
+        Mutex<Option<(i64, crate::edit::AiKey, Arc<momento_image_processing::develop::Source>)>>,
+    pub(crate) ai_busy: std::sync::atomic::AtomicBool,
+    /// Cálculos de AI Denoise em curso (para não repetir o mesmo em paralelo).
+    pub(crate) ai_inflight: Mutex<std::collections::HashSet<crate::edit::AiKey>>,
+    pub(crate) auto_job: Mutex<Option<crate::auto_edit::AutoEditJob>>,
 }
 
 impl ProjectSession {
@@ -259,6 +276,11 @@ impl ProjectSession {
             import: Mutex::new(None),
             analysis: Mutex::new(None),
             edits: crate::edit::EditService::new(),
+            denoiser: std::sync::OnceLock::new(),
+            ai_next: Mutex::new(None),
+            ai_busy: std::sync::atomic::AtomicBool::new(false),
+            ai_inflight: Mutex::new(std::collections::HashSet::new()),
+            auto_job: Mutex::new(None),
         });
         if let Some(s) = unfinished {
             tracing::info!(sessao = s.id.0, "a retomar importação interrompida");
@@ -326,7 +348,7 @@ impl ProjectSession {
 
     /// Render para a interface (frame binário: dimensões, histograma, RGBA). Não grava nada.
     pub fn render_edit(
-        &self,
+        self: &Arc<Self>,
         key: i64,
         settings: &DevelopSettings,
         max_w: u32,
@@ -335,39 +357,26 @@ impl ProjectSession {
         uncropped: bool,
     ) -> CoreResult<Vec<u8>> {
         let (_, asset) = self.catalog().resolve_key(key)?;
-        let src = self.edits.source(&self.open_catalog()?, &self.registry, asset)?;
+        // AI Denoise: se ainda não estiver calculado, render sem ele e cálculo em segundo
+        // plano (evento `ai_denoise` quando estiver pronto).
+        let (src, _) =
+            self.source_for(&self.open_catalog()?, asset, settings, false, false, key)?;
         Ok(self.edits.render_frame(&src, settings, max_w, max_h, quality, uncropped))
     }
 
     /// Ligação própria para operações longas (não bloqueia a do resto da interface).
-    fn open_catalog(&self) -> CoreResult<Catalog> {
+    pub(crate) fn open_catalog(&self) -> CoreResult<Catalog> {
         Catalog::open_existing(&self.paths.catalog())
     }
 
-    fn after_edit(self: &Arc<Self>, keys: Vec<i64>) {
+    pub(crate) fn after_edit(self: &Arc<Self>, keys: Vec<i64>) {
         // Sidecars e miniaturas editadas em segundo plano.
         let me = self.clone();
         std::thread::spawn(move || {
             let Ok(cat) = me.open_catalog() else { return };
             for &k in &keys {
-                let Ok((variant, asset)) = cat.resolve_key(k) else { continue };
-                let Ok(recipe) = cat.recipe_of(variant) else { continue };
-                if let Err(e) = crate::edit::write_sidecar(&me.paths, &cat, asset, variant, &recipe)
-                {
-                    tracing::warn!(erro = %e, "sidecar da edição não gravado");
-                }
-                if !recipe.is_identity() {
-                    let src = |edge: Option<u32>| -> CoreResult<Arc<momento_image_processing::develop::Source>> {
-                        match edge {
-                            Some(_) => me.edits.source(&cat, &me.registry, asset),
-                            None => crate::edit::load_source(&cat, &me.registry, asset, None).map(Arc::new),
-                        }
-                    };
-                    if let Err(e) =
-                        crate::edit::ensure_edited(&me.paths, &src, variant, &recipe, "thumbs")
-                    {
-                        tracing::warn!(erro = %e, "miniatura editada não gerada");
-                    }
+                if let Err(e) = me.refresh_edited(&cat, k) {
+                    tracing::warn!(erro = %e, "miniatura editada ou sidecar não gerados");
                 }
             }
             me.events.edits_changed(&keys);
@@ -500,7 +509,7 @@ impl ProjectSession {
     /// Ficheiro a servir à interface para uma chave (`thumb`/`preview`/`full`): a versão
     /// editada quando há ajustes, senão os ficheiros normais do asset.
     pub fn serve_image(
-        &self,
+        self: &Arc<Self>,
         key: i64,
         level: crate::paths::CacheLevel,
     ) -> CoreResult<crate::previews::Servable> {
@@ -515,14 +524,10 @@ impl ProjectSession {
             crate::paths::CacheLevel::Preview => "previews",
             crate::paths::CacheLevel::Full => "full",
         };
+        let settings = DevelopSettings::from_recipe(&recipe);
         let src =
             |edge: Option<u32>| -> CoreResult<Arc<momento_image_processing::develop::Source>> {
-                match edge {
-                    Some(_) => self.edits.source(&cat, &self.registry, asset),
-                    None => {
-                        crate::edit::load_source(&cat, &self.registry, asset, None).map(Arc::new)
-                    }
-                }
+                self.source_for(&cat, asset, &settings, edge.is_none(), true, key).map(|s| s.0)
             };
         let path = crate::edit::ensure_edited(&self.paths, &src, variant, &recipe, name)?;
         Ok(crate::previews::Servable { path, mime: "image/jpeg" })
@@ -957,6 +962,9 @@ impl ProjectSession {
     /// Fecha o projeto: suspende a importação (retomada na próxima abertura) e para as
     /// miniaturas (as pendentes ficam registadas no catálogo).
     pub fn close(&self) {
+        // Edição automática: para (o que já foi editado fica; o resto não é tocado).
+        self.cancel_auto_edit();
+        self.wait_auto_edit();
         let a = self.analysis.lock().unwrap_or_else(|e| e.into_inner()).take();
         if let Some(a) = a {
             a.cancel();

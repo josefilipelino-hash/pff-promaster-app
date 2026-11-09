@@ -17,6 +17,7 @@
 //! ×1,5 rodado pelos olhos, subconjunto de 146 pontos) e é validado contra os resultados
 //! de referência publicados pela Google (`portrait.jpg`).
 
+pub mod denoise;
 mod detector;
 pub mod identity;
 mod mesh;
@@ -27,6 +28,7 @@ mod tensor;
 /// Modelo otimizado e pronto a executar.
 pub(crate) type Plan = std::sync::Arc<tract_onnx::prelude::TypedRunnableModel>;
 
+pub use denoise::{Denoiser, DENOISE_MODEL_FILE};
 pub use detector::FaceDetection;
 pub use mesh::{blendshape_index, FaceMesh, BLENDSHAPE_NAMES};
 pub use models::{

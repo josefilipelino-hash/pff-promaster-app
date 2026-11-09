@@ -1,12 +1,39 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { api, isMac } from "../../api";
+import { api, events, isMac } from "../../api";
 import { ASPECTS, cloneSettings, DEFAULT_COPY_BLOCKS, defaultSettings, fitCropToAspect, parseFrame, sameSettings, type Frame } from "../../logic/develop";
 import { errorText, useStore } from "../../store";
-import { SETTINGS_BLOCKS, type DevelopSettings, type EditView } from "../../types";
+import { SETTINGS_BLOCKS, type AutoOptions, type AutoReport, type DevelopSettings, type EditView } from "../../types";
+import { AutoOptionsForm, AutoReportView } from "./AutoPanel";
 import { Modal } from "../Modal";
 import { DevelopPanel, type SetField } from "./DevelopPanel";
 import { Slider } from "./Slider";
+
+/** Opções para só detetar olhos vermelhos ou manchas (o resto da receita fica igual). */
+function onlyRetouch(kind: "redEye" | "dust"): AutoOptions {
+  return {
+    intensity: "custom",
+    strength: 100,
+    tone: false,
+    whiteBalance: false,
+    color: false,
+    sharpen: false,
+    denoise: false,
+    aiDenoise: "off",
+    straighten: false,
+    crop: false,
+    lens: false,
+    redEye: kind === "redEye",
+    dust: kind === "dust",
+  };
+}
+
+/** "Antes" alinhado com o "depois" na vista dividida: original com o mesmo enquadramento. */
+export function beforeForSplit(s: DevelopSettings): DevelopSettings {
+  const b = defaultSettings();
+  b.geometry = { ...s.geometry, crop: { ...s.geometry.crop } };
+  return b;
+}
 
 type Quality = "fast" | "final";
 /** Depois de parar de mexer, o render final chega após este intervalo. */
@@ -114,6 +141,16 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
   const [wbPicking, setWbPicking] = useState(false);
   const [dialog, setDialog] = useState<"copy" | "sync" | null>(null);
   const [snapName, setSnapName] = useState("");
+  const autoOptions = useStore((s) => s.autoOptions);
+  const setAutoOptions = useStore((s) => s.setAutoOptions);
+  const [report, setReport] = useState<AutoReport | null>(null);
+  const [autoBusy, setAutoBusy] = useState(false);
+  const [aiAvailable, setAiAvailable] = useState(false);
+  const [aiProgress, setAiProgress] = useState<number | null>(null);
+  /** Vista dividida antes/depois e posição da divisória (0–1). */
+  const [split, setSplit] = useState(false);
+  const [splitX, setSplitX] = useState(0.5);
+  const beforeCanvas = useRef<HTMLCanvasElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [box, setBox] = useState({ w: 900, h: 600 });
@@ -138,11 +175,17 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
     committed.current = v.settings;
   }, []);
 
+  useEffect(() => {
+    api.aiDenoiseAvailable().then(setAiAvailable).catch(() => setAiAvailable(false));
+  }, []);
+
   // Fotografia nova: carrega o estado de edição.
   useEffect(() => {
     setFrame(null);
     setCropMode(false);
     setBefore(false);
+    setReport(null);
+    setAiProgress(null);
     api.editView(photoKey).then(applyView).catch(fail);
   }, [photoKey, applyView, fail]);
 
@@ -161,6 +204,26 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
   }, []);
   const renderer = useRenderer(photoKey, settings, before, cropMode, box, onFrame, fail);
   const loaded = view !== null && view.key === photoKey;
+  // AI Denoise calculado em segundo plano: progresso e novo render quando acaba.
+  useEffect(() => {
+    let un: (() => void) | undefined;
+    let alive = true;
+    void events
+      .aiDenoise((p) => {
+        if (p.key !== photoKey) return;
+        if (p.finished) {
+          setAiProgress(null);
+          renderer.request(false);
+        } else setAiProgress(p.total > 0 ? p.done / p.total : 0);
+      })
+      .then((u) => (alive ? (un = u) : u()))
+      .catch(() => {});
+    return () => {
+      alive = false;
+      un?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [photoKey]);
   // Pedido de render quando muda algo que não é interação contínua.
   useEffect(() => {
     if (loaded) renderer.request(false);
@@ -210,6 +273,26 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
     applyView(v);
     void reloadPhotos();
   };
+  const runAuto = async (options: AutoOptions, keepReport = true) => {
+    setAutoBusy(true);
+    try {
+      const r = await api.autoEditPhoto(photoKey, options);
+      replace(r.view);
+      if (keepReport) setReport(r.report);
+      return r;
+    } catch (e) {
+      fail(e);
+      return null;
+    } finally {
+      setAutoBusy(false);
+    }
+  };
+  const retouchOnly = async (kind: "redEye" | "dust") => {
+    const r = await runAuto(onlyRetouch(kind), false);
+    if (!r) return;
+    const n = kind === "redEye" ? r.report.redEyes : r.report.spots;
+    toast("info", n > 0 ? t(`develop.retouch.found.${kind}`, { count: n }) : t(`develop.retouch.none.${kind}`));
+  };
   const undo = () => api.undoEdit(photoKey).then(replace).catch(fail);
   const redo = () => api.redoEdit(photoKey).then(replace).catch(fail);
   const reset = () => api.resetEdit(photoKey).then(replace).catch(fail);
@@ -233,6 +316,8 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
       if (!m && !e.altKey && e.key === "\\") return e.preventDefault(), setBefore((b) => !b);
       if (!m && !e.altKey && k === "r") return e.preventDefault(), setCropMode((c) => !c);
       if (!m && !e.altKey && k === "w") return e.preventDefault(), setWbPicking((w) => !w);
+      if (!m && !e.altKey && k === "y") return e.preventDefault(), setSplit((v) => !v);
+      if (m && !e.shiftKey && k === "u") return e.preventDefault(), void runAuto(autoOptions);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -270,6 +355,34 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
       fail(e);
     }
   };
+
+  // Vista dividida: o "antes" (original com o mesmo enquadramento) ao mesmo tamanho do frame.
+  const geoKey = JSON.stringify(settings.geometry);
+  useEffect(() => {
+    if (!split || !frame || before || cropMode) return;
+    let alive = true;
+    api
+      .renderEdit(photoKey, beforeForSplit(settings), frame.width, frame.height, "final", false)
+      .then((buf) => {
+        const f = parseFrame(buf);
+        const c = beforeCanvas.current;
+        const ctx = c?.getContext?.("2d");
+        if (!alive || !c || !ctx) return;
+        c.width = f.width;
+        c.height = f.height;
+        try {
+          ctx.putImageData(new ImageData(new Uint8ClampedArray(f.rgba), f.width, f.height), 0, 0);
+        } catch {
+          /* testes */
+        }
+      })
+      .catch(fail);
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [split, photoKey, geoKey, frame?.width, frame?.height, before, cropMode]);
+  const dragSplit = useRef(false);
 
   // Posição de um clique no canvas em coordenadas normalizadas da imagem.
   const uvOf = (e: { clientX: number; clientY: number }) => {
@@ -507,6 +620,9 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
           <button type="button" className={`btn small${before ? " active" : ""}`} aria-pressed={before} onClick={() => setBefore(!before)} title={`${t("develop.beforeAfter")} (\\)`}>
             {before ? t("develop.before") : t("develop.after")}
           </button>
+          <button type="button" className={`btn small${split ? " active" : ""}`} aria-pressed={split} onClick={() => setSplit(!split)} title={`${t("develop.splitHint")} (Y)`}>
+            ◧ {t("develop.split")}
+          </button>
           <span className="sep" />
           <button type="button" className="btn small" onClick={() => setDialog("copy")} title={`${mod}+Shift+C`}>
             {t("develop.copy")}
@@ -524,6 +640,46 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
         <div ref={stage} className={`develop-stage${wbPicking ? " picking" : ""}`}>
           <div className="develop-image" style={shown ? { width: shown.w, height: shown.h } : undefined} onClick={pickWb}>
             <canvas ref={canvas} aria-label={t("develop.image")} role="img" style={shown ? { width: shown.w, height: shown.h } : undefined} />
+            {split && !before && !cropMode && (
+              <div
+                className="split-layer"
+                onPointerMove={(e) => {
+                  if (!dragSplit.current) return;
+                  const r = e.currentTarget.getBoundingClientRect();
+                  setSplitX(Math.min(1, Math.max(0, (e.clientX - r.left) / (r.width || 1))));
+                }}
+                onPointerUp={() => (dragSplit.current = false)}
+              >
+                <canvas
+                  ref={beforeCanvas}
+                  className="split-before"
+                  aria-label={t("develop.before")}
+                  role="img"
+                  style={{ clipPath: `inset(0 ${(1 - splitX) * 100}% 0 0)` }}
+                />
+                <div
+                  className="split-handle"
+                  role="slider"
+                  aria-label={t("develop.splitHint")}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(splitX * 100)}
+                  tabIndex={0}
+                  style={{ left: `${splitX * 100}%` }}
+                  onPointerDown={(e) => {
+                    e.stopPropagation();
+                    (e.target as Element).setPointerCapture?.(e.pointerId);
+                    dragSplit.current = true;
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "ArrowLeft") setSplitX((x) => Math.max(0, x - 0.05));
+                    if (e.key === "ArrowRight") setSplitX((x) => Math.min(1, x + 0.05));
+                  }}
+                />
+                <span className="split-label left">{t("develop.before")}</span>
+                <span className="split-label right">{t("develop.after")}</span>
+              </div>
+            )}
             {cropMode && !before && (
               <div className="crop-layer" onPointerMove={onCropMove} onPointerUp={onCropUp}>
                 <div
@@ -542,6 +698,11 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
           </div>
           {!frame && <div className="viewer-loading">{t("develop.loading")}</div>}
           {before && <div className="before-badge">{t("develop.before")}</div>}
+          {aiProgress !== null && settings.detail.aiDenoise > 0 && (
+            <div className="ai-badge" role="status">
+              {t("develop.aiRunning", { pct: Math.round(aiProgress * 100) })}
+            </div>
+          )}
         </div>
       </section>
       <DevelopPanel
@@ -551,6 +712,51 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
         wbPicking={wbPicking}
         onPickWb={() => setWbPicking(!wbPicking)}
         geometry={geometry}
+        ai={{ available: aiAvailable, progress: settings.detail.aiDenoise > 0 ? aiProgress : null }}
+        auto={
+          <div className="dev-auto">
+            <AutoOptionsForm options={autoOptions} onChange={setAutoOptions} aiAvailable={aiAvailable} />
+            <button type="button" className="btn primary" disabled={autoBusy || !loaded} onClick={() => void runAuto(autoOptions)} title={`${t("auto.runHint")} (${mod}+U)`}>
+              {autoBusy ? t("auto.running") : `✦ ${t("auto.run")}`}
+            </button>
+            {report && (
+              <AutoReportView
+                report={report}
+                onApplyAi={aiAvailable && settings.detail.aiDenoise === 0 ? () => set("detail.aiDenoise", (s) => void (s.detail.aiDenoise = 50), true) : undefined}
+              />
+            )}
+          </div>
+        }
+        retouch={
+          <div className="dev-retouch">
+            {(["redEye", "dust"] as const).map((kind) => {
+              const n = kind === "redEye" ? settings.retouch.redEyes.length : settings.retouch.spots.length;
+              return (
+                <div key={kind} className="dev-row">
+                  <span className="small">{t(`develop.retouch.${kind}`, { count: n })}</span>
+                  <span className="spacer" />
+                  <button type="button" className="btn small" disabled={autoBusy} onClick={() => void retouchOnly(kind)}>
+                    {t("develop.retouch.detect")}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn small ghost"
+                    disabled={n === 0}
+                    onClick={() =>
+                      set(`retouch.${kind}`, (s) => {
+                        if (kind === "redEye") s.retouch.redEyes = [];
+                        else s.retouch.spots = [];
+                      }, true)
+                    }
+                  >
+                    {t("develop.retouch.remove")}
+                  </button>
+                </div>
+              );
+            })}
+            <p className="small muted dev-note">{t("develop.retouch.note")}</p>
+          </div>
+        }
       />
       {dialog === "copy" && (
         <CopyDialog

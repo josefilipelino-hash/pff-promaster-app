@@ -109,6 +109,13 @@ pub fn run() {
             commands::paste_settings,
             commands::pick_white_balance,
             commands::auto_straighten,
+            commands::auto_edit_photo,
+            commands::start_auto_edit,
+            commands::auto_edit_status,
+            commands::pause_auto_edit,
+            commands::resume_auto_edit,
+            commands::cancel_auto_edit,
+            commands::ai_denoise_available,
         ])
         .build(tauri::generate_context!())
         .expect("falha ao iniciar a aplicação");

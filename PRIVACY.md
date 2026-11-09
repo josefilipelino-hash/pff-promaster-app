@@ -24,6 +24,12 @@ abaixo são requisitos de arquitetura, não opções.
    Caminhos de ficheiros podem aparecer em registos de erro locais. Ficam apenas no
    computador (macOS: `~/Library/Logs/pt.momentostudio.desktop/`; Windows:
    `%LOCALAPPDATA%\pt.momentostudio.desktop\logs\`).
+5d. **Fase 6 — edição automática e AI Denoise:** a análise de cada fotografia, a deteção
+   de rostos/íris (para a exposição dos rostos, olhos vermelhos e recorte) e o AI Denoise
+   (FFDNet) correm neste computador. Os pontos das íris **não são guardados**: só os
+   círculos das correções de olhos vermelhos ficam na receita (catálogo e sidecar JSON do
+   projeto). O resultado do AI Denoise fica só em memória (e nas miniaturas/previews
+   editadas em cache do projeto); nada é enviado para fora nem escrito junto dos originais.
 5c. **Fase 4 — pessoas (dados biométricos):** a identidade facial (vetor de 128 valores
    por rosto, SFace) é calculada e guardada **só** no `catalog.db` do projeto; nunca é
    enviada para fora, nem usada entre projetos. Nomes e papéis são escritos pelo

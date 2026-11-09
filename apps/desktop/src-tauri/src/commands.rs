@@ -7,6 +7,8 @@ use momento_database::library::RecentProject;
 use momento_database::moments::{AssetMoment, MomentRow};
 use momento_database::people::{FaceRef, PersonRow};
 use momento_project_management::analysis::SelectionSummary;
+use momento_project_management::auto_edit::{AutoEditProgress, AutoEditResult};
+use momento_project_management::AutoOptions;
 use momento_project_management::{
     AnalysisStatus, ImportRequest, NewProject, ProjectInfo, SelectionSettings,
 };
@@ -454,6 +456,51 @@ pub async fn auto_straighten(
     settings: DevelopSettings,
 ) -> CmdResult<Option<f32>> {
     state.session().and_then(|s| s.auto_straighten(key, &settings)).map_err(err)
+}
+
+// ---------------------------------------------------------------- edição automática (Fase 6)
+
+#[tauri::command]
+pub async fn auto_edit_photo(
+    state: State<'_, AppState>,
+    key: i64,
+    options: AutoOptions,
+) -> CmdResult<AutoEditResult> {
+    state.session().and_then(|s| s.auto_edit_photo(key, &options)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn start_auto_edit(
+    state: State<'_, AppState>,
+    keys: Vec<i64>,
+    options: AutoOptions,
+) -> CmdResult<u64> {
+    state.session().and_then(|s| s.start_auto_edit(keys, options)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn auto_edit_status(state: State<'_, AppState>) -> CmdResult<AutoEditProgress> {
+    state.session().map(|s| s.auto_edit_status()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn pause_auto_edit(state: State<'_, AppState>) -> CmdResult<()> {
+    state.session().map(|s| s.pause_auto_edit()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn resume_auto_edit(state: State<'_, AppState>) -> CmdResult<()> {
+    state.session().map(|s| s.resume_auto_edit()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn cancel_auto_edit(state: State<'_, AppState>) -> CmdResult<()> {
+    state.session().map(|s| s.cancel_auto_edit()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn ai_denoise_available(state: State<'_, AppState>) -> CmdResult<bool> {
+    state.session().map(|s| s.ai_denoise_available()).map_err(err)
 }
 
 #[cfg(test)]

@@ -9,6 +9,7 @@ import { clickSelect, moveFocus, restrict, selectAll, targets } from "../logic/s
 import { keyToAction, type Action } from "../logic/shortcuts";
 import { errorText, useStore } from "../store";
 import type { Color, GroupRow, ImportMode, Label } from "../types";
+import { AutoEditDialog, AutoEditQueue } from "./AutoEdit";
 import { ClockDialog } from "./ClockDialog";
 import { CompareView, type CompareHandle } from "./CompareView";
 import { PeopleView } from "./PeopleView";
@@ -110,9 +111,17 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
       }),
             events.thumbnails((b) => useStore.getState().applyThumbBatch(b)),
       events.editsChanged((keys) => {
+        useStore.getState().bumpEdited(keys);
+        // Numa fila de centenas de fotografias chegam muitos avisos: recarregar com limite.
+        scheduleReload();
+      }),
+      events.autoEdit((p) => {
         const st = useStore.getState();
-        st.bumpEdited(keys);
-        st.reloadPhotos().catch(() => {});
+        st.setAutoProgress(p);
+        if (p.finished) {
+          scheduleReload();
+          st.toast("info", p.cancelled ? t("auto.toastCancelled", { count: p.done }) : t("auto.toastFinished", { count: p.done }));
+        }
       }),
       events.analysis((p) => {
         const st = useStore.getState();
@@ -473,6 +482,8 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
             onClose={() => void closeProject()}
             onHelp={() => s.setHelpOpen(true)}
             onCompare={compareFromSelection}
+            onAutoEdit={() => s.setAutoDialog(true)}
+            selectedCount={s.selection.ids.size}
             view={s.view}
             onView={(v) => s.setView(v)}
           />
@@ -563,6 +574,8 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
       {s.importSummary && <ImportReport summary={s.importSummary} onClose={() => s.setImportSummary(null)} />}
             {s.helpOpen && <HelpOverlay onClose={() => s.setHelpOpen(false)} />}
       {s.clockOpen && <ClockDialog onClose={() => s.setClockOpen(false)} onApplied={() => void reloadAfterClock()} />}
+      {s.autoDialog && <AutoEditDialog keys={order.filter((k) => s.selection.ids.has(k))} onClose={() => s.setAutoDialog(false)} />}
+      <AutoEditQueue />
       {s.dragIds && <div className="drag-badge">{t("moments.dropHint", { count: s.dragIds.length })}</div>}
     </div>
   );

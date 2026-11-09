@@ -69,6 +69,22 @@ plataforma, ecrã inicial, validação do formulário, grelha virtualizada com 3
 secções futuras desativadas, classificação por teclado e em seleção múltipla, filtro
 Favoritas + visualizador, reversão quando o núcleo recusa, paridade de traduções.
 
+## Fase 6 — edição automática
+
+| Teste | O que verifica |
+|---|---|
+| `image-processing::develop::auto` (11) | cada fotografia recebe ajustes próprios (escura clareia, clara escurece/recupera, dominante azul aquece, quente arrefece menos); escura e normal convergem (diferença < 50 % da inicial); intensidades ordenadas e "Personalizada" só mexe nos grupos pedidos; ruído medido (limpa ≈ 0, σ ≈ 9/255 detetado), só a ruidosa recebe redução forte, ISO 100 limita, AI Denoise só quando pedido; tabela de sensores; horizonte inclinado 3° corrigido e direito não mexe; aberração cromática estimada (≈ −40) e ausente numa imagem limpa; olhos vermelhos detetados e corrigidos (pupila escura e neutra, pele intacta) e pupilas escuras ignoradas; 3 manchas de pó encontradas num céu em degradê, removidas, e nenhuma numa imagem sem pó; recorte automático mantém a proporção e o rosto; HSL, grão, 90° e curva de pontos do utilizador mantêm-se; bloco `retouch` na receita |
+| `face-analysis::denoise` | FFDNet no tract: ruído gaussiano σ = 25/255 → PSNR 20,2 → 39,8 dB; cancelar devolve `false` sem alterar a imagem |
+| `auto_edit_flow` | caminho real: pré-visualização não grava; "auto" no histórico e desfazer volta ao original; fila de 8 em pausa não avança, acrescentar à fila, opções diferentes recusadas, retomar → 8 editadas com ajustes diferentes; cancelar não toca nas restantes; AI Denoise no editor não bloqueia o render e avisa quando acaba; RAW real (`MOMENTO_SAMPLES_DIR`); **originais com o mesmo hash** |
+| Fotografias reais (`examples/auto_eval`) | 10 fotografias (JPEG e RAW Canon 7D, Fuji X-E1, Nikon D810): comparações antes/depois; **0 olhos vermelhos falsos em 33 rostos** e 2/2 olhos vermelhos simulados detetados e corrigidos |
+| Interface (+3) | intensidades e "Personalizada"; Auto (botão e Ctrl+U) com relatório; aplicar AI Denoise recomendado; retoque só de olhos vermelhos; vista dividida (Y); diálogo "Editar automaticamente seleção", fila com pausa/retoma/cancelar/fechar |
+
+Avaliar a edição automática com fotografias próprias (nada é escrito nos originais):
+
+```bash
+cargo run --release -p momento-project-management --example auto_eval -- /pasta/fotos /pasta/saida natural
+```
+
 ## Fase 5 — motor de edição
 
 | Teste | O que verifica |

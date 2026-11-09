@@ -98,6 +98,11 @@ pub struct Detail {
     /// 0…100.
     pub noise_luminance: f32,
     pub noise_color: f32,
+    /// 0…100: preservação do detalhe na redução de ruído de luminância (alto = mais textura).
+    pub noise_detail: f32,
+    /// AI Denoise (FFDNet), 0 = desligado, 1…100 = intensidade. Calculado sobre a fonte
+    /// (antes de todos os outros ajustes) a partir do nível de ruído medido.
+    pub ai_denoise: f32,
 }
 
 impl Default for Detail {
@@ -109,6 +114,8 @@ impl Default for Detail {
             sharpen_masking: 0.0,
             noise_luminance: 0.0,
             noise_color: 0.0,
+            noise_detail: 50.0,
+            ai_denoise: 0.0,
         }
     }
 }
@@ -218,6 +225,36 @@ impl Default for Lens {
     }
 }
 
+/// Correção de olho vermelho: círculo em coordenadas normalizadas da fotografia orientada
+/// (x pela largura, y pela altura; raio pelo lado maior).
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct RedEye {
+    pub x: f32,
+    pub y: f32,
+    pub r: f32,
+}
+
+/// Remoção de mancha (pó do sensor): o círculo (x, y, r) é substituído pela zona (sx, sy),
+/// com transição suave. Mesmas coordenadas que [`RedEye`].
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Spot {
+    pub x: f32,
+    pub y: f32,
+    pub r: f32,
+    pub sx: f32,
+    pub sy: f32,
+}
+
+/// Retoque básico (não destrutivo): olhos vermelhos e manchas do sensor.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Retouch {
+    pub red_eyes: Vec<RedEye>,
+    pub spots: Vec<Spot>,
+}
+
 /// Todos os ajustes de uma variante.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -231,11 +268,12 @@ pub struct Settings {
     pub effects: Effects,
     pub geometry: Geometry,
     pub lens: Lens,
+    pub retouch: Retouch,
 }
 
 /// Nomes dos blocos (copiar/colar escolhe blocos).
-pub const BLOCKS: [&str; 9] =
-    ["light", "wb", "color", "hsl", "curve", "detail", "effects", "geometry", "lens"];
+pub const BLOCKS: [&str; 10] =
+    ["light", "wb", "color", "hsl", "curve", "detail", "effects", "geometry", "lens", "retouch"];
 
 fn put<T: Serialize + Default + PartialEq>(r: &mut EditRecipe, name: &str, v: &T) {
     if *v != T::default() {
@@ -261,6 +299,7 @@ impl Settings {
             effects: get(r, "effects"),
             geometry: get(r, "geometry"),
             lens: get(r, "lens"),
+            retouch: get(r, "retouch"),
         }
     }
 
@@ -276,6 +315,7 @@ impl Settings {
         put(&mut r, "effects", &self.effects);
         put(&mut r, "geometry", &self.geometry);
         put(&mut r, "lens", &self.lens);
+        put(&mut r, "retouch", &self.retouch);
         r
     }
 

@@ -6,6 +6,9 @@ Os modelos não são guardados no Git (ver .gitignore e LICENSES.md). As origens
 SHA-256; os ONNX gerados pelo tf2onnx podem diferir byte a byte entre execuções (nomes
 internos), mas são numericamente equivalentes. O CI executa-o antes de compilar.
 
+Fase 6: também o AI Denoise (FFDNet, pesos MIT do projeto KAIR), reconstruído em ONNX a
+partir dos pesos sem PyTorch (`scripts/torch_legacy.py`). Só esse: `--only denoise`.
+
 Requisitos (só em desenvolvimento/CI):
     python3 -m venv .venv-models
     .venv-models/bin/pip install tf2onnx==1.17.0 tensorflow-cpu==2.21.0 onnx==1.23.2
@@ -64,6 +67,73 @@ SFACE = {
     "npm_mirror": ("https://registry.npmjs.org/maystar-facecompare/-/maystar-facecompare-1.0.2.tgz", "package/weights/sface.onnx"),
     "file": "face_identity.onnx",
 }
+
+
+# Fase 6: AI Denoise — FFDNet (Zhang, Zuo & Zhang, IEEE TIP 2018), pesos oficiais do
+# projeto KAIR (MIT, github.com/cszn/KAIR, release v1.0). A rede (12 convoluções 3×3 a
+# meia resolução com o mapa do nível de ruído como entrada) é reconstruída em ONNX a partir
+# dos pesos, lidos sem PyTorch por `torch_legacy.py`. O "pixel unshuffle" e o "pixel
+# shuffle" são feitos no Rust (packages/face-analysis/src/denoise.rs).
+FFDNET = {
+    "url": "https://github.com/cszn/KAIR/releases/download/v1.0/ffdnet_color_clip.pth",
+    "sha256": "99a5081e32afdaa25df3ded11aa16447556692e550906caed320db31324af5ce",
+    "file": "denoise_ffdnet.onnx",
+}
+
+
+def prepare_ffdnet() -> dict:
+    import numpy as np
+    import onnx
+    from onnx import TensorProto, helper, numpy_helper
+
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import torch_legacy
+
+    data = urllib.request.urlopen(FFDNET["url"], timeout=300).read()
+    digest = sha256(data)
+    if digest != FFDNET["sha256"]:
+        sys.exit(f"SHA-256 inesperado para o FFDNet: {digest} (esperado {FFDNET['sha256']})")
+    with tempfile.TemporaryDirectory() as tmp:
+        src = os.path.join(tmp, "ffdnet.pth")
+        with open(src, "wb") as f:
+            f.write(data)
+        w = torch_legacy.load(src)
+    convs = sorted({int(k.split(".")[1]) for k in w})
+    if len(convs) != 12 or w[f"model.{convs[0]}.weight"].shape != (96, 13, 3, 3):
+        sys.exit("FFDNet: estrutura inesperada dos pesos")
+    nodes = [helper.make_node("Concat", ["x", "sigma"], ["h0"], axis=1)]
+    inits = []
+    cur = "h0"
+    for i, c in enumerate(convs):
+        inits += [
+            numpy_helper.from_array(w[f"model.{c}.weight"].astype(np.float32), f"w{i}"),
+            numpy_helper.from_array(w[f"model.{c}.bias"].astype(np.float32), f"b{i}"),
+        ]
+        nodes.append(helper.make_node("Conv", [cur, f"w{i}", f"b{i}"], [f"c{i}"], pads=[1, 1, 1, 1], kernel_shape=[3, 3]))
+        cur = f"c{i}"
+        if i < len(convs) - 1:
+            nodes.append(helper.make_node("Relu", [cur], [f"a{i}"]))
+            cur = f"a{i}"
+    nodes.append(helper.make_node("Identity", [cur], ["y"]))
+    graph = helper.make_graph(
+        nodes,
+        "ffdnet_color_clip",
+        [
+            helper.make_tensor_value_info("x", TensorProto.FLOAT, [1, 12, "h", "w"]),
+            helper.make_tensor_value_info("sigma", TensorProto.FLOAT, [1, 1, "h", "w"]),
+        ],
+        [helper.make_tensor_value_info("y", TensorProto.FLOAT, [1, 12, "h", "w"])],
+        inits,
+    )
+    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", 13)], producer_name="momento-prepare-models")
+    model.ir_version = 8
+    onnx.checker.check_model(model)
+    dst = os.path.join(OUT, FFDNET["file"])
+    onnx.save(model, dst)
+    with open(dst, "rb") as f:
+        out = f.read()
+    print(f"  {FFDNET['file']}: {len(out) // 1024} KB")
+    return {"file": FFDNET["file"], "sha256": sha256(out), "bytes": len(out), "source_sha256": FFDNET["sha256"]}
 
 
 def fetch_sface() -> bytes:
@@ -127,9 +197,21 @@ def convert(tflite_bytes: bytes, out_name: str) -> dict:
 
 
 def main() -> None:
+    """Sem argumentos prepara todos os modelos; `--only denoise` (ou outro id) só esses."""
     os.makedirs(OUT, exist_ok=True)
+    only = set(sys.argv[sys.argv.index("--only") + 1 :]) if "--only" in sys.argv else None
+    lock_path = os.path.join(OUT, "models.lock.json")
     produced = []
+    if only is not None and os.path.isfile(lock_path):
+        with open(lock_path) as f:
+            produced = json.load(f).get("models", [])
+
+    def put(entry: dict) -> None:
+        produced[:] = [e for e in produced if e["file"] != entry["file"]] + [entry]
+
     for s in SOURCES:
+        if only is not None and s["id"] not in only:
+            continue
         print(f"{s['id']}: {s['url']}")
         data = urllib.request.urlopen(s["url"], timeout=120).read()
         digest = sha256(data)
@@ -138,12 +220,16 @@ def main() -> None:
         if "members" in s:
             with zipfile.ZipFile(io.BytesIO(data)) as z:
                 for member, out_name in s["members"].items():
-                    produced.append(convert(z.read(member), out_name))
+                    put(convert(z.read(member), out_name))
         else:
-            produced.append(convert(data, s["file"]))
-    print("face_identity (SFace)")
-    produced.append(prepare_sface())
-    with open(os.path.join(OUT, "models.lock.json"), "w") as f:
+            put(convert(data, s["file"]))
+    if only is None or "face_identity" in only:
+        print("face_identity (SFace)")
+        put(prepare_sface())
+    if only is None or "denoise" in only:
+        print(f"denoise (FFDNet): {FFDNET['url']}")
+        put(prepare_ffdnet())
+    with open(lock_path, "w") as f:
         json.dump({"generator": "scripts/prepare-models.py", "models": produced}, f, indent=2)
     print(f"Modelos prontos em {OUT}")
 

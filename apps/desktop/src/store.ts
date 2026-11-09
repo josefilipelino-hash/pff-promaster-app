@@ -3,7 +3,10 @@ import { api } from "./api";
 import { DEFAULT_FILTER, type Filter } from "./logic/filters";
 import { EMPTY_SELECTION, type Selection } from "./logic/selection";
 import type { RecMap } from "./logic/filters";
+import { defaultAutoOptions } from "./logic/develop";
 import type {
+  AutoEditProgress,
+  AutoOptions,
   DevelopSettings,
   AssetMoment,
   MomentRow,
@@ -86,6 +89,12 @@ interface State {
   clockOpen: boolean;
   /** Definições copiadas (Copiar/Colar). */
   clipboard: { settings: DevelopSettings; blocks: string[] } | null;
+  // Edição automática (Fase 6)
+  /** Últimas opções usadas (editor e "Editar automaticamente seleção"). */
+  autoOptions: AutoOptions;
+  /** Estado da fila em segundo plano (null = sem fila visível). */
+  autoProgress: AutoEditProgress | null;
+  autoDialog: boolean;
 }
 
 interface Actions {
@@ -117,11 +126,27 @@ interface Actions {
   setDrag(ids: number[] | null): void;
     setClockOpen(o: boolean): void;
   setClipboard(c: State["clipboard"]): void;
+  setAutoOptions(o: AutoOptions): void;
+  setAutoProgress(p: AutoEditProgress | null): void;
+  setAutoDialog(o: boolean): void;
   /** Miniaturas/previews editadas mudaram: novas URLs e recarregar a lista. */
   bumpEdited(keys: number[]): void;
 }
 
 let toastSeq = 1;
+
+const AUTO_OPTIONS_KEY = "momento.autoOptions";
+
+/** Opções da edição automática lembradas entre sessões (preferência deste computador). */
+function loadAutoOptions(): AutoOptions {
+  try {
+    const raw = localStorage.getItem(AUTO_OPTIONS_KEY);
+    if (raw) return { ...defaultAutoOptions(), ...(JSON.parse(raw) as Partial<AutoOptions>) };
+  } catch {
+    /* ignorado */
+  }
+  return defaultAutoOptions();
+}
 
 function buildIndex(rows: PhotoRow[]): Map<number, number> {
   const m = new Map<number, number>();
@@ -180,6 +205,9 @@ export const useStore = create<State & Actions>((set, get) => ({
     dragIds: null,
   clockOpen: false,
   clipboard: null,
+  autoOptions: loadAutoOptions(),
+  autoProgress: null,
+  autoDialog: false,
 
 
 
@@ -213,6 +241,8 @@ export const useStore = create<State & Actions>((set, get) => ({
         photoMoment: new Map(),
         dragIds: null,
         clockOpen: false,
+        autoProgress: null,
+        autoDialog: false,
       });
       return;
     }
@@ -403,6 +433,23 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   setClipboard(c) {
     set({ clipboard: c });
+  },
+
+  setAutoOptions(o) {
+    set({ autoOptions: o });
+    try {
+      localStorage.setItem(AUTO_OPTIONS_KEY, JSON.stringify(o));
+    } catch {
+      /* armazenamento indisponível */
+    }
+  },
+
+  setAutoProgress(p) {
+    set({ autoProgress: p });
+  },
+
+  setAutoDialog(o) {
+    set({ autoDialog: o });
   },
 
   bumpEdited(keys) {

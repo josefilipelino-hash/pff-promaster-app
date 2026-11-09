@@ -37,7 +37,9 @@ impl Plane {
     /// Canal isolado (aberração cromática).
     #[inline]
     pub fn sample_channel(&self, u: f32, v: f32, ch: usize) -> f32 {
-        self.sample(u, v).map(|p| p[ch]).unwrap_or(0.0)
+        // Fora da imagem (ex.: vermelho deslocado pela aberração cromática junto à borda):
+        // repete a borda em vez de preto, para não criar uma linha colorida.
+        self.sample(u.clamp(0.0, 1.0), v.clamp(0.0, 1.0)).map(|p| p[ch]).unwrap_or(0.0)
     }
 
     fn half(&self) -> Plane {

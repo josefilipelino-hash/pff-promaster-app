@@ -384,7 +384,18 @@ export interface DevelopSettings {
     green: [number, number][];
     blue: [number, number][];
   };
-  detail: { sharpenAmount: number; sharpenRadius: number; sharpenDetail: number; sharpenMasking: number; noiseLuminance: number; noiseColor: number };
+  detail: {
+    sharpenAmount: number;
+    sharpenRadius: number;
+    sharpenDetail: number;
+    sharpenMasking: number;
+    noiseLuminance: number;
+    noiseColor: number;
+    /** Preservação do detalhe na redução de ruído (0–100). */
+    noiseDetail: number;
+    /** AI Denoise: 0 = desligado, 1–100 = intensidade. */
+    aiDenoise: number;
+  };
   effects: {
     texture: number;
     clarity: number;
@@ -407,6 +418,10 @@ export interface DevelopSettings {
     horizontal: number;
   };
   lens: { distortion: number; caRed: number; caBlue: number; vignetting: number; vignettingMidpoint: number };
+  retouch: {
+    redEyes: { x: number; y: number; r: number }[];
+    spots: { x: number; y: number; r: number; sx: number; sy: number }[];
+  };
 }
 
 export interface HistoryEntry {
@@ -433,5 +448,64 @@ export interface EditView {
   settings: DevelopSettings;
 }
 
-export const SETTINGS_BLOCKS = ["light", "wb", "color", "hsl", "curve", "detail", "effects", "geometry", "lens"] as const;
+export const SETTINGS_BLOCKS = ["light", "wb", "color", "hsl", "curve", "detail", "effects", "geometry", "lens", "retouch"] as const;
 export type SettingsBlock = (typeof SETTINGS_BLOCKS)[number];
+
+// --- Edição automática (Fase 6) -------------------------------------------------------------
+
+export type AutoIntensity = "verySoft" | "soft" | "natural" | "balanced" | "strong" | "custom";
+export const AUTO_INTENSITIES: AutoIntensity[] = ["verySoft", "soft", "natural", "balanced", "strong", "custom"];
+export type AiDenoiseMode = "off" | "whenNeeded" | "always";
+
+export interface AutoOptions {
+  intensity: AutoIntensity;
+  /** Força em % (só "custom"), 0–150. */
+  strength: number;
+  tone: boolean;
+  whiteBalance: boolean;
+  color: boolean;
+  sharpen: boolean;
+  denoise: boolean;
+  aiDenoise: AiDenoiseMode;
+  straighten: boolean;
+  crop: boolean;
+  lens: boolean;
+  redEye: boolean;
+  dust: boolean;
+}
+
+export type NoiseLevel = "none" | "low" | "moderate" | "high" | "veryHigh";
+
+export interface AutoReport {
+  exposure: number;
+  temperature: number;
+  tint: number;
+  noise: { luminance: number; chroma: number; iso: number | null; sensorFactor: number; level: NoiseLevel; aiRecommended: boolean };
+  tilt: number | null;
+  cropped: boolean;
+  redEyes: number;
+  spots: number;
+  faces: number;
+}
+
+export interface AutoEditResult {
+  view: EditView;
+  report: AutoReport;
+}
+
+export interface AutoEditProgress {
+  total: number;
+  done: number;
+  failed: number;
+  paused: boolean;
+  cancelled: boolean;
+  finished: boolean;
+  current: string | null;
+}
+
+export interface AiDenoiseProgress {
+  key: number;
+  done: number;
+  total: number;
+  finished: boolean;
+}

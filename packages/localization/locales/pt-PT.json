@@ -238,7 +238,9 @@
     "undoRedo": "Desfazer / refazer (editor)",
     "beforeAfter": "Antes / depois (editor)",
     "crop": "Ferramenta de recorte (editor)",
-    "copyPaste": "Copiar / colar definições (editor)"
+    "copyPaste": "Copiar / colar definições (editor)",
+    "split": "Antes/depois dividido (editor)",
+    "autoEdit": "Edição automática da fotografia (editor)"
   },
   "error": {
     "io": "Erro ao ler ou escrever um ficheiro.",
@@ -570,7 +572,9 @@
       "detail": "Detalhe",
       "effects": "Efeitos",
       "geometry": "Geometria",
-      "lens": "Correções da objetiva"
+      "lens": "Correções da objetiva",
+      "auto": "Automático",
+      "retouch": "Retoque"
     },
     "resetSection": "Repor esta secção",
     "panel": "Ajustes",
@@ -598,7 +602,9 @@
         "sharpenDetail": "Detalhe",
         "sharpenMasking": "Máscara",
         "noiseLuminance": "Ruído de luminância",
-        "noiseColor": "Ruído de cor"
+        "noiseColor": "Ruído de cor",
+        "noiseDetail": "Ruído: detalhe",
+        "aiDenoise": "AI Denoise"
       },
       "effects": {
         "texture": "Textura",
@@ -639,6 +645,10 @@
         "rotateRight": "Rodar à direita",
         "flip": "Espelhar",
         "autoStraighten": "Endireitar automático"
+      },
+      "retouch": {
+        "redEye": "Olhos vermelhos",
+        "dust": "Manchas do sensor"
       }
     },
     "wbPicker": "Conta-gotas",
@@ -666,7 +676,8 @@
       "paste": "Colar definições",
       "snapshot": "Instantâneo aplicado",
       "virtualCopy": "Cópia virtual",
-      "resetSection": "Repor {{section}}"
+      "resetSection": "Repor {{section}}",
+      "auto": "Edição automática"
     },
     "copyNote": "A geometria (recorte, rotação) não é copiada por omissão.",
     "loading": "A carregar a fotografia…",
@@ -711,6 +722,129 @@
     "clipboardEmpty": "Ainda não copiou definições.",
     "pasted_one": "Definições aplicadas a {{count}} fotografia.",
     "pasted_other": "Definições aplicadas a {{count}} fotografias.",
-    "syncNeedSelection": "Selecione na grelha as fotografias a sincronizar."
+    "syncNeedSelection": "Selecione na grelha as fotografias a sincronizar.",
+    "aiRunning": "AI Denoise: a calcular… {{pct}} %",
+    "split": "Dividir",
+    "splitHint": "Antes/depois lado a lado com divisória (arraste)",
+    "retouch": {
+      "redEye_one": "Olhos vermelhos: {{count}}",
+      "redEye_other": "Olhos vermelhos: {{count}}",
+      "dust_one": "Manchas: {{count}}",
+      "dust_other": "Manchas: {{count}}",
+      "detect": "Detetar",
+      "remove": "Remover",
+      "note": "Correções não destrutivas: os olhos vêm da deteção de rostos local; as manchas procuram-se em zonas lisas.",
+      "found": {
+        "redEye_one": "{{count}} olho vermelho corrigido.",
+        "redEye_other": "{{count}} olhos vermelhos corrigidos.",
+        "dust_one": "{{count}} mancha removida.",
+        "dust_other": "{{count}} manchas removidas."
+      },
+      "none": {
+        "redEye": "Não foram encontrados olhos vermelhos.",
+        "dust": "Não foram encontradas manchas do sensor."
+      }
+    }
+  },
+  "auto": {
+    "intensity": "Intensidade",
+    "intensities": {
+      "verySoft": "Muito suave",
+      "soft": "Suave",
+      "natural": "Natural",
+      "balanced": "Equilibrada",
+      "strong": "Intensa",
+      "custom": "Personalizada"
+    },
+    "intensityHint": {
+      "verySoft": "Só correções pequenas; o aspeto original quase não muda",
+      "soft": "Correções moderadas, sem acrescentar contraste nem cor",
+      "natural": "Corrige exposição, balanço e tons mantendo o ambiente da fotografia",
+      "balanced": "Correções completas e um pouco mais de contraste, cor e clareza",
+      "strong": "Correções completas com contraste, cor e clareza mais marcados",
+      "custom": "Escolha a força e que grupos de ajustes são automáticos"
+    },
+    "strength": "Força (%)",
+    "groupsTitle": "Ajustar automaticamente",
+    "groups": {
+      "tone": "Exposição e tons",
+      "whiteBalance": "Balanço de brancos",
+      "color": "Cor (vibração)",
+      "sharpen": "Nitidez",
+      "denoise": "Redução de ruído",
+      "lens": "Objetiva (aberração, vinheta)",
+      "straighten": "Endireitar horizonte"
+    },
+    "extrasTitle": "Opções",
+    "extras": {
+      "crop": "Recorte automático",
+      "redEye": "Olhos vermelhos",
+      "dust": "Manchas do sensor"
+    },
+    "extrasHint": {
+      "crop": "Só em fotografias com pessoas: melhora o enquadramento sem cortar rostos (no máximo ~15 %)",
+      "redEye": "Deteta pupilas vermelhas (flash) nos rostos encontrados e corrige-as",
+      "dust": "Procura manchas pequenas e redondas em zonas lisas (céu, paredes) e remove-as"
+    },
+    "aiDenoise": "AI Denoise",
+    "aiModes": {
+      "off": "Desligado (só rápida)",
+      "whenNeeded": "Quando houver muito ruído",
+      "always": "Sempre que houver ruído"
+    },
+    "aiMissing": "Modelo do AI Denoise não encontrado (scripts/prepare-models.py): usa-se só a redução de ruído rápida.",
+    "aiSlow": "O AI Denoise é lento (cerca de 3 s por megapíxel num computador de 4 núcleos).",
+    "aiRecommended": "Ruído alto: o AI Denoise dá melhor resultado.",
+    "applyAi": "Aplicar AI Denoise",
+    "report": {
+      "exposure": "Exposição {{value}} EV",
+      "wb": "Balanço {{temperature}} / matiz {{tint}}",
+      "noise": "Ruído: {{level}}",
+      "noiseIso": "Ruído: {{level}} (ISO {{iso}})",
+      "tilt": "Horizonte endireitado {{value}}°",
+      "cropped": "Recorte automático aplicado",
+      "faces_one": "{{count}} rosto considerado",
+      "faces_other": "{{count}} rostos considerados",
+      "redEyes_one": "{{count}} olho vermelho corrigido",
+      "redEyes_other": "{{count}} olhos vermelhos corrigidos",
+      "spots_one": "{{count}} mancha removida",
+      "spots_other": "{{count}} manchas removidas"
+    },
+    "noise": {
+      "none": "nenhum",
+      "low": "baixo",
+      "moderate": "moderado",
+      "high": "alto",
+      "veryHigh": "muito alto"
+    },
+    "run": "Auto",
+    "runHint": "Analisar esta fotografia e ajustá-la automaticamente (pode ser desfeito)",
+    "running": "A analisar…",
+    "batchButton_one": "Auto ({{count}})",
+    "batchButton_other": "Auto ({{count}})",
+    "batchHint": "Editar automaticamente as fotografias selecionadas, em segundo plano",
+    "batchTitle_one": "Editar automaticamente {{count}} fotografia",
+    "batchTitle_other": "Editar automaticamente {{count}} fotografias",
+    "batchStart_one": "Editar {{count}} fotografia",
+    "batchStart_other": "Editar {{count}} fotografias",
+    "batchIntro": "Cada fotografia é analisada individualmente (exposição, balanço, tons, cor, ruído com o ISO da câmara, horizonte, objetiva): os ajustes não são iguais para todas.",
+    "nonDestructive": "Os originais nunca são alterados. Cada edição fica no histórico da fotografia e pode ser desfeita.",
+    "queueTitle": "Edição automática",
+    "queueState": {
+      "running": "em curso",
+      "paused": "em pausa",
+      "finished": "concluída",
+      "cancelled": "cancelada"
+    },
+    "queueCount": "{{done}} de {{total}}",
+    "queueFailed_one": "{{count}} falhou",
+    "queueFailed_other": "{{count}} falharam",
+    "pause": "Pausar",
+    "resume": "Retomar",
+    "cancel": "Cancelar",
+    "toastFinished_one": "Edição automática concluída: {{count}} fotografia.",
+    "toastFinished_other": "Edição automática concluída: {{count}} fotografias.",
+    "toastCancelled_one": "Edição automática cancelada ({{count}} fotografia editada).",
+    "toastCancelled_other": "Edição automática cancelada ({{count}} fotografias editadas)."
   }
 }

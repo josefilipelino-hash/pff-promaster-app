@@ -7,9 +7,11 @@
 //! - [`thumbnails::ThumbnailService`]: miniaturas em segundo plano com prioridade;
 //! - [`analysis::AnalysisService`]: análise local (métricas, rostos, embeddings) e seleção;
 //! - [`previews`]: previews e resolução total a pedido;
+//! - [`auto_edit`]: edição automática por fotografia e fila em segundo plano (Fase 6);
 //! - [`ProjectSession`]: projeto aberto — catálogo, importações e eventos.
 
 pub mod analysis;
+pub mod auto_edit;
 pub mod cache;
 pub mod codecs;
 pub mod edit;

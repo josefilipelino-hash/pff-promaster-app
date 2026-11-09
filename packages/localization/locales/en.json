@@ -238,7 +238,9 @@
     "undoRedo": "Undo / redo (editor)",
     "beforeAfter": "Before / after (editor)",
     "crop": "Crop tool (editor)",
-    "copyPaste": "Copy / paste settings (editor)"
+    "copyPaste": "Copy / paste settings (editor)",
+    "split": "Split before/after (editor)",
+    "autoEdit": "Automatic edit of the photo (editor)"
   },
   "error": {
     "io": "Error reading or writing a file.",
@@ -570,7 +572,9 @@
       "detail": "Detail",
       "effects": "Effects",
       "geometry": "Geometry",
-      "lens": "Lens corrections"
+      "lens": "Lens corrections",
+      "auto": "Automatic",
+      "retouch": "Retouch"
     },
     "resetSection": "Reset this section",
     "panel": "Adjustments",
@@ -598,7 +602,9 @@
         "sharpenDetail": "Detail",
         "sharpenMasking": "Masking",
         "noiseLuminance": "Luminance noise",
-        "noiseColor": "Color noise"
+        "noiseColor": "Color noise",
+        "noiseDetail": "Noise: detail",
+        "aiDenoise": "AI Denoise"
       },
       "effects": {
         "texture": "Texture",
@@ -639,6 +645,10 @@
         "rotateRight": "Rotate right",
         "flip": "Flip",
         "autoStraighten": "Auto straighten"
+      },
+      "retouch": {
+        "redEye": "Red eyes",
+        "dust": "Sensor dust"
       }
     },
     "wbPicker": "Picker",
@@ -666,7 +676,8 @@
       "paste": "Paste settings",
       "snapshot": "Snapshot applied",
       "virtualCopy": "Virtual copy",
-      "resetSection": "Reset {{section}}"
+      "resetSection": "Reset {{section}}",
+      "auto": "Automatic edit"
     },
     "copyNote": "Geometry (crop, rotation) is not copied by default.",
     "loading": "Loading the photo…",
@@ -711,6 +722,129 @@
     "clipboardEmpty": "You have not copied settings yet.",
     "pasted_one": "Settings applied to {{count}} photo.",
     "pasted_other": "Settings applied to {{count}} photos.",
-    "syncNeedSelection": "Select the photos to sync in the grid."
+    "syncNeedSelection": "Select the photos to sync in the grid.",
+    "aiRunning": "AI Denoise: computing… {{pct}} %",
+    "split": "Split",
+    "splitHint": "Before/after side by side with a divider (drag)",
+    "retouch": {
+      "redEye_one": "Red eyes: {{count}}",
+      "redEye_other": "Red eyes: {{count}}",
+      "dust_one": "Spots: {{count}}",
+      "dust_other": "Spots: {{count}}",
+      "detect": "Detect",
+      "remove": "Remove",
+      "note": "Non-destructive fixes: eyes come from the local face detection; spots are searched on smooth areas.",
+      "found": {
+        "redEye_one": "{{count}} red eye fixed.",
+        "redEye_other": "{{count}} red eyes fixed.",
+        "dust_one": "{{count}} spot removed.",
+        "dust_other": "{{count}} spots removed."
+      },
+      "none": {
+        "redEye": "No red eyes found.",
+        "dust": "No sensor dust found."
+      }
+    }
+  },
+  "auto": {
+    "intensity": "Intensity",
+    "intensities": {
+      "verySoft": "Very soft",
+      "soft": "Soft",
+      "natural": "Natural",
+      "balanced": "Balanced",
+      "strong": "Strong",
+      "custom": "Custom"
+    },
+    "intensityHint": {
+      "verySoft": "Small corrections only; the original look barely changes",
+      "soft": "Moderate corrections, without adding contrast or color",
+      "natural": "Fixes exposure, white balance and tones while keeping the photo's mood",
+      "balanced": "Full corrections plus a little more contrast, color and clarity",
+      "strong": "Full corrections with stronger contrast, color and clarity",
+      "custom": "Choose the strength and which adjustment groups are automatic"
+    },
+    "strength": "Strength (%)",
+    "groupsTitle": "Adjust automatically",
+    "groups": {
+      "tone": "Exposure and tones",
+      "whiteBalance": "White balance",
+      "color": "Color (vibrance)",
+      "sharpen": "Sharpening",
+      "denoise": "Noise reduction",
+      "lens": "Lens (aberration, vignetting)",
+      "straighten": "Straighten horizon"
+    },
+    "extrasTitle": "Options",
+    "extras": {
+      "crop": "Auto crop",
+      "redEye": "Red eyes",
+      "dust": "Sensor dust"
+    },
+    "extrasHint": {
+      "crop": "Only for photos with people: improves framing without cutting faces (at most ~15 %)",
+      "redEye": "Detects red (flash) pupils on the faces found and fixes them",
+      "dust": "Looks for small round spots on smooth areas (sky, walls) and removes them"
+    },
+    "aiDenoise": "AI Denoise",
+    "aiModes": {
+      "off": "Off (fast only)",
+      "whenNeeded": "When there is a lot of noise",
+      "always": "Whenever there is noise"
+    },
+    "aiMissing": "AI Denoise model not found (scripts/prepare-models.py): only the fast noise reduction is used.",
+    "aiSlow": "AI Denoise is slow (about 3 s per megapixel on a 4-core computer).",
+    "aiRecommended": "High noise: AI Denoise gives a better result.",
+    "applyAi": "Apply AI Denoise",
+    "report": {
+      "exposure": "Exposure {{value}} EV",
+      "wb": "White balance {{temperature}} / tint {{tint}}",
+      "noise": "Noise: {{level}}",
+      "noiseIso": "Noise: {{level}} (ISO {{iso}})",
+      "tilt": "Horizon straightened {{value}}°",
+      "cropped": "Auto crop applied",
+      "faces_one": "{{count}} face considered",
+      "faces_other": "{{count}} faces considered",
+      "redEyes_one": "{{count}} red eye fixed",
+      "redEyes_other": "{{count}} red eyes fixed",
+      "spots_one": "{{count}} spot removed",
+      "spots_other": "{{count}} spots removed"
+    },
+    "noise": {
+      "none": "none",
+      "low": "low",
+      "moderate": "moderate",
+      "high": "high",
+      "veryHigh": "very high"
+    },
+    "run": "Auto",
+    "runHint": "Analyse this photo and adjust it automatically (can be undone)",
+    "running": "Analysing…",
+    "batchButton_one": "Auto ({{count}})",
+    "batchButton_other": "Auto ({{count}})",
+    "batchHint": "Automatically edit the selected photos, in the background",
+    "batchTitle_one": "Automatically edit {{count}} photo",
+    "batchTitle_other": "Automatically edit {{count}} photos",
+    "batchStart_one": "Edit {{count}} photo",
+    "batchStart_other": "Edit {{count}} photos",
+    "batchIntro": "Each photo is analysed individually (exposure, white balance, tones, color, noise with the camera ISO, horizon, lens): the adjustments are not the same for all.",
+    "nonDestructive": "Originals are never changed. Each edit is kept in the photo's history and can be undone.",
+    "queueTitle": "Automatic editing",
+    "queueState": {
+      "running": "running",
+      "paused": "paused",
+      "finished": "finished",
+      "cancelled": "cancelled"
+    },
+    "queueCount": "{{done}} of {{total}}",
+    "queueFailed_one": "{{count}} failed",
+    "queueFailed_other": "{{count}} failed",
+    "pause": "Pause",
+    "resume": "Resume",
+    "cancel": "Cancel",
+    "toastFinished_one": "Automatic editing finished: {{count}} photo.",
+    "toastFinished_other": "Automatic editing finished: {{count}} photos.",
+    "toastCancelled_one": "Automatic editing cancelled ({{count}} photo edited).",
+    "toastCancelled_other": "Automatic editing cancelled ({{count}} photos edited)."
   }
 }

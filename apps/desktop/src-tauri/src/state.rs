@@ -16,6 +16,8 @@ pub const EV_IMPORT_FINISHED: &str = "import-finished";
 pub const EV_THUMBNAILS: &str = "thumbnails";
 pub const EV_ANALYSIS: &str = "analysis-progress";
 pub const EV_EDITS: &str = "edits-changed";
+pub const EV_AUTO_EDIT: &str = "auto-edit-progress";
+pub const EV_AI_DENOISE: &str = "ai-denoise";
 
 struct Emitter2 {
     app: AppHandle,
@@ -48,6 +50,12 @@ impl SessionEvents for Emitter2 {
     }
     fn edits_changed(&self, keys: &[i64]) {
         let _ = self.app.emit(EV_EDITS, keys);
+    }
+    fn auto_edit(&self, p: &momento_project_management::auto_edit::AutoEditProgress) {
+        let _ = self.app.emit(EV_AUTO_EDIT, p);
+    }
+    fn ai_denoise(&self, p: &momento_project_management::auto_edit::AiDenoiseProgress) {
+        let _ = self.app.emit(EV_AI_DENOISE, p);
     }
 }
 

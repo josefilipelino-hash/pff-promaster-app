@@ -1,4 +1,4 @@
-import type { DevelopSettings } from "../types";
+import type { AutoOptions, DevelopSettings } from "../types";
 
 /** Ajustes neutros (iguais aos do núcleo: uma receita vazia reproduz o original). */
 export function defaultSettings(): DevelopSettings {
@@ -8,10 +8,11 @@ export function defaultSettings(): DevelopSettings {
     color: { saturation: 0, vibrance: 0 },
     hsl: { hue: Array(8).fill(0), saturation: Array(8).fill(0), luminance: Array(8).fill(0) },
     curve: { highlights: 0, lights: 0, darks: 0, shadows: 0, splitShadows: 25, splitMidtones: 50, splitHighlights: 75, rgb: [], red: [], green: [], blue: [] },
-    detail: { sharpenAmount: 0, sharpenRadius: 1, sharpenDetail: 25, sharpenMasking: 0, noiseLuminance: 0, noiseColor: 0 },
+    detail: { sharpenAmount: 0, sharpenRadius: 1, sharpenDetail: 25, sharpenMasking: 0, noiseLuminance: 0, noiseColor: 0, noiseDetail: 50, aiDenoise: 0 },
     effects: { texture: 0, clarity: 0, dehaze: 0, vignette: 0, vignetteMidpoint: 50, vignetteFeather: 50, vignetteRoundness: 0, grain: 0, grainSize: 25, grainRoughness: 50 },
     geometry: { crop: { x: 0, y: 0, w: 1, h: 1 }, quarterTurns: 0, flipHorizontal: false, straighten: 0, aspect: "original", vertical: 0, horizontal: 0 },
     lens: { distortion: 0, caRed: 0, caBlue: 0, vignetting: 0, vignettingMidpoint: 50 },
+    retouch: { redEyes: [], spots: [] },
   };
 }
 
@@ -76,3 +77,22 @@ export function fitCropToAspect(crop: { x: number; y: number; w: number; h: numb
 
 /** Blocos copiados por omissão (a geometria/recorte raramente se quer em todas as fotografias). */
 export const DEFAULT_COPY_BLOCKS = ["light", "wb", "color", "hsl", "curve", "detail", "effects", "lens"];
+
+/** Opções por omissão da edição automática (iguais às do núcleo). */
+export function defaultAutoOptions(): AutoOptions {
+  return {
+    intensity: "natural",
+    strength: 100,
+    tone: true,
+    whiteBalance: true,
+    color: true,
+    sharpen: true,
+    denoise: true,
+    aiDenoise: "off",
+    straighten: true,
+    crop: false,
+    lens: true,
+    redEye: true,
+    dust: false,
+  };
+}

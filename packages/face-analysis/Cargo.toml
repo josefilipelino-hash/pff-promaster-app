@@ -11,6 +11,7 @@ authors.workspace = true
 [dependencies]
 momento-core-types.workspace = true
 tract-onnx.workspace = true
+rayon.workspace = true
 anyhow = "1"
 image.workspace = true
 serde.workspace = true

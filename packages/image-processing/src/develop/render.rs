@@ -10,7 +10,7 @@
 //! 3. **Filtros espaciais** à resolução do render: textura, redução de ruído, nitidez.
 //! 4. **Saída**: vinheta, grão → sRGB 8 bits (RGBA) + histograma.
 
-use super::color::{luma, matmul, mul3, wb_matrix, Transfer, REC2020_TO_SRGB};
+use super::color::{luma, matmul, mul3, oetf, wb_matrix, Transfer, REC2020_TO_SRGB};
 use super::curves::CurveLuts;
 use super::filters::{gaussian, min_filter, sample_plane};
 use super::geometry::{output_size, GeoMap};
@@ -69,6 +69,9 @@ struct Prep<'a> {
     /// Tamanho de um píxel de saída em coordenadas normalizadas (sobreamostragem).
     du: f32,
     dv: f32,
+    /// Retoque em unidades do lado maior: escala de u e v.
+    ru: f32,
+    rv: f32,
 }
 
 impl<'a> Prep<'a> {
@@ -81,7 +84,10 @@ impl<'a> Prep<'a> {
             }
         }
         let h = &s.hsl;
+        let long = src.width().max(src.height()) as f32;
         Prep {
+            ru: src.width() as f32 / long,
+            rv: src.height() as f32 / long,
             s,
             geo: GeoMap::new(src.width(), src.height(), &s.geometry, &s.lens, uncropped),
             wbx,
@@ -110,6 +116,9 @@ impl<'a> Prep<'a> {
                 let bb =
                     if pts[2] == pts[1] { g[2] } else { src.sample_channel(pts[2].0, pts[2].1, 2) };
                 let mut p = [rr, g[1], bb];
+                if !self.s.retouch.spots.is_empty() || !self.s.retouch.red_eyes.is_empty() {
+                    p = self.retouch(src, &pts, p);
+                }
                 let lv = self.s.lens.vignetting;
                 if lv != 0.0 {
                     let m = 0.5 + (50.0 - self.s.lens.vignetting_midpoint) / 100.0;
@@ -123,6 +132,51 @@ impl<'a> Prep<'a> {
             }
         }
         Some(mul3(&self.wbx, [acc[0] / n, acc[1] / n, acc[2] / n]))
+    }
+
+    /// Manchas (clonagem suave a partir da zona de origem) e olhos vermelhos, no original.
+    #[inline]
+    fn retouch(
+        &self,
+        src: &super::source::Plane,
+        pts: &[(f32, f32); 3],
+        mut p: [f32; 3],
+    ) -> [f32; 3] {
+        let (u, v) = pts[1];
+        for sp in &self.s.retouch.spots {
+            let (dx, dy) = ((u - sp.x) * self.ru, (v - sp.y) * self.rv);
+            let r = sp.r.max(1e-5);
+            let d2 = dx * dx + dy * dy;
+            if d2 >= r * r {
+                continue;
+            }
+            let w = 1.0 - smoothstep(0.55 * r, r, d2.sqrt());
+            let (ox, oy) = (sp.sx - sp.x, sp.sy - sp.y);
+            let q: [f32; 3] =
+                std::array::from_fn(|c| src.sample_channel(pts[c].0 + ox, pts[c].1 + oy, c));
+            p = std::array::from_fn(|c| p[c] + (q[c] - p[c]) * w);
+        }
+        for e in &self.s.retouch.red_eyes {
+            let (dx, dy) = ((u - e.x) * self.ru, (v - e.y) * self.rv);
+            let r = e.r.max(1e-5);
+            let d2 = dx * dx + dy * dy;
+            if d2 >= r * r {
+                continue;
+            }
+            // Razão vermelho/(verde, azul) no domínio de visualização: só a pupila vermelha
+            // (a íris castanha e a pele à volta ficam iguais).
+            let m = (p[1] + p[2]) * 0.5;
+            let (dr, dm) = (oetf(p[0].clamp(0.0, 1.0)), oetf(p[1].max(p[2]).clamp(0.0, 1.0)));
+            if dr <= dm * 1.3 || dr < 0.12 {
+                continue;
+            }
+            let k =
+                smoothstep(1.3, 2.0, dr / dm.max(1e-4)) * (1.0 - smoothstep(0.7 * r, r, d2.sqrt()));
+            // Pupila: neutra e escura (o reflexo branco do flash não é vermelho e mantém-se).
+            let t = p[1].min(p[2]).min(m) * 0.8;
+            p = p.map(|c| c + (t - c) * k);
+        }
+        p
     }
 }
 
@@ -489,12 +543,17 @@ fn spatial(disp: &mut [[f32; 3]], w: usize, h: usize, s: &Settings, src: &Source
     }
     if nl > 0.0 {
         // Filtro sigma: desfoca onde a diferença é pequena (ruído), preserva arestas.
+        // Preservação do detalhe: 50 = comportamento base; mais alto → limiar mais baixo e
+        // parte do detalhe fino devolvida.
+        let keep = d.noise_detail.clamp(0.0, 100.0) / 100.0;
         let b = gaussian(&y, w, h, 1.0 + nl * 2.0);
-        let sig = 0.02 + nl * 0.16;
+        let sig = (0.02 + nl * 0.16) * (1.4 - keep * 0.8);
+        let back = ((keep - 0.5) * 0.5).max(0.0);
         for (v, bb) in y.iter_mut().zip(&b) {
             let diff = *v - bb;
             let wgt = (-(diff * diff) / (sig * sig)).exp();
-            *v += (bb - *v) * wgt * nl.min(1.0);
+            let delta = (bb - *v) * wgt * nl.min(1.0);
+            *v += delta * (1.0 - back);
         }
     }
     if tex != 0.0 {

@@ -3,6 +3,7 @@
 //!
 //! Ver `render` para a ordem das operações e `color` para a gestão de cor.
 
+pub mod auto;
 pub mod color;
 pub mod curves;
 pub mod filters;

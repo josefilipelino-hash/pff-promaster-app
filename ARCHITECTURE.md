@@ -218,7 +218,7 @@ das capacidades do SQLite.
 
 ---
 
-## 5. Pipeline de imagem **[implementado na Fase 5 — ver D-034 a D-039]**
+## 5. Pipeline de imagem **[implementado na Fase 5 — ver D-034 a D-039; automático na Fase 6 — D-040 a D-045]**
 
 ### 5.0 O que está implementado (`momento-image-processing::develop`)
 
@@ -744,4 +744,10 @@ ficheiros a partir do frontend (caminhos sempre resolvidos e verificados no núc
 | D-037 | 2026-11-09 | Frames enviados à interface como **binário** (RGBA + histograma) pela IPC do Tauri e desenhados num canvas | JPEG por protocolo | Sem codificar/descodificar JPEG em cada frame |
 | D-038 | 2026-11-09 | Receita por **variante** no catálogo (+ histórico completo e instantâneos) e cópia em **sidecar JSON na pasta do projeto**; nada é escrito junto dos originais | XMP ao lado dos originais | Os cartões/pastas do cliente nunca são tocados; XMP compatível fica para a exportação |
 | D-039 | 2026-11-09 | Cópias virtuais = variantes; na interface, uma **chave** por fotografia (`AssetId` na principal, 2⁴⁰ + `VariantId` nas cópias) | Refazer a interface toda à volta de variantes | Classificação e edição por cópia; análise, pessoas e momentos continuam por ficheiro |
+| D-040 | 2026-11-09 | **Edição automática por medição de cada fotografia** (histograma, chave da cena, rostos, cinzento das arestas + píxeis cinzentos, saturação, ruído de Immerkær nas zonas lisas, inclinação, aberração cromática, vinheta) que produz uma receita normal (`Settings`); correções **parciais** (até 0,4 EV de "ambiente" conservados; arrefecer menos do que aquecer) | Modelo treinado de edição; parâmetros fixos | Explicável, testável e sem dados de treino; o resultado é editável e desfazível como qualquer ajuste |
+| D-041 | 2026-11-09 | Intensidades = fator das correções + acréscimo criativo; a intensidade só modera o **primeiro EV** de exposição (erros grandes corrigem-se sempre); "Personalizada" escolhe a força e os grupos | Uma só escala para tudo | "Muito suave" nunca deixa uma fotografia 2 EV subexposta |
+| D-042 | 2026-11-09 | Ruído: o **medido** decide; o ISO × fator do sensor (tabela por marca/modelo) limita a redução quando o ISO é baixo (a "granulação" medida a ISO 100 é textura) e garante redução de cor nos RAW de ISO alto | Só o ISO; só a medição | Não se aplica redução forte a fotografias limpas (testado) |
+| D-043 | 2026-11-09 | **AI Denoise com FFDNet** (KAIR, MIT), reconstruído em ONNX a partir dos pesos (sem PyTorch, sem executar pickle) e executado pelo tract por mosaicos de 256 px com sobreposição; o nível de ruído medido entra como mapa de σ; aplicado à **fonte** (antes dos outros ajustes) em memória, nunca escrito | Modelos maiores (NAFNet/Restormer: lentos em CPU, licenças/proveniência menos claras); denoise só tradicional | ≈ 3 s/MP em 4 núcleos (6 MP ≈ 17 s); no editor calcula em segundo plano (a pré-visualização usa a fonte sem ele até estar pronto); é treinado com ruído gaussiano em sRGB, não com RAW reais |
+| D-044 | 2026-11-09 | Retoque básico como bloco `retouch` da receita: olhos vermelhos (círculos nas íris da malha MediaPipe, só píxeis muito vermelhos no domínio de visualização) e manchas do sensor (clonagem suave a partir de uma zona vizinha), aplicados na amostragem do original | Pincel de correção; edição de píxeis | Não destrutivo, sobrevive a qualquer mudança de recorte/geometria; zero falsos positivos em 33 rostos reais |
+| D-045 | 2026-11-09 | Fila de edição automática própria (até 2 trabalhadores, cada fotografia usa todos os núcleos via rayon) com **pausa por condição** entre fotografias, cancelamento que não toca nas restantes, e acrescento à fila em curso | Reutilizar `WorkQueue` sem pausa | A pausa/cancelamento atuam entre fotografias (a que está em curso termina); a interface nunca bloqueia |
 

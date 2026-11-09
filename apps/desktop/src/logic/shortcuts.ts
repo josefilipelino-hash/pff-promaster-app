@@ -104,6 +104,8 @@ export const SHORTCUT_HELP: [string, string][] = [
   ["\\", "shortcuts.beforeAfter"],
   ["R", "shortcuts.crop"],
   ["Mod + Shift + C / V", "shortcuts.copyPaste"],
+  ["Y", "shortcuts.split"],
+  ["Mod + U", "shortcuts.autoEdit"],
   ["Mod + Shift + I", "shortcuts.import"],
   ["?", "shortcuts.help"],
 ];

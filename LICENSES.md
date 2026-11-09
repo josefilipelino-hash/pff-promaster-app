@@ -122,11 +122,18 @@ por `scripts/prepare-models.py` (URLs e SHA-256 fixados) e incluídos no instala
 | MobileNetV3-small image embedder (`image_embedder`) | Google MediaPipe | Apache-2.0 | 4,2 MB | semelhança visual |
 | EfficientNet-Lite2 image classifier (`scene_classifier`) | Google MediaPipe | Apache-2.0 | 23,8 MB | cena/objetos (momentos) |
 | SFace (`face_identity`) | OpenCV Zoo (`face_recognition_sface_2021dec`) | Apache-2.0 | 37,8 MB | identidade facial (pessoas) |
+| FFDNet a cores (`denoise_ffdnet`) | KAIR, Kai Zhang (`ffdnet_color_clip.pth`, release v1.0) | MIT | 3,3 MB | AI Denoise (Fase 6), opcional |
 
 O SFace é descarregado do objeto Git LFS oficial; se o LFS não estiver acessível, usa-se a
 cópia incluída no pacote npm `maystar-facecompare@1.0.2` **apenas** porque os bytes são
 idênticos ao oficial (SHA-256 `0ba9fbfa…4e79`, verificado pelo script). As etiquetas
 ImageNet (`imagenet_labels.txt`) vêm do próprio modelo do MediaPipe.
+
+O FFDNet (Zhang, Zuo & Zhang, *IEEE TIP* 2018) vem das *releases* oficiais do repositório
+KAIR (`github.com/cszn/KAIR`, licença MIT, © 2019 Kai Zhang). O ficheiro `.pth` é verificado
+por SHA-256 (`99a5081e…f5ce`) e lido **sem PyTorch e sem executar pickle**
+(`scripts/torch_legacy.py` só interpreta os opcodes); a rede é reconstruída em ONNX com o
+pacote `onnx` (Apache-2.0). O resultado é determinístico (SHA-256 em `models.lock.json`).
 
 Licença confirmada no *model card* do MediaPipe Face Landmarker e do Image Embedder
 (Apache-2.0). A conversão (tf2onnx 1.17, só no momento da preparação, não incluído na

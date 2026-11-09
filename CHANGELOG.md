@@ -5,6 +5,27 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [0.6.0] — 2026-11-09 — Fase 6: edição automática
+
+### Adicionado
+- **Edição automática** por fotografia (cada uma é medida; nada de parâmetros fixos):
+  exposição (com rostos), balanço de brancos, realces, sombras, brancos, pretos, contraste,
+  curva, vibração/saturação, redução de ruído (nível medido + ISO + tamanho do sensor),
+  nitidez, horizonte, aberração cromática e vinheta da objetiva. Relatório do que foi
+  medido. Atalho Ctrl/⌘+U.
+- Intensidades: Muito suave, Suave, Natural, Equilibrada, Intensa, Personalizada (força e
+  grupos de ajustes).
+- **AI Denoise** local opcional (FFDNet, KAIR, MIT) com o nível de ruído medido; redução
+  rápida com novo controlo de preservação de detalhe.
+- Recorte automático opcional (com pessoas), correção de **olhos vermelhos** e remoção de
+  **manchas do sensor** (bloco de receita `retouch`, não destrutivo).
+- **Editar automaticamente seleção**: fila em segundo plano com progresso, pausa, retoma
+  e cancelamento.
+- Antes/depois **dividido** com divisória arrastável (tecla Y).
+
+### Corrigido
+- A aberração cromática junto à borda criava uma linha colorida (amostragem fora da imagem).
+
 ## [0.5.0] — 2026-11-09 — Fase 5: motor de edição
 
 ### Adicionado

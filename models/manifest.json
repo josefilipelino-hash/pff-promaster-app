@@ -32,6 +32,13 @@
       "source": "https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_small/float32/latest/mobilenet_v3_small.tflite",
       "license": "Apache-2.0",
       "task": "embedding visual de 1024 dimensões (MobileNetV3-small)"
+    },
+    {
+      "id": "denoise",
+      "file": "denoise_ffdnet.onnx",
+      "source": "https://github.com/cszn/KAIR/releases/download/v1.0/ffdnet_color_clip.pth",
+      "license": "MIT",
+      "task": "AI Denoise (FFDNet a cores, 12 convoluções, mapa do nível de ruído); opcional"
     }
   ]
 }

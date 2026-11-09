@@ -9,7 +9,10 @@ use image::{imageops, RgbImage};
 use momento_core_types::recipe::EditRecipe;
 use momento_core_types::{AssetId, CoreError, CoreResult, VariantId};
 use momento_database::Catalog;
+use momento_face_analysis::Denoiser;
 use momento_image_codecs::{format_from_id, CodecRegistry, FormatFamily};
+use momento_image_processing::develop::color::{eotf, oetf};
+use momento_image_processing::develop::source::Plane;
 use momento_image_processing::develop::{self, Quality, RenderOptions, Settings, Source};
 use momento_image_processing::{apply_orientation, encode_jpeg, write_atomic};
 use momento_raw_engine::RawFile;
@@ -136,8 +139,49 @@ fn prune_old(dir: &std::path::Path, variant: VariantId, keep: &std::path::Path) 
     }
 }
 
+/// AI Denoise aplicado a uma fonte (em memória; nunca escrito sobre o original).
+///
+/// O nível de ruído é medido na própria fonte; `strength` (1–100) escala-o (50 = o nível
+/// medido). A rede trabalha no domínio de visualização (0–1); valores acima de 1 (realces
+/// recuperáveis dos RAW) recebem a mesma correção, como diferença.
+pub fn ai_denoised(
+    src: &Source,
+    strength: f32,
+    dn: &Denoiser,
+    progress: &(dyn Fn(usize, usize) -> bool + Sync),
+) -> CoreResult<Option<Source>> {
+    let p = &src.levels[0];
+    let (lum, chroma) = develop::auto::measure_noise(src, 1.0);
+    let measured = lum.max(chroma * 0.5).max(1.0) / 255.0;
+    let sigma = (measured * (strength.clamp(1.0, 100.0) / 50.0)).clamp(1.0 / 255.0, 50.0 / 255.0);
+    let mut disp: Vec<[f32; 3]> = p.px.iter().map(|q| q.map(|c| oetf(c.clamp(0.0, 1.0)))).collect();
+    if !dn.denoise(&mut disp, p.w, p.h, sigma, progress)? {
+        return Ok(None);
+    }
+    let px =
+        p.px.iter()
+            .zip(&disp)
+            .map(|(q, d)| {
+                std::array::from_fn(|c| {
+                    let before = q[c].clamp(0.0, 1.0);
+                    (q[c] + eotf(d[c].clamp(0.0, 1.0)) - before).max(0.0)
+                })
+            })
+            .collect();
+    Ok(Some(Source::from_plane(
+        Plane { w: p.w, h: p.h, px },
+        src.full_width,
+        src.full_height,
+        src.baseline_ev,
+    )))
+}
+
+/// Chave de uma fonte com AI Denoise: asset, resolução total?, intensidade.
+pub type AiKey = (AssetId, bool, u32);
+
 pub struct EditService {
     cache: Mutex<VecDeque<(AssetId, Arc<Source>)>>,
+    ai: Mutex<VecDeque<(AiKey, Arc<Source>)>>,
 }
 
 impl Default for EditService {
@@ -148,7 +192,23 @@ impl Default for EditService {
 
 impl EditService {
     pub fn new() -> Self {
-        EditService { cache: Mutex::new(VecDeque::new()) }
+        EditService { cache: Mutex::new(VecDeque::new()), ai: Mutex::new(VecDeque::new()) }
+    }
+
+    pub fn ai_cached(&self, key: AiKey) -> Option<Arc<Source>> {
+        self.ai
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .find(|e| e.0 == key)
+            .map(|e| e.1.clone())
+    }
+
+    pub fn ai_store(&self, key: AiKey, src: Arc<Source>) {
+        let mut c = self.ai.lock().unwrap_or_else(|e| e.into_inner());
+        c.retain(|e| e.0 != key);
+        c.push_front((key, src));
+        c.truncate(2);
     }
 
     /// Fonte de edição (em cache).
@@ -178,6 +238,7 @@ impl EditService {
 
     pub fn forget(&self) {
         self.cache.lock().unwrap_or_else(|e| e.into_inner()).clear();
+        self.ai.lock().unwrap_or_else(|e| e.into_inner()).clear();
     }
 
     pub fn render_frame(

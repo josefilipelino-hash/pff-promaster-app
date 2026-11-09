@@ -12,6 +12,8 @@ export function Toolbar({
   onClose,
   onHelp,
   onCompare,
+  onAutoEdit,
+  selectedCount = 0,
   view,
   onView,
 }: {
@@ -22,6 +24,9 @@ export function Toolbar({
   onClose: () => void;
   onHelp: () => void;
   onCompare: () => void;
+  /** "Editar automaticamente seleção". */
+  onAutoEdit?: () => void;
+  selectedCount?: number;
   view: View;
   onView: (v: View) => void;
 }) {
@@ -52,6 +57,11 @@ export function Toolbar({
       <button type="button" className="btn" onClick={onCompare} title={`${t("compare.openHint")} (C)`}>
         {t("compare.open")}
       </button>
+      {onAutoEdit && (
+        <button type="button" className="btn" disabled={selectedCount === 0} onClick={onAutoEdit} title={t("auto.batchHint")}>
+          ✦ {t("auto.batchButton", { count: selectedCount })}
+        </button>
+      )}
       <span className="sep" />
       <button type="button" className="btn" disabled={importBusy} onClick={onImportFiles} title={t("import.filesHint")}>
         {t("import.files")}

@@ -66,34 +66,42 @@ Motor não destrutivo (luz, balanço de brancos, cor, HSL, curvas, detalhe, efei
 geometria, objetiva), histórico, instantâneos, cópias virtuais, copiar/colar/sincronizar,
 antes/depois, histograma, qualidade dinâmica. **Por fazer (próximas fases):** máscaras e
 ajustes locais, color grading, presets (próprios, XMP, LUT), perfis de objetiva
-automáticos, correção automática por fotografia.
+automáticos (a correção automática por fotografia foi feita na Fase 6).
 
 Também: consistência de cor entre câmaras e condições de luz; workflow de revisão.
 
 
 
-## Fase 6 — Exportação
+## Fase 6 — Edição automática ✅ *(concluída 2026-11-09, ver PROJECT_STATUS.md)*
+
+Edição automática por fotografia (exposição, balanço, realces/sombras, brancos/pretos,
+contraste, curva, cor, ruído com ISO e câmara, nitidez, horizonte, objetiva), 6
+intensidades, AI Denoise local opcional (FFDNet), redução rápida com preservação de
+detalhe, recorte automático opcional, olhos vermelhos, manchas do sensor, antes/depois
+dividido, "Editar automaticamente seleção" em segundo plano com pausa/retoma/cancelar.
+
+## Fase 7 — Exportação
 
 Receitas e lotes múltiplos, presets de exportação, gestão de cor completa (soft proofing,
 gamut), marca de água, metadados e privacidade, impressão, redes sociais, arquivo
 TIFF/DNG.
 
-## Fase 7 — Galerias
+## Fase 8 — Galerias
 
 Galeria estática com temas, slideshow, downloads, favoritas, palavra-passe (cifra), e
 publicação opcional (S3/R2/B2/SFTP).
 
-## Fase 8 — Álbuns
+## Fase 9 — Álbuns
 
 Editor, templates, montagem automática, margens, sangria, perfis, validações, exportação
 PDF/JPEG/TIFF.
 
-## Fase 9 — Otimização e distribuição
+## Fase 10 — Otimização e distribuição
 
 GPU (wgpu), otimização Apple Silicon, projetos grandes, recuperação, testes de carga,
 assinatura de instaladores.
 
-> **Windows** deixou de ser tarefa da Fase 9: por decisão do utilizador (D-011), Windows e
+> **Windows** deixou de ser tarefa da fase de otimização: por decisão do utilizador (D-011), Windows e
 > macOS são plataformas-alvo desde a Fase 1 — CI, compilação cruzada e instalador NSIS.
 
 ## Mais tarde

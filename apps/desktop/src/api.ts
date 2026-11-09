@@ -1,6 +1,10 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  AiDenoiseProgress,
+  AutoEditProgress,
+  AutoEditResult,
+  AutoOptions,
   DevelopSettings,
   EditView,
   AssetMoment,
@@ -101,6 +105,14 @@ export const api = {
   pasteSettings: (keys: number[], settings: DevelopSettings, blocks: string[]) => invoke<number>("paste_settings", { keys, settings, blocks }),
   pickWhiteBalance: (key: number, settings: DevelopSettings, u: number, v: number) => invoke<[number, number] | null>("pick_white_balance", { key, settings, u, v }),
   autoStraighten: (key: number, settings: DevelopSettings) => invoke<number | null>("auto_straighten", { key, settings }),
+  // Edição automática (cada fotografia é analisada; fila em segundo plano).
+  autoEditPhoto: (key: number, options: AutoOptions) => invoke<AutoEditResult>("auto_edit_photo", { key, options }),
+  startAutoEdit: (keys: number[], options: AutoOptions) => invoke<number>("start_auto_edit", { keys, options }),
+  autoEditStatus: () => invoke<AutoEditProgress>("auto_edit_status"),
+  pauseAutoEdit: () => invoke<void>("pause_auto_edit"),
+  resumeAutoEdit: () => invoke<void>("resume_auto_edit"),
+  cancelAutoEdit: () => invoke<void>("cancel_auto_edit"),
+  aiDenoiseAvailable: () => invoke<boolean>("ai_denoise_available"),
 };
 
 export const events = {
@@ -113,6 +125,8 @@ export const events = {
     analysis: (cb: (p: AnalysisProgress) => void): Promise<UnlistenFn> =>
     listen<AnalysisProgress>("analysis-progress", (e) => cb(e.payload)),
   editsChanged: (cb: (keys: number[]) => void): Promise<UnlistenFn> => listen<number[]>("edits-changed", (e) => cb(e.payload)),
+  autoEdit: (cb: (p: AutoEditProgress) => void): Promise<UnlistenFn> => listen<AutoEditProgress>("auto-edit-progress", (e) => cb(e.payload)),
+  aiDenoise: (cb: (p: AiDenoiseProgress) => void): Promise<UnlistenFn> => listen<AiDenoiseProgress>("ai-denoise", (e) => cb(e.payload)),
 };
 
 export type ImageLevel = "thumb" | "preview" | "full";

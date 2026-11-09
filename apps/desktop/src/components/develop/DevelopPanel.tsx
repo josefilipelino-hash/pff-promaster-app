@@ -31,6 +31,7 @@ const SECTIONS: [string, Field[]][] = [
     ["detail", "sharpenDetail", 0, 100, 1, 25],
     ["detail", "sharpenMasking", 0, 100, 1, 0],
     ["detail", "noiseLuminance", 0, 100, 1, 0],
+    ["detail", "noiseDetail", 0, 100, 1, 50],
     ["detail", "noiseColor", 0, 100, 1, 0],
   ]],
   ["effects", [
@@ -91,6 +92,9 @@ export function DevelopPanel({
   wbPicking,
   onPickWb,
   geometry,
+  auto,
+  retouch,
+  ai,
 }: {
   settings: DevelopSettings;
   set: SetField;
@@ -98,9 +102,15 @@ export function DevelopPanel({
   wbPicking: boolean;
   onPickWb: () => void;
   geometry: React.ReactNode;
+  /** Secção "Automático" (opções, botão e relatório). */
+  auto?: React.ReactNode;
+  /** Secção "Retoque" (olhos vermelhos, manchas). */
+  retouch?: React.ReactNode;
+  /** AI Denoise: modelo disponível e progresso do cálculo (0–1) em curso. */
+  ai?: { available: boolean; progress: number | null };
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState<Record<string, boolean>>({ light: true, wb: true, color: true });
+  const [open, setOpen] = useState<Record<string, boolean>>({ auto: true, light: true, wb: true, color: true });
   const [hslTab, setHslTab] = useState<"hue" | "saturation" | "luminance">("hue");
   const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }));
   const fieldSlider = ([block, key, min, max, step, def, digits]: Field) => {
@@ -134,6 +144,11 @@ export function DevelopPanel({
   return (
     <aside className="develop-panel" aria-label={t("develop.panel")}>
       <Histogram data={histogram} />
+      {auto && (
+        <Section id="auto" open={!!open.auto} toggle={() => toggle("auto")}>
+          {auto}
+        </Section>
+      )}
       <Section id="light" open={!!open.light} toggle={() => toggle("light")} onReset={resetBlock("light", sectionFields("light"))}>
         {sectionFields("light").map(fieldSlider)}
       </Section>
@@ -207,6 +222,21 @@ export function DevelopPanel({
       <Section id="detail" open={!!open.detail} toggle={() => toggle("detail")} onReset={resetBlock("detail", sectionFields("detail"))}>
         <p className="small muted dev-note">{t("develop.detailNote")}</p>
         {sectionFields("detail").map(fieldSlider)}
+        <div className="dev-ai">
+          <Slider
+            label={t("develop.field.detail.aiDenoise")}
+            value={settings.detail.aiDenoise}
+            min={0}
+            max={100}
+            onChange={(v, done) => set("detail.aiDenoise", (s) => void (s.detail.aiDenoise = v), done)}
+          />
+          {ai && !ai.available && <p className="small muted dev-note">{t("auto.aiMissing")}</p>}
+          {ai?.progress !== null && ai?.progress !== undefined && (
+            <p className="small dev-note" role="status">
+              {t("develop.aiRunning", { pct: Math.round(ai.progress * 100) })}
+            </p>
+          )}
+        </div>
       </Section>
       <Section id="effects" open={!!open.effects} toggle={() => toggle("effects")} onReset={resetBlock("effects", sectionFields("effects"))}>
         {sectionFields("effects").map(fieldSlider)}
@@ -217,6 +247,11 @@ export function DevelopPanel({
       <Section id="lens" open={!!open.lens} toggle={() => toggle("lens")} onReset={resetBlock("lens", sectionFields("lens"))}>
         {sectionFields("lens").map(fieldSlider)}
       </Section>
+      {retouch && (
+        <Section id="retouch" open={!!open.retouch} toggle={() => toggle("retouch")}>
+          {retouch}
+        </Section>
+      )}
     </aside>
   );
 }

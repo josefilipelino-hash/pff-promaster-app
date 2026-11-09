@@ -68,6 +68,13 @@ const apiMock = {
   pasteSettings: vi.fn(async (keys: number[]) => keys.length),
   pickWhiteBalance: vi.fn(async () => [23.4, -7.6] as [number, number]),
   autoStraighten: vi.fn(async () => 2.34),
+  aiDenoiseAvailable: vi.fn(async () => true),
+  autoEditPhoto: vi.fn(),
+  startAutoEdit: vi.fn(async (keys: number[]) => keys.length),
+  autoEditStatus: vi.fn(),
+  pauseAutoEdit: vi.fn(async () => {}),
+  resumeAutoEdit: vi.fn(async () => {}),
+  cancelAutoEdit: vi.fn(async () => {}),
 };
 /** Frame binário como o do núcleo (dimensões, histograma, RGBA cinzento). */
 function frameBuffer(w: number, h: number): ArrayBuffer {
@@ -92,7 +99,7 @@ function analysisStatus(analyzed: number, total: number) {
 vi.mock("../api", async (orig) => {
   const real = await orig<typeof import("../api")>();
   const noop = async () => () => {};
-  return { ...real, api: apiMock, events: { importProgress: noop, importFinished: noop, thumbnails: noop, analysis: noop, editsChanged: noop } };
+  return { ...real, api: apiMock, events: { importProgress: noop, importFinished: noop, thumbnails: noop, analysis: noop, editsChanged: noop, autoEdit: noop, aiDenoise: noop } };
 });
 vi.mock("@tauri-apps/api/webview", () => ({ getCurrentWebview: () => ({ onDragDropEvent: async () => () => {} }) }));
 vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ isFullscreen: async () => false, setFullscreen: vi.fn(async () => {}) }) }));
@@ -116,6 +123,7 @@ const { explain, joinList } = await import("../logic/explain");
 const { parseOffset, formatOffset } = await import("../logic/clock");
 const { faceCrop } = await import("./FaceThumb");
 const { defaultSettings, parseFrame, fitCropToAspect } = await import("../logic/develop");
+const { beforeForSplit } = await import("./develop/DevelopView");
 const { historyLabel } = await import("./develop/DevelopView");
 function editViewOf(key: number) {
   return { key, asset: key, variant: key, position: 0, history: [], canUndo: false, canRedo: false, snapshots: [], settings: defaultSettings() };
@@ -667,6 +675,120 @@ describe("edição (Fase 5)", () => {
     expect(historyLabel("light.exposure", t)).toBe("Exposição");
     expect(historyLabel("reset.light", t)).toBe("Repor Luz");
     expect(historyLabel("paste", t)).toBe("Colar definições");
+    expect(historyLabel("auto", t)).toBe("Edição automática");
+  });
+
+  it("edição automática: intensidade, analisar esta fotografia, relatório e AI Denoise recomendado", async () => {
+    const report = {
+      exposure: 0.6,
+      temperature: 8,
+      tint: -3,
+      noise: { luminance: 6, chroma: 3, iso: 6400, sensorFactor: 1, level: "high", aiRecommended: true },
+      tilt: -1.2,
+      cropped: false,
+      redEyes: 2,
+      spots: 0,
+      faces: 3,
+    };
+    apiMock.autoEditPhoto.mockImplementation(async (key: number) => {
+      const v = editViewOf(key);
+      v.settings.light.exposure = 0.6;
+      return { view: { ...v, history: [{ seq: 1, label: "auto", createdAt: 1 }], position: 1, canUndo: true }, report };
+    });
+    await openDevelop();
+    const panel = screen.getByRole("complementary", { name: "Ajustes" });
+    expect(within(panel).getByRole("region", { name: "Automático" })).toBeTruthy();
+    fireEvent.click(within(panel).getByRole("button", { name: "Intensa" }));
+    expect(useStore.getState().autoOptions.intensity).toBe("strong");
+    // Personalizada: força e grupos.
+    fireEvent.click(within(panel).getByRole("button", { name: "Personalizada" }));
+    expect(within(panel).getByRole("slider", { name: "Força (%)" })).toBeTruthy();
+    fireEvent.click(within(panel).getByRole("checkbox", { name: "Balanço de brancos" }));
+    expect(useStore.getState().autoOptions.whiteBalance).toBe(false);
+    // Voltar a uma predefinida volta a ligar todos os grupos.
+    fireEvent.click(within(panel).getByRole("button", { name: "Intensa" }));
+    expect(useStore.getState().autoOptions.whiteBalance).toBe(true);
+    fireEvent.click(within(panel).getByRole("button", { name: /✦ Auto/ }));
+    await act(async () => {});
+    expect(apiMock.autoEditPhoto).toHaveBeenCalledWith(2, expect.objectContaining({ intensity: "strong", redEye: true, crop: false }));
+    expect(screen.getByText("Exposição +0,60 EV")).toBeTruthy();
+    expect(screen.getByText("Ruído: alto (ISO 6400)")).toBeTruthy();
+    expect(screen.getByText("Horizonte endireitado 1,2°")).toBeTruthy();
+    expect(screen.getByText("2 olhos vermelhos corrigidos")).toBeTruthy();
+    expect(screen.getByText("Edição automática", { selector: ".history-list *" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar AI Denoise" }));
+    await act(async () => {});
+    expect(apiMock.commitEdit).toHaveBeenCalledWith(2, "detail.aiDenoise", expect.objectContaining({ detail: expect.objectContaining({ aiDenoise: 50 }) }));
+    // Atalho Ctrl+U.
+    apiMock.autoEditPhoto.mockClear();
+    fireEvent.keyDown(window, { key: "u", ctrlKey: true });
+    await act(async () => {});
+    expect(apiMock.autoEditPhoto).toHaveBeenCalledTimes(1);
+  });
+
+  it("retoque (olhos vermelhos/manchas só) e vista dividida antes/depois", async () => {
+    apiMock.autoEditPhoto.mockImplementation(async (key: number) => {
+      const v = editViewOf(key);
+      v.settings.retouch.redEyes = [{ x: 0.4, y: 0.3, r: 0.01 }];
+      return { view: v, report: { exposure: 0, temperature: 0, tint: 0, noise: { luminance: 0, chroma: 0, iso: null, sensorFactor: 1.2, level: "none", aiRecommended: false }, tilt: null, cropped: false, redEyes: 1, spots: 0, faces: 1 } };
+    });
+    await openDevelop();
+    const panel = screen.getByRole("complementary", { name: "Ajustes" });
+    fireEvent.click(within(panel).getByRole("button", { name: /Retoque/ }));
+    fireEvent.click(within(panel).getAllByRole("button", { name: "Detetar" })[0]!);
+    await act(async () => {});
+    const opts = apiMock.autoEditPhoto.mock.calls.at(-1)![1] as Record<string, unknown>;
+    expect(opts).toMatchObject({ redEye: true, dust: false, tone: false, whiteBalance: false, color: false, denoise: false, lens: false, straighten: false, crop: false });
+    expect(screen.getByText("Olhos vermelhos: 1")).toBeTruthy();
+    fireEvent.click(within(panel).getAllByRole("button", { name: "Remover" })[0]!);
+    await act(async () => {});
+    expect(apiMock.commitEdit).toHaveBeenCalledWith(2, "retouch.redEye", expect.objectContaining({ retouch: { redEyes: [], spots: [] } }));
+    // Vista dividida (Y): o "antes" tem o mesmo enquadramento, sem os ajustes.
+    apiMock.renderEdit.mockClear();
+    fireEvent.keyDown(window, { key: "y" });
+    await act(async () => {});
+    await waitFor(() => expect(screen.getByRole("slider", { name: /Antes\/depois lado a lado/ })).toBeTruthy());
+    const before = apiMock.renderEdit.mock.calls.find((c) => JSON.stringify(c[1]) === JSON.stringify(beforeForSplit(defaultSettings())));
+    expect(before).toBeTruthy();
+    const handle = screen.getByRole("slider", { name: /Antes\/depois lado a lado/ });
+    fireEvent.keyDown(handle, { key: "ArrowLeft" });
+    expect(handle.getAttribute("aria-valuenow")).toBe("45");
+  });
+});
+
+describe("edição automática em lote (Fase 6)", () => {
+  it("Editar automaticamente seleção: diálogo, início da fila, pausa, retoma e cancelar", async () => {
+    apiMock.listPhotos.mockResolvedValue(rows(5).map((r) => ({ ...r, flag: 0 })));
+    act(() => useStore.getState().setProject(project));
+    render(<App />);
+    await screen.findByText("Casamento Ana & Pedro");
+    await act(async () => {});
+    expect((screen.getByRole("button", { name: /✦ Auto \(0\)/ }) as HTMLButtonElement).disabled).toBe(true);
+    act(() => useStore.getState().setSelection({ ids: new Set([1, 3, 4]), focus: 1, anchor: 1 }));
+    fireEvent.click(screen.getByRole("button", { name: /✦ Auto \(3\)/ }));
+    const dlg = await screen.findByRole("dialog", { name: "Editar automaticamente 3 fotografias" });
+    fireEvent.click(within(dlg).getByRole("button", { name: "Equilibrada" }));
+    fireEvent.change(within(dlg).getByRole("combobox", { name: "AI Denoise" }), { target: { value: "whenNeeded" } });
+    expect(within(dlg).getByText(/O AI Denoise é lento/)).toBeTruthy();
+    fireEvent.click(within(dlg).getByRole("button", { name: "Editar 3 fotografias" }));
+    await act(async () => {});
+    expect(apiMock.startAutoEdit).toHaveBeenCalledWith([1, 3, 4], expect.objectContaining({ intensity: "balanced", aiDenoise: "whenNeeded" }));
+    const queue = screen.getByRole("region", { name: "Edição automática" });
+    expect(within(queue).getByText("0 de 3")).toBeTruthy();
+    fireEvent.click(within(queue).getByRole("button", { name: /Pausar/ }));
+    expect(apiMock.pauseAutoEdit).toHaveBeenCalled();
+    // O núcleo envia o progresso (aqui simulado no estado).
+    act(() => useStore.getState().setAutoProgress({ total: 3, done: 1, failed: 0, paused: true, cancelled: false, finished: false, current: "IMG_0003.jpg" }));
+    expect(within(queue).getByText("em pausa")).toBeTruthy();
+    expect(within(queue).getByText("IMG_0003.jpg")).toBeTruthy();
+    fireEvent.click(within(queue).getByRole("button", { name: /Retomar/ }));
+    expect(apiMock.resumeAutoEdit).toHaveBeenCalled();
+    fireEvent.click(within(queue).getByRole("button", { name: "Cancelar" }));
+    expect(apiMock.cancelAutoEdit).toHaveBeenCalled();
+    act(() => useStore.getState().setAutoProgress({ total: 3, done: 1, failed: 0, paused: false, cancelled: true, finished: true, current: null }));
+    expect(within(queue).getByText("cancelada")).toBeTruthy();
+    fireEvent.click(within(queue).getByRole("button", { name: "Fechar" }));
+    expect(screen.queryByRole("region", { name: "Edição automática" })).toBeNull();
   });
 });
 
