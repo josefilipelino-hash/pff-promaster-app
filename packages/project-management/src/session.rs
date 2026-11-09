@@ -22,10 +22,12 @@ use momento_image_codecs::CodecRegistry;
 pub use momento_image_processing::develop::auto::{
     AiDenoise, AutoOptions, AutoReport, Intensity as AutoIntensity,
 };
+pub use momento_image_processing::develop::consistency::{MatchOptions, MatchReport};
 pub use momento_image_processing::develop::{
     Quality as RenderQuality, Settings as DevelopSettings,
 };
 use momento_import_engine::{ImportControl, ImportEvent, ImportOptions, ImportProgress};
+pub use momento_presets::{apply as apply_preset_settings, Component, Preset};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -115,6 +117,20 @@ static MODEL_PATHS: std::sync::OnceLock<Vec<PathBuf>> = std::sync::OnceLock::new
 
 pub fn set_model_search_paths(paths: Vec<PathBuf>) {
     let _ = MODEL_PATHS.set(paths);
+}
+
+/// Pastas de LUT da aplicação (registadas pela aplicação desktop) — além de `<projeto>/luts`.
+static LUT_PATHS: std::sync::OnceLock<Vec<PathBuf>> = std::sync::OnceLock::new();
+
+pub fn set_lut_search_paths(paths: Vec<PathBuf>) {
+    for p in &paths {
+        momento_image_processing::develop::lut::add_search_path(p.clone());
+    }
+    let _ = LUT_PATHS.set(paths);
+}
+
+pub(crate) fn lut_dirs() -> Vec<PathBuf> {
+    LUT_PATHS.get().cloned().unwrap_or_default()
 }
 
 pub(crate) fn models_dir() -> Option<PathBuf> {
@@ -267,6 +283,7 @@ impl ProjectSession {
         thumbs.enqueue(catalog.pending_thumbnail_ids()?);
         let unfinished = catalog.unfinished_import_session()?;
 
+        momento_image_processing::develop::lut::add_search_path(paths.root.join("luts"));
         let session = Arc::new(ProjectSession {
             paths,
             catalog: Mutex::new(catalog),

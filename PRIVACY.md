@@ -24,6 +24,11 @@ abaixo são requisitos de arquitetura, não opções.
    Caminhos de ficheiros podem aparecer em registos de erro locais. Ficam apenas no
    computador (macOS: `~/Library/Logs/pt.momentostudio.desktop/`; Windows:
    `%LOCALAPPDATA%\pt.momentostudio.desktop\logs\`).
+5e. **Fase 7 — presets e consistência:** os presets do utilizador ficam na biblioteca local
+   da aplicação e as LUT importadas na pasta de dados da aplicação (copiadas para o projeto
+   quando usadas). As características de luz (EV, dominante, flash) ficam no catálogo do
+   projeto. A exportação de presets só acontece para um ficheiro escolhido pelo utilizador
+   (permissão `dialog:allow-save`); nada é enviado para fora.
 5d. **Fase 6 — edição automática e AI Denoise:** a análise de cada fotografia, a deteção
    de rostos/íris (para a exposição dos rostos, olhos vermelhos e recorte) e o AI Denoise
    (FFDNet) correm neste computador. Os pontos das íris **não são guardados**: só os

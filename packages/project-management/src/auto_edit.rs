@@ -20,6 +20,7 @@ use momento_image_codecs::{format_from_id, FormatFamily};
 use momento_image_processing::develop::auto::{
     auto_edit, AutoContext, AutoOptions, AutoReport, FaceBox,
 };
+use momento_image_processing::develop::consistency::{match_reference, MatchOptions, MatchReport};
 use momento_image_processing::develop::{self, Quality, RedEye, Settings, Source};
 use serde::Serialize;
 use std::collections::VecDeque;
@@ -29,6 +30,8 @@ use std::thread::JoinHandle;
 
 /// Etiqueta do histórico para a edição automática.
 pub const AUTO_LABEL: &str = "auto";
+/// Etiqueta do histórico para a sincronização com uma referência.
+pub const SYNC_LABEL: &str = "sync";
 /// Lado maior da imagem usada para encontrar rostos e íris.
 const FACE_EDGE: u32 = 1600;
 
@@ -36,6 +39,8 @@ const FACE_EDGE: u32 = 1600;
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutoEditProgress {
+    /// Tipo de trabalho: `auto` (edição automática) ou `sync` (sincronizar com referência).
+    pub kind: String,
     pub total: u64,
     pub done: u64,
     pub failed: u64,
@@ -106,8 +111,29 @@ pub struct AutoEditJob {
     failed: Arc<AtomicU64>,
     /// Trabalhadores ainda ativos.
     active: Arc<AtomicU64>,
-    options: AutoOptions,
+    task: BatchTask,
     handles: Vec<JoinHandle<()>>,
+}
+
+/// Trabalho de uma fila em segundo plano.
+#[derive(Debug, Clone, PartialEq)]
+pub enum BatchTask {
+    Auto(AutoOptions),
+    /// Sincronizar com uma fotografia de referência (ajustes da referência no início).
+    Sync {
+        reference: i64,
+        settings: Box<Settings>,
+        options: MatchOptions,
+    },
+}
+
+impl BatchTask {
+    fn kind(&self) -> &'static str {
+        match self {
+            BatchTask::Auto(_) => "auto",
+            BatchTask::Sync { .. } => "sync",
+        }
+    }
 }
 
 impl AutoEditJob {
@@ -383,6 +409,7 @@ impl ProjectSession {
             Some(j) => {
                 let (paused, cancelled) = j.control.state();
                 AutoEditProgress {
+                    kind: j.task.kind().into(),
                     total: j.total.load(Ordering::SeqCst),
                     done: j.done.load(Ordering::SeqCst),
                     failed: j.failed.load(Ordering::SeqCst),
@@ -392,7 +419,7 @@ impl ProjectSession {
                     current,
                 }
             }
-            None => AutoEditProgress { finished: true, ..Default::default() },
+            None => AutoEditProgress { kind: "auto".into(), finished: true, ..Default::default() },
         }
     }
 
@@ -409,15 +436,34 @@ impl ProjectSession {
         keys: Vec<i64>,
         options: AutoOptions,
     ) -> CoreResult<u64> {
+        self.start_batch(keys, BatchTask::Auto(options))
+    }
+
+    /// Sincronizar fotografias com uma referência (fila em segundo plano): cada uma recebe
+    /// o aspeto da referência e é ajustada até o resultado coincidir (ver
+    /// [`develop::consistency`]).
+    pub fn start_sync(
+        self: &Arc<Self>,
+        reference: i64,
+        keys: Vec<i64>,
+        options: MatchOptions,
+    ) -> CoreResult<u64> {
+        let keys: Vec<i64> = keys.into_iter().filter(|&k| k != reference).collect();
+        let (variant, _) = self.open_catalog()?.resolve_key(reference)?;
+        let settings = Settings::from_recipe(&self.open_catalog()?.recipe_of(variant)?);
+        self.start_batch(keys, BatchTask::Sync { reference, settings: Box::new(settings), options })
+    }
+
+    fn start_batch(self: &Arc<Self>, keys: Vec<i64>, task: BatchTask) -> CoreResult<u64> {
         if keys.is_empty() {
             return Err(CoreError::Other("nenhuma fotografia selecionada".into()));
         }
         let mut g = self.auto_job.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(j) = g.as_ref() {
             if !j.is_finished() {
-                if j.options != options {
+                if j.task != task {
                     return Err(CoreError::Other(
-                        "já existe uma edição automática em curso com outras opções".into(),
+                        "já existe um trabalho em curso com outras opções".into(),
                     ));
                 }
                 let mut q = j.queue.lock().unwrap_or_else(|e| e.into_inner());
@@ -434,7 +480,7 @@ impl ProjectSession {
             done: Arc::new(AtomicU64::new(0)),
             failed: Arc::new(AtomicU64::new(0)),
             active: Arc::new(AtomicU64::new(0)),
-            options: options.clone(),
+            task: task.clone(),
             handles: Vec::new(),
         };
         let workers =
@@ -449,10 +495,10 @@ impl ProjectSession {
                 job.failed.clone(),
                 job.active.clone(),
             );
-            let opts = options.clone();
+            let task = task.clone();
             active.fetch_add(1, Ordering::SeqCst);
             handles.push(std::thread::spawn(move || {
-                me.auto_worker(&ctl, &q, &done, &failed, &opts);
+                me.batch_worker(&ctl, &q, &done, &failed, &task);
                 // O último trabalhador a sair anuncia o fim.
                 if active.fetch_sub(1, Ordering::SeqCst) == 1 {
                     me.events.auto_edit(&me.auto_progress(None, true));
@@ -466,14 +512,16 @@ impl ProjectSession {
         Ok(total)
     }
 
-    fn auto_worker(
+    fn batch_worker(
         self: &Arc<Self>,
         ctl: &Control,
         q: &Mutex<VecDeque<i64>>,
         done: &AtomicU64,
         failed: &AtomicU64,
-        opts: &AutoOptions,
+        task: &BatchTask,
     ) {
+        // Referência carregada uma vez por trabalhador.
+        let mut reference: Option<(Arc<Source>, Vec<FaceBox>)> = None;
         let models = crate::session::models_dir().and_then(|d| VisionModels::load(&d).ok());
         let mut cat = match self.open_catalog() {
             Ok(c) => c,
@@ -493,7 +541,26 @@ impl ProjectSession {
                 .and_then(|(_, a)| cat.photo_details(a).ok().flatten())
                 .map(|d| d.file_name);
             self.events.auto_edit(&self.auto_progress(name, false));
-            match self.auto_edit_one(&mut cat, key, opts, models.as_ref(), true) {
+            let result = match task {
+                BatchTask::Auto(opts) => {
+                    self.auto_edit_one(&mut cat, key, opts, models.as_ref(), true).map(|_| ())
+                }
+                BatchTask::Sync { reference: rk, settings, options } => {
+                    if reference.is_none() {
+                        match self.load_for_match(&cat, *rk) {
+                            Ok(r) => reference = Some(r),
+                            Err(e) => {
+                                tracing::warn!(erro = %e, "referência da sincronização");
+                                failed.fetch_add(1, Ordering::SeqCst);
+                                continue;
+                            }
+                        }
+                    }
+                    let (rs, rf) = reference.as_ref().expect("referência");
+                    self.sync_one(&mut cat, key, rs, settings, rf, options).map(|_| ())
+                }
+            };
+            match result {
                 Ok(_) => {
                     // Miniatura editada já com tudo (incluindo o AI Denoise), sidecar e aviso.
                     if let Err(e) = self.refresh_edited(&cat, key) {
@@ -503,11 +570,61 @@ impl ProjectSession {
                     done.fetch_add(1, Ordering::SeqCst);
                 }
                 Err(e) => {
-                    tracing::warn!(chave = key, erro = %e, "edição automática falhou");
+                    tracing::warn!(chave = key, erro = %e, "trabalho em lote falhou");
                     failed.fetch_add(1, Ordering::SeqCst);
                 }
             }
         }
+    }
+
+    /// Fonte de edição e rostos (catálogo da análise) de uma fotografia.
+    fn load_for_match(&self, cat: &Catalog, key: i64) -> CoreResult<(Arc<Source>, Vec<FaceBox>)> {
+        let (_, asset) = cat.resolve_key(key)?;
+        let src = Arc::new(edit::load_source(cat, self.registry(), asset, Some(edit::EDIT_EDGE))?);
+        let faces = cat
+            .face_boxes(asset)?
+            .into_iter()
+            .map(|b| FaceBox { x: b[0], y: b[1], w: b[2], h: b[3] })
+            .collect();
+        Ok((src, faces))
+    }
+
+    fn sync_one(
+        self: &Arc<Self>,
+        cat: &mut Catalog,
+        key: i64,
+        ref_src: &Source,
+        ref_settings: &Settings,
+        ref_faces: &[FaceBox],
+        options: &MatchOptions,
+    ) -> CoreResult<MatchReport> {
+        let (variant, _) = cat.resolve_key(key)?;
+        let base_recipe = cat.recipe_of(variant)?;
+        let base = Settings::from_recipe(&base_recipe);
+        let (src, faces) = self.load_for_match(cat, key)?;
+        let (s, rep) =
+            match_reference(ref_src, ref_settings, ref_faces, &src, &base, &faces, options);
+        let recipe = s.to_recipe(&base_recipe);
+        if recipe != base_recipe {
+            cat.commit_edit(variant, SYNC_LABEL, &recipe)?;
+        }
+        Ok(rep)
+    }
+
+    /// Sincronização imediata de uma fotografia (testes e pré-visualização).
+    pub fn sync_photo(
+        self: &Arc<Self>,
+        reference: i64,
+        key: i64,
+        options: &MatchOptions,
+    ) -> CoreResult<MatchReport> {
+        let mut cat = self.open_catalog()?;
+        let (rv, _) = cat.resolve_key(reference)?;
+        let rs = Settings::from_recipe(&cat.recipe_of(rv)?);
+        let (src, faces) = self.load_for_match(&cat, reference)?;
+        let rep = self.sync_one(&mut cat, key, &src, &rs, &faces, options)?;
+        self.after_edit(vec![key]);
+        Ok(rep)
     }
 
     /// Sidecar + miniatura editada de uma chave (bloqueante).

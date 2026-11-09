@@ -147,3 +147,95 @@ mod tests {
         assert_eq!(lib.recent(10).unwrap().len(), 1);
     }
 }
+
+/// Preset guardado (o conteúdo é o JSON do crate `momento-presets`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PresetRow {
+    pub id: String,
+    pub name: String,
+    pub group: String,
+    pub position: i64,
+    pub body: String,
+}
+
+impl Library {
+    /// Presets do utilizador, por grupo e posição.
+    pub fn presets(&self) -> CoreResult<Vec<PresetRow>> {
+        let mut st = self
+            .conn
+            .prepare("SELECT id, name, group_name, position, body FROM preset ORDER BY group_name, position, name")
+            .map_err(db_err)?;
+        let rows = st
+            .query_map([], |r| {
+                Ok(PresetRow {
+                    id: r.get(0)?,
+                    name: r.get(1)?,
+                    group: r.get(2)?,
+                    position: r.get(3)?,
+                    body: r.get(4)?,
+                })
+            })
+            .map_err(db_err)?;
+        rows.collect::<Result<_, _>>().map_err(db_err)
+    }
+
+    /// Cria ou substitui um preset.
+    pub fn save_preset(&self, p: &PresetRow) -> CoreResult<()> {
+        self.conn
+            .execute(
+                "INSERT INTO preset(id, name, group_name, position, body, updated_at) VALUES(?1, ?2, ?3, ?4, ?5, ?6)
+                 ON CONFLICT(id) DO UPDATE SET name = ?2, group_name = ?3, position = ?4, body = ?5, updated_at = ?6",
+                params![p.id, p.name, p.group, p.position, p.body, now_millis()],
+            )
+            .map_err(db_err)?;
+        Ok(())
+    }
+
+    pub fn delete_preset(&self, id: &str) -> CoreResult<bool> {
+        Ok(self.conn.execute("DELETE FROM preset WHERE id = ?1", params![id]).map_err(db_err)? > 0)
+    }
+
+    /// Próxima posição livre num grupo.
+    pub fn next_preset_position(&self, group: &str) -> CoreResult<i64> {
+        self.conn
+            .query_row(
+                "SELECT coalesce(max(position) + 1, 0) FROM preset WHERE group_name = ?1",
+                params![group],
+                |r| r.get(0),
+            )
+            .map_err(db_err)
+    }
+}
+
+#[cfg(test)]
+mod preset_tests {
+    use super::*;
+
+    #[test]
+    fn preset_crud_and_order() {
+        let l = Library::open_in_memory().unwrap();
+        let row = |id: &str, g: &str, pos: i64| PresetRow {
+            id: id.into(),
+            name: id.to_uppercase(),
+            group: g.into(),
+            position: pos,
+            body: "{}".into(),
+        };
+        l.save_preset(&row("b", "Cor", 1)).unwrap();
+        l.save_preset(&row("a", "Cor", 0)).unwrap();
+        l.save_preset(&row("c", "", 0)).unwrap();
+        assert_eq!(
+            l.presets().unwrap().iter().map(|p| p.id.as_str()).collect::<Vec<_>>(),
+            ["c", "a", "b"]
+        );
+        assert_eq!(l.next_preset_position("Cor").unwrap(), 2);
+        let mut r = row("a", "Película", 0);
+        r.name = "Novo".into();
+        l.save_preset(&r).unwrap();
+        assert_eq!(l.presets().unwrap().iter().find(|p| p.id == "a").unwrap().group, "Película");
+        assert!(l.delete_preset("a").unwrap());
+        assert!(!l.delete_preset("a").unwrap());
+        assert_eq!(l.presets().unwrap().len(), 2);
+    }
+}

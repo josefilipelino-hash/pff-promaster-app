@@ -102,7 +102,9 @@
     "formatsNote": "São importados JPEG, PNG, TIFF/BigTIFF, WebP, JPEG XL, JPEG 2000, PSD/PSB (imagem composta), BMP, GIF, OpenEXR, HDR e RAW de câmara (LibRaw), além de HEIC/HEIF/AVIF no macOS e no Windows. Ficheiros não suportados, corrompidos ou sem codec são listados no relatório. Duplicados (mesmo conteúdo) são ignorados.",
     "dropHere": "Largue aqui para importar",
     "busy": "Já existe uma importação em curso.",
-    "imagesFilter": "Imagens e RAW"
+    "imagesFilter": "Imagens e RAW",
+    "filesShort": "+ Ficheiros",
+    "folderShort": "+ Pasta"
   },
   "report": {
     "title": "Importação concluída",
@@ -426,7 +428,8 @@
     "grid": "Grelha",
     "sequences": "Sequências",
     "people": "Pessoas",
-    "develop": "Revelar"
+    "develop": "Revelar",
+    "consistency": "Consistência"
   },
   "moment": {
     "bride_prep": "Preparação da noiva",
@@ -574,7 +577,11 @@
       "geometry": "Geometria",
       "lens": "Correções da objetiva",
       "auto": "Automático",
-      "retouch": "Retoque"
+      "retouch": "Retoque",
+      "presets": "Presets",
+      "grading": "Tonalização e LUT",
+      "bw": "Preto e branco",
+      "lut": "LUT"
     },
     "resetSection": "Repor esta secção",
     "panel": "Ajustes",
@@ -649,6 +656,21 @@
       "retouch": {
         "redEye": "Olhos vermelhos",
         "dust": "Manchas do sensor"
+      },
+      "grading": {
+        "shadowsHue": "Sombras: matiz",
+        "shadowsSat": "Sombras: intensidade",
+        "highlightsHue": "Realces: matiz",
+        "highlightsSat": "Realces: intensidade",
+        "balance": "Equilíbrio"
+      },
+      "lut": {
+        "amount": "LUT: intensidade",
+        "remove": "Remover LUT"
+      },
+      "bw": {
+        "enabled": "Preto e branco",
+        "mix": "Mistura P&B"
       }
     },
     "wbPicker": "Conta-gotas",
@@ -677,7 +699,9 @@
       "snapshot": "Instantâneo aplicado",
       "virtualCopy": "Cópia virtual",
       "resetSection": "Repor {{section}}",
-      "auto": "Edição automática"
+      "auto": "Edição automática",
+      "preset": "Preset: {{name}}",
+      "sync": "Sincronizado com referência"
     },
     "copyNote": "A geometria (recorte, rotação) não é copiada por omissão.",
     "loading": "A carregar a fotografia…",
@@ -744,7 +768,9 @@
         "redEye": "Não foram encontrados olhos vermelhos.",
         "dust": "Não foram encontradas manchas do sensor."
       }
-    }
+    },
+    "lut": "LUT",
+    "bwEnable": "Converter para preto e branco"
   },
   "auto": {
     "intensity": "Intensidade",
@@ -846,5 +872,160 @@
     "toastFinished_other": "Edição automática concluída: {{count}} fotografias.",
     "toastCancelled_one": "Edição automática cancelada ({{count}} fotografia editada).",
     "toastCancelled_other": "Edição automática cancelada ({{count}} fotografias editadas)."
+  },
+  "presets": {
+    "button": "Presets…",
+    "applyHint": "Aplicar um preset à seleção, a um momento ou ao casamento completo",
+    "amount": "Amount (%)",
+    "create": "Criar preset",
+    "createTitle": "Criar preset a partir desta fotografia",
+    "name": "Nome",
+    "group": "Grupo",
+    "noGroup": "Os meus presets",
+    "components": "Componentes incluídos",
+    "component": {
+      "exposure": "Exposição",
+      "tone": "Tons (contraste, realces, sombras, brancos, pretos)",
+      "whiteBalance": "Balanço de brancos",
+      "presence": "Presença (vibração, saturação, clareza, textura, névoa)",
+      "hsl": "HSL",
+      "curve": "Curva",
+      "grading": "Tonalização",
+      "blackWhite": "Preto e branco",
+      "sharpening": "Nitidez",
+      "noiseReduction": "Redução de ruído",
+      "effects": "Vinheta e grão",
+      "lens": "Objetiva",
+      "lut": "LUT"
+    },
+    "componentsNote": "Só os componentes escolhidos são guardados e aplicados; o resto de cada fotografia fica como está. Por omissão, só o aspeto (sem exposição nem balanço de brancos, que mudam de fotografia para fotografia).",
+    "created": "Preset \"{{name}}\" criado.",
+    "import": "Importar…",
+    "manage": "Gerir…",
+    "manageTitle": "Gerir presets",
+    "export_one": "Exportar ({{count}})",
+    "export_other": "Exportar ({{count}})",
+    "exported_one": "{{count}} preset exportado.",
+    "exported_other": "{{count}} presets exportados.",
+    "select": "Selecionar {{name}}",
+    "builtin": "interno",
+    "up": "Subir {{name}}",
+    "down": "Descer {{name}}",
+    "rename": "Renomear",
+    "groupOf": "Grupo de {{name}}",
+    "duplicate": "Duplicar",
+    "copySuffix": "(cópia)",
+    "delete": "Eliminar",
+    "deleteTitle": "Eliminar o preset \"{{name}}\"?",
+    "deleteNote": "As fotografias onde já foi aplicado não mudam (cada edição tem a sua receita).",
+    "fileFilter": "Presets (Momento, XMP do Lightroom, LUT .cube)",
+    "imported": {
+      "momentopreset_one": "{{count}} preset importado.",
+      "momentopreset_other": "{{count}} presets importados.",
+      "xmp_one": "Preset XMP importado (aproximado)",
+      "xmp_other": "Presets XMP importados (aproximados)",
+      "cube_one": "LUT importada",
+      "cube_other": "LUT importadas"
+    },
+    "xmpWarning": "Os valores do Lightroom/Camera Raw foram interpretados pelo motor do Momento Studio. Os nomes são parecidos, mas os motores não: o aspeto não será igual ao do Lightroom. Reveja o preset numa fotografia antes de o usar em lote.",
+    "interpreted_one": "{{count}} campo interpretado",
+    "interpreted_other": "{{count}} campos interpretados",
+    "ignored_one": "{{count}} campo ignorado",
+    "ignored_other": "{{count}} campos ignorados",
+    "cubeNote": "LUT de cor aplicada em sRGB no fim do processamento, com interpolação trilinear (como nos editores de vídeo). LUT para imagens log/HDR são recusadas.",
+    "applyTitle": "Aplicar preset",
+    "scope": "Aplicar a",
+    "scopeSelection_one": "Seleção ({{count}} fotografia)",
+    "scopeSelection_other": "Seleção ({{count}} fotografias)",
+    "scopeMoment": "Momento",
+    "scopeAll_one": "Casamento completo ({{count}} fotografia)",
+    "scopeAll_other": "Casamento completo ({{count}} fotografias)",
+    "applyN_one": "Aplicar a {{count}} fotografia",
+    "applyN_other": "Aplicar a {{count}} fotografias",
+    "applied_one": "\"{{name}}\" aplicado a {{count}} fotografia.",
+    "applied_other": "\"{{name}}\" aplicado a {{count}} fotografias.",
+    "applyNote": "Cada fotografia mantém a sua exposição, balanço e recorte (se o preset não os incluir) e a aplicação pode ser desfeita no histórico.",
+    "previewing": "Pré-visualização do preset",
+    "groups": {
+      "Cor": "Cor",
+      "Película": "Película",
+      "Luz": "Luz",
+      "Preto e branco": "Preto e branco",
+      "Importados": "Importados",
+      "LUT": "LUT"
+    }
+  },
+  "look": {
+    "viewHint": "Agrupar por luz, câmara, cenário, horário, balanço e flash; sincronizar com uma referência",
+    "groupsTitle": "Grupos",
+    "criterion": "Agrupar por",
+    "criteria": {
+      "combined": "Luz semelhante (combinado)",
+      "lighting": "Iluminação",
+      "camera": "Câmara",
+      "scene": "Cenário (momento)",
+      "time": "Horário",
+      "whiteBalance": "Balanço de brancos",
+      "flash": "Flash / natural"
+    },
+    "missing_one": "{{count}} fotografia ainda sem medição de luz.",
+    "missing_other": "{{count}} fotografias ainda sem medição de luz.",
+    "measure": "Medir agora",
+    "measuring": "A medir…",
+    "lighting": {
+      "bright": "Luz forte (exterior)",
+      "shade": "Exterior à sombra / nublado",
+      "indoor": "Interior iluminado",
+      "dark": "Interior escuro / noite",
+      "unknown": "Sem dados de exposição"
+    },
+    "wb": {
+      "warm": "Luz quente",
+      "slightlyWarm": "Ligeiramente quente",
+      "neutral": "Luz neutra",
+      "slightlyCool": "Ligeiramente fria",
+      "cool": "Luz fria",
+      "unknown": "Sem medição de cor"
+    },
+    "flash": {
+      "on": "Com flash",
+      "off": "Luz natural (sem flash)",
+      "unknown": "Flash desconhecido"
+    },
+    "camera": {
+      "unknown": "Câmara desconhecida"
+    },
+    "scene": {
+      "unclassified": "Por classificar",
+      "moment": "Momento"
+    },
+    "time": "Horário",
+    "photos_one": "{{count}} fotografia",
+    "photos_other": "{{count}} fotografias",
+    "selectGroup": "Selecionar o grupo",
+    "presetGroup": "Aplicar preset ao grupo…",
+    "referenceHint": "Clique numa fotografia para a escolher como referência (duplo clique abre-a no editor). Edite a referência e depois sincronize as restantes.",
+    "reference": "Referência",
+    "editReference": "Editar a referência",
+    "syncGroup_one": "Sincronizar {{count}} fotografia com a referência",
+    "syncGroup_other": "Sincronizar {{count}} fotografias com a referência",
+    "empty": "Sem fotografias."
+  },
+  "sync": {
+    "smart": "Ajustar cada fotografia à referência (inteligente)",
+    "copyValues": "Copiar os mesmos valores",
+    "smartIntro": "Cada fotografia recebe o aspeto desta e é ajustada até o resultado coincidir — não são copiados os mesmos valores:",
+    "option": {
+      "look": "Aspeto (tons, cor, curva, tonalização, P&B, efeitos, LUT)",
+      "exposure": "Exposição coerente (rostos ou cena)",
+      "whiteBalance": "Balanço de brancos (mesma cor de branco)",
+      "skin": "Tons de pele",
+      "contrast": "Contraste",
+      "color": "Cor (saturação)"
+    },
+    "smartNote": "Medido no resultado de cada fotografia; corre em segundo plano e cada uma pode ser desfeita no histórico. Os tons de pele precisam da análise (rostos).",
+    "queueTitle": "Sincronizar com referência",
+    "toastFinished_one": "Sincronização concluída: {{count}} fotografia.",
+    "toastFinished_other": "Sincronização concluída: {{count}} fotografias."
   }
 }

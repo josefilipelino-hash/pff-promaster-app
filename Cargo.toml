@@ -23,7 +23,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 rust-version = "1.85"
 license = "UNLICENSED"
@@ -59,6 +59,7 @@ momento-image-codecs = { path = "packages/image-codecs" }
 momento-task-queue = { path = "packages/task-queue" }
 momento-metadata = { path = "packages/metadata" }
 momento-image-processing = { path = "packages/image-processing" }
+momento-presets = { path = "packages/presets" }
 momento-import-engine = { path = "packages/import-engine" }
 momento-project-management = { path = "packages/project-management" }
 momento-test-fixtures = { path = "packages/test-fixtures" }

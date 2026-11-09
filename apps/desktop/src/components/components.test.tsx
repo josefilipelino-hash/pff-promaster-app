@@ -75,7 +75,35 @@ const apiMock = {
   pauseAutoEdit: vi.fn(async () => {}),
   resumeAutoEdit: vi.fn(async () => {}),
   cancelAutoEdit: vi.fn(async () => {}),
+  listPresets: vi.fn(async () => presetList()),
+  createPreset: vi.fn(async (name: string, ..._rest: unknown[]) => ({ ...presetList()[0]!, id: "u1", name, builtin: false, group: "" })),
+  renamePreset: vi.fn(async () => ({})),
+  movePreset: vi.fn(async () => ({})),
+  reorderPresets: vi.fn(async () => {}),
+  duplicatePreset: vi.fn(async () => ({})),
+  deletePreset: vi.fn(async () => {}),
+  importPresetFile: vi.fn(),
+  exportPresets: vi.fn(async (ids: string[]) => ids.length),
+  presetPreviewSettings: vi.fn(async (settings: unknown, _id: string, amount: number) => ({ ...(settings as object), light: { ...(settings as { light: object }).light, contrast: amount / 10 } })),
+  applyPreset: vi.fn(async (keys: number[]) => keys.length),
+  measureConsistency: vi.fn(async () => 4),
+  consistencyGroups: vi.fn(async () => ({ groups: lookGroups(), missing: 0 })),
+  startSync: vi.fn(async (_r: number, keys: number[]) => keys.length),
 };
+function presetList() {
+  return [
+    { id: "builtin:natural-wedding", name: "Natural Wedding", group: "Cor", components: ["tone", "presence"], settings: defaultSettings(), builtin: true, description: "Natural" },
+    { id: "builtin:bw-classic", name: "B&W Classic", group: "Preto e branco", components: ["tone", "blackWhite"], settings: defaultSettings(), builtin: true, description: "P&B" },
+    { id: "u7", name: "Meu look", group: "Clientes", components: ["tone"], settings: defaultSettings(), builtin: false, description: "" },
+    { id: "u8", name: "Outro", group: "Clientes", components: ["tone"], settings: defaultSettings(), builtin: false, description: "" },
+  ];
+}
+function lookGroups() {
+  return [
+    { id: "combined:0", code: "lighting.bright", tags: ["flash.off", "wb.neutral"], detail: "", moment: null, start: "2026-06-15T15:00:00", end: "2026-06-15T15:20:00", ids: [1, 2] },
+    { id: "combined:1", code: "lighting.dark", tags: ["flash.on", "wb.warm"], detail: "", moment: null, start: "2026-06-15T22:00:00", end: "2026-06-15T23:10:00", ids: [3, 4] },
+  ];
+}
 /** Frame binário como o do núcleo (dimensões, histograma, RGBA cinzento). */
 function frameBuffer(w: number, h: number): ArrayBuffer {
   const buf = new ArrayBuffer(8 + 3 * 256 * 4 + w * h * 4);
@@ -629,7 +657,9 @@ describe("edição (Fase 5)", () => {
     expect(apiMock.pasteSettings).toHaveBeenCalledWith([2], expect.anything(), expect.not.arrayContaining(["geometry"]));
     act(() => useStore.getState().setSelection({ ids: new Set([2, 3, 4]), focus: 2, anchor: 2 }));
     fireEvent.click(screen.getByRole("button", { name: "Sincronizar" }));
-    fireEvent.click(within(screen.getByRole("dialog", { name: "Sincronizar com 2 fotografias" })).getByRole("button", { name: "Sincronizar" }));
+    const syncDlg = screen.getByRole("dialog", { name: "Sincronizar com 2 fotografias" });
+    fireEvent.click(within(syncDlg).getByRole("radio", { name: "Copiar os mesmos valores" }));
+    fireEvent.click(within(syncDlg).getByRole("button", { name: "Sincronizar" }));
     await act(async () => {});
     expect(apiMock.pasteSettings).toHaveBeenLastCalledWith([3, 4], expect.anything(), expect.any(Array));
     fireEvent.change(screen.getByRole("textbox", { name: "Nome do instantâneo" }), { target: { value: "Quente" } });
@@ -756,6 +786,124 @@ describe("edição (Fase 5)", () => {
   });
 });
 
+describe("presets e consistência (Fase 7)", () => {
+  async function openApp(n = 4) {
+    vi.useRealTimers();
+    apiMock.listPhotos.mockResolvedValue(rows(n).map((r) => ({ ...r, flag: 0 })));
+    act(() => useStore.getState().setProject(project));
+    render(<App />);
+    await screen.findByText("Casamento Ana & Pedro");
+    await act(async () => {});
+  }
+
+  it("editor: pré-visualizar ao passar o rato, aplicar com Amount, criar preset", async () => {
+    await openApp();
+    fireEvent.mouseDown(document.querySelector('[data-id="2"]')!);
+    fireEvent.keyDown(window, { key: "d" });
+    await act(async () => {});
+    const panel = screen.getByRole("complementary", { name: "Ajustes" });
+    const sec = within(panel).getByRole("region", { name: "Presets" });
+    expect(within(sec).getByText(/Preto e branco/)).toBeTruthy();
+    fireEvent.change(within(sec).getByRole("slider", { name: "Amount (%)" }), { target: { value: "60" } });
+    apiMock.renderEdit.mockClear();
+    fireEvent.mouseEnter(within(sec).getByRole("button", { name: "Natural Wedding" }));
+    await act(async () => {});
+    expect(apiMock.presetPreviewSettings).toHaveBeenLastCalledWith(expect.anything(), "builtin:natural-wedding", 60);
+    await waitFor(() => expect(apiMock.renderEdit.mock.calls.some((c) => (c[1] as { light: { contrast: number } }).light.contrast === 6)).toBe(true));
+    expect(apiMock.commitEdit).not.toHaveBeenCalled();
+    fireEvent.click(within(sec).getByRole("button", { name: "Natural Wedding" }));
+    await act(async () => {});
+    expect(apiMock.commitEdit).toHaveBeenCalledWith(2, "preset:Natural Wedding", expect.objectContaining({ light: expect.objectContaining({ contrast: 6 }) }));
+    const t = i18n.t.bind(i18n) as (k: string, o?: Record<string, unknown>) => string;
+    expect(historyLabel("preset:Film Warm", t)).toBe("Preset: Film Warm");
+    expect(historyLabel("sync", t)).toBe("Sincronizado com referência");
+    // Criar preset: só os componentes escolhidos.
+    fireEvent.click(within(sec).getByRole("button", { name: "+ Criar preset" }));
+    const dlg = screen.getByRole("dialog", { name: "Criar preset a partir desta fotografia" });
+    fireEvent.change(within(dlg).getByRole("textbox", { name: "Nome" }), { target: { value: "Igreja quente" } });
+    fireEvent.click(within(dlg).getByRole("checkbox", { name: /^Exposição$/ }));
+    fireEvent.click(within(dlg).getByRole("button", { name: "Criar preset" }));
+    await act(async () => {});
+    expect(apiMock.createPreset).toHaveBeenCalledWith("Igreja quente", "", expect.arrayContaining(["tone", "exposure"]), expect.anything());
+    expect(apiMock.createPreset.mock.calls[0]![2]).not.toContain("lut");
+  });
+
+  it("gerir: renomear, duplicar, ordenar, eliminar com confirmação, exportar", async () => {
+    await openApp();
+    fireEvent.mouseDown(document.querySelector('[data-id="2"]')!);
+    fireEvent.keyDown(window, { key: "d" });
+    await act(async () => {});
+    fireEvent.click(screen.getByRole("button", { name: "Gerir…" }));
+    const dlg = screen.getByRole("dialog", { name: "Gerir presets" });
+    const rowOf = (name: string) => within(dlg).getByText(name).closest("li")!;
+    expect(within(rowOf("Natural Wedding")).queryByRole("button", { name: "Eliminar" })).toBeNull();
+    fireEvent.click(within(rowOf("Meu look")).getByRole("button", { name: "Renomear" }));
+    const input = within(dlg).getByDisplayValue("Meu look");
+    fireEvent.change(input, { target: { value: "Look Ana" } });
+    fireEvent.blur(input);
+    await act(async () => {});
+    expect(apiMock.renamePreset).toHaveBeenCalledWith("u7", "Look Ana");
+    fireEvent.click(within(rowOf("Natural Wedding")).getByRole("button", { name: "Duplicar" }));
+    await act(async () => {});
+    expect(apiMock.duplicatePreset).toHaveBeenCalledWith("builtin:natural-wedding", "(cópia)");
+    fireEvent.click(within(dlg).getByRole("button", { name: "Descer Meu look" }));
+    await act(async () => {});
+    expect(apiMock.reorderPresets).toHaveBeenCalledWith(["u8", "u7"]);
+    fireEvent.click(within(rowOf("Outro")).getByRole("button", { name: "Eliminar" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: 'Eliminar o preset "Outro"?' })).getByRole("button", { name: "Eliminar" }));
+    await act(async () => {});
+    expect(apiMock.deletePreset).toHaveBeenCalledWith("u8");
+    expect((within(dlg).getByRole("button", { name: "Exportar (0)" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("aplicar preset: seleção, momento e casamento completo", async () => {
+    await openApp(5);
+    act(() => useStore.getState().setSelection({ ids: new Set([1, 2]), focus: 1, anchor: 1 }));
+    fireEvent.click(screen.getByRole("button", { name: "Presets…" }));
+    const dlg = await screen.findByRole("dialog", { name: "Aplicar preset" });
+    fireEvent.click(within(dlg).getByRole("button", { name: "B&W Classic" }));
+    fireEvent.change(within(dlg).getByRole("slider", { name: "Amount (%)" }), { target: { value: "80" } });
+    fireEvent.click(within(dlg).getByRole("button", { name: "Aplicar a 2 fotografias" }));
+    await act(async () => {});
+    expect(apiMock.applyPreset).toHaveBeenCalledWith([1, 2], "builtin:bw-classic", 80);
+    fireEvent.click(screen.getByRole("button", { name: "Presets…" }));
+    const dlg2 = await screen.findByRole("dialog", { name: "Aplicar preset" });
+    fireEvent.click(within(dlg2).getByRole("radio", { name: /Casamento completo/ }));
+    fireEvent.click(within(dlg2).getByRole("button", { name: "Natural Wedding" }));
+    fireEvent.click(within(dlg2).getByRole("button", { name: "Aplicar a 5 fotografias" }));
+    await act(async () => {});
+    expect(apiMock.applyPreset).toHaveBeenLastCalledWith([1, 2, 3, 4, 5], "builtin:natural-wedding", 100);
+  });
+
+  it("consistência: grupos, referência, sincronizar e sincronização inteligente no editor", async () => {
+    await openApp();
+    fireEvent.click(screen.getByRole("button", { name: "Consistência" }));
+    await act(async () => {});
+    expect(apiMock.consistencyGroups).toHaveBeenCalledWith("combined");
+    const groups = screen.getByRole("complementary", { name: "Grupos" });
+    expect(within(groups).getByText("Luz forte (exterior)")).toBeTruthy();
+    expect(within(groups).getByText(/22:00–23:10 · Com flash · Luz quente/)).toBeTruthy();
+    fireEvent.change(within(groups).getByRole("combobox", { name: "Agrupar por" }), { target: { value: "camera" } });
+    await act(async () => {});
+    expect(apiMock.consistencyGroups).toHaveBeenLastCalledWith("camera");
+    fireEvent.click(within(groups).getByRole("button", { name: /Interior escuro/ }));
+    fireEvent.click(screen.getByRole("button", { name: "IMG_00003.jpg" }));
+    expect(screen.getByRole("button", { name: "IMG_00003.jpg" }).getAttribute("aria-pressed")).toBe("true");
+    fireEvent.click(screen.getByRole("checkbox", { name: "Tons de pele" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sincronizar 1 fotografia com a referência" }));
+    await act(async () => {});
+    expect(apiMock.startSync).toHaveBeenCalledWith(3, [3, 4], expect.objectContaining({ skin: false, exposure: true, look: true }));
+    expect(screen.getByRole("region", { name: "Sincronizar com referência" })).toBeTruthy();
+    // Medir o que falta.
+    apiMock.consistencyGroups.mockResolvedValueOnce({ groups: lookGroups(), missing: 3 });
+    fireEvent.change(within(groups).getByRole("combobox", { name: "Agrupar por" }), { target: { value: "flash" } });
+    await act(async () => {});
+    fireEvent.click(screen.getByRole("button", { name: "Medir agora" }));
+    await act(async () => {});
+    expect(apiMock.measureConsistency).toHaveBeenCalled();
+  });
+});
+
 describe("edição automática em lote (Fase 6)", () => {
   it("Editar automaticamente seleção: diálogo, início da fila, pausa, retoma e cancelar", async () => {
     apiMock.listPhotos.mockResolvedValue(rows(5).map((r) => ({ ...r, flag: 0 })));
@@ -778,14 +926,14 @@ describe("edição automática em lote (Fase 6)", () => {
     fireEvent.click(within(queue).getByRole("button", { name: /Pausar/ }));
     expect(apiMock.pauseAutoEdit).toHaveBeenCalled();
     // O núcleo envia o progresso (aqui simulado no estado).
-    act(() => useStore.getState().setAutoProgress({ total: 3, done: 1, failed: 0, paused: true, cancelled: false, finished: false, current: "IMG_0003.jpg" }));
+    act(() => useStore.getState().setAutoProgress({ kind: "auto", total: 3, done: 1, failed: 0, paused: true, cancelled: false, finished: false, current: "IMG_00003.jpg" }));
     expect(within(queue).getByText("em pausa")).toBeTruthy();
-    expect(within(queue).getByText("IMG_0003.jpg")).toBeTruthy();
+    expect(within(queue).getByText("IMG_00003.jpg")).toBeTruthy();
     fireEvent.click(within(queue).getByRole("button", { name: /Retomar/ }));
     expect(apiMock.resumeAutoEdit).toHaveBeenCalled();
     fireEvent.click(within(queue).getByRole("button", { name: "Cancelar" }));
     expect(apiMock.cancelAutoEdit).toHaveBeenCalled();
-    act(() => useStore.getState().setAutoProgress({ total: 3, done: 1, failed: 0, paused: false, cancelled: true, finished: true, current: null }));
+    act(() => useStore.getState().setAutoProgress({ kind: "auto", total: 3, done: 1, failed: 0, paused: false, cancelled: true, finished: true, current: null }));
     expect(within(queue).getByText("cancelada")).toBeTruthy();
     fireEvent.click(within(queue).getByRole("button", { name: "Fechar" }));
     expect(screen.queryByRole("region", { name: "Edição automática" })).toBeNull();

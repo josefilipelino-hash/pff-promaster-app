@@ -10,7 +10,7 @@
 //! 3. **Filtros espaciais** à resolução do render: textura, redução de ruído, nitidez.
 //! 4. **Saída**: vinheta, grão → sRGB 8 bits (RGBA) + histograma.
 
-use super::color::{luma, matmul, mul3, oetf, wb_matrix, Transfer, REC2020_TO_SRGB};
+use super::color::{eotf, luma, matmul, mul3, oetf, wb_matrix, Transfer, REC2020_TO_SRGB};
 use super::curves::CurveLuts;
 use super::filters::{gaussian, min_filter, sample_plane};
 use super::geometry::{output_size, GeoMap};
@@ -72,6 +72,16 @@ struct Prep<'a> {
     /// Retoque em unidades do lado maior: escala de u e v.
     ru: f32,
     rv: f32,
+    /// Tonalização: vetores de cor (sem luminância) das sombras e dos realces, já escalados.
+    grade: Option<([f32; 3], [f32; 3], f32)>,
+    lut: Option<(std::sync::Arc<super::lut::Lut>, f32)>,
+}
+
+/// Cor pura de um matiz sem a sua luminância (para tonalizar sem mudar o brilho).
+fn chroma_of(hue: f32) -> [f32; 3] {
+    let c = hsv_to_rgb(hue, 1.0, 1.0);
+    let l = luma(c);
+    c.map(|v| v - l)
 }
 
 impl<'a> Prep<'a> {
@@ -85,7 +95,21 @@ impl<'a> Prep<'a> {
         }
         let h = &s.hsl;
         let long = src.width().max(src.height()) as f32;
+        let g = &s.grading;
+        let grade = (g.shadows_sat > 0.0 || g.highlights_sat > 0.0).then(|| {
+            (
+                chroma_of(g.shadows_hue).map(|v| v * g.shadows_sat / 100.0 * 0.3),
+                chroma_of(g.highlights_hue).map(|v| v * g.highlights_sat / 100.0 * 0.3),
+                g.balance.clamp(-100.0, 100.0) / 100.0,
+            )
+        });
+        let lut = (s.lut.amount > 0.0)
+            .then(|| super::lut::get(&s.lut.id))
+            .flatten()
+            .map(|l| (l, s.lut.amount.clamp(0.0, 100.0) / 100.0));
         Prep {
+            grade,
+            lut,
             ru: src.width() as f32 / long,
             rv: src.height() as f32 / long,
             s,
@@ -358,6 +382,20 @@ fn color_ops(p: &Prep, mut d: [f32; 3]) -> [f32; 3] {
             d = hsv_to_rgb(nh, ns, nv);
         }
     }
+    if s.bw.enabled {
+        // Preto e branco: luminância com a mistura por cor (mais efeito nas cores saturadas).
+        let l = luma(d);
+        let (h, sat, _) = rgb_to_hsv([d[0].max(0.0), d[1].max(0.0), d[2].max(0.0)]);
+        let adj: f32 = hsl_weights(h).iter().map(|&(i, w)| w * s.bw.mix[i] / 100.0).sum();
+        let g = (l * (1.0 + adj * sat.min(1.0) * 0.9)).max(0.0);
+        d = [g, g, g];
+    }
+    if let Some((sh, hl, bal)) = p.grade {
+        let l = luma(d).clamp(0.0, 1.0);
+        let ws = ((1.0 - l).powi(2) * (1.0 - bal * 0.6)).max(0.0);
+        let wh = (l * l * (1.0 + bal * 0.6)).max(0.0);
+        d = std::array::from_fn(|i| d[i] + sh[i] * ws + hl[i] * wh);
+    }
     d
 }
 
@@ -488,7 +526,14 @@ pub fn render(src: &Source, s: &Settings, o: &RenderOptions) -> Rendered {
                     d = d.map(|c| c + n * amp);
                 }
                 let lin = [tr.to_linear.get(d[0]), tr.to_linear.get(d[1]), tr.to_linear.get(d[2])];
-                let out = mul3(&to_srgb, lin);
+                let mut out = mul3(&to_srgb, lin);
+                if let Some((lut, amt)) = &p.lut {
+                    // LUT em sRGB codificado (0–1), como nos editores de vídeo.
+                    let e = out.map(|c| oetf(c.clamp(0.0, 1.0)));
+                    let l = lut.apply(e);
+                    out =
+                        std::array::from_fn(|i| eotf((e[i] + (l[i] - e[i]) * amt).clamp(0.0, 1.0)));
+                }
                 for c in 0..3 {
                     let b = tr.encode_u8(out[c]);
                     row[x * 4 + c] = b;

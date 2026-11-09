@@ -326,7 +326,7 @@ fn small_plane(src: &Source, edge: f32) -> &Plane {
 
 /// Estimativa do iluminante por "cinzento das arestas" (van de Weijer et al., 2007,
 /// Minkowski p = 6) combinada com o cinzento médio dos píxeis pouco saturados.
-fn estimate_illuminant(p: &Plane) -> Option<[f32; 3]> {
+pub fn estimate_illuminant(p: &Plane) -> Option<[f32; 3]> {
     let (w, h) = (p.w, p.h);
     if w < 8 || h < 8 {
         return None;

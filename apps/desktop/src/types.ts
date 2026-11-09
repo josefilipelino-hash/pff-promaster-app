@@ -422,6 +422,9 @@ export interface DevelopSettings {
     redEyes: { x: number; y: number; r: number }[];
     spots: { x: number; y: number; r: number; sx: number; sy: number }[];
   };
+  grading: { shadowsHue: number; shadowsSat: number; highlightsHue: number; highlightsSat: number; balance: number };
+  bw: { enabled: boolean; mix: number[] };
+  lut: { id: string; name: string; amount: number };
 }
 
 export interface HistoryEntry {
@@ -448,7 +451,7 @@ export interface EditView {
   settings: DevelopSettings;
 }
 
-export const SETTINGS_BLOCKS = ["light", "wb", "color", "hsl", "curve", "detail", "effects", "geometry", "lens", "retouch"] as const;
+export const SETTINGS_BLOCKS = ["light", "wb", "color", "hsl", "curve", "detail", "effects", "geometry", "lens", "retouch", "grading", "bw", "lut"] as const;
 export type SettingsBlock = (typeof SETTINGS_BLOCKS)[number];
 
 // --- Edição automática (Fase 6) -------------------------------------------------------------
@@ -494,6 +497,8 @@ export interface AutoEditResult {
 }
 
 export interface AutoEditProgress {
+  /** "auto" (edição automática) ou "sync" (sincronizar com referência). */
+  kind: string;
   total: number;
   done: number;
   failed: number;
@@ -508,4 +513,67 @@ export interface AiDenoiseProgress {
   done: number;
   total: number;
   finished: boolean;
+}
+
+// --- Presets e consistência (Fase 7) --------------------------------------------------------
+
+export type PresetComponent =
+  | "exposure"
+  | "tone"
+  | "whiteBalance"
+  | "presence"
+  | "hsl"
+  | "curve"
+  | "grading"
+  | "blackWhite"
+  | "sharpening"
+  | "noiseReduction"
+  | "effects"
+  | "lens"
+  | "lut";
+export const PRESET_COMPONENTS: PresetComponent[] = ["exposure", "tone", "whiteBalance", "presence", "hsl", "curve", "grading", "blackWhite", "sharpening", "noiseReduction", "effects", "lens", "lut"];
+export const LOOK_COMPONENTS: PresetComponent[] = ["tone", "presence", "hsl", "curve", "grading", "blackWhite", "effects", "lut"];
+
+export interface Preset {
+  id: string;
+  name: string;
+  group: string;
+  components: PresetComponent[];
+  settings: DevelopSettings;
+  builtin: boolean;
+  description: string;
+}
+
+export interface CompatReport {
+  interpreted: string[];
+  ignored: [string, string][];
+}
+
+export interface PresetImportResult {
+  presets: Preset[];
+  report: CompatReport | null;
+  kind: "momentopreset" | "xmp" | "cube";
+}
+
+export type Criterion = "combined" | "lighting" | "camera" | "scene" | "time" | "whiteBalance" | "flash";
+export const CRITERIA: Criterion[] = ["combined", "lighting", "camera", "scene", "time", "whiteBalance", "flash"];
+
+export interface LookGroup {
+  id: string;
+  code: string;
+  tags: string[];
+  detail: string;
+  moment: number | null;
+  start: string | null;
+  end: string | null;
+  ids: number[];
+}
+
+export interface MatchOptions {
+  exposure: boolean;
+  whiteBalance: boolean;
+  skin: boolean;
+  contrast: boolean;
+  color: boolean;
+  look: boolean;
 }

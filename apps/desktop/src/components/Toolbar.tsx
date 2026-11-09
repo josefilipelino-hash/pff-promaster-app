@@ -13,6 +13,7 @@ export function Toolbar({
   onHelp,
   onCompare,
   onAutoEdit,
+  onPresets,
   selectedCount = 0,
   view,
   onView,
@@ -26,6 +27,8 @@ export function Toolbar({
   onCompare: () => void;
   /** "Editar automaticamente seleção". */
   onAutoEdit?: () => void;
+  /** Aplicar preset (seleção, momento, casamento). */
+  onPresets?: () => void;
   selectedCount?: number;
   view: View;
   onView: (v: View) => void;
@@ -50,6 +53,9 @@ export function Toolbar({
                 <button type="button" className={`btn small${view === "people" ? " active" : ""}`} aria-pressed={view === "people"} onClick={() => onView("people")}>
           {t("view.people")}
         </button>
+        <button type="button" className={`btn small${view === "consistency" ? " active" : ""}`} aria-pressed={view === "consistency"} onClick={() => onView("consistency")} title={t("look.viewHint")}>
+          {t("view.consistency")}
+        </button>
         <button type="button" className={`btn small${view === "develop" ? " active" : ""}`} aria-pressed={view === "develop"} onClick={() => onView("develop")} title={`${t("view.develop")} (D)`}>
           {t("view.develop")}
         </button>
@@ -57,6 +63,11 @@ export function Toolbar({
       <button type="button" className="btn" onClick={onCompare} title={`${t("compare.openHint")} (C)`}>
         {t("compare.open")}
       </button>
+      {onPresets && (
+        <button type="button" className="btn" onClick={onPresets} title={t("presets.applyHint")}>
+          {t("presets.button")}
+        </button>
+      )}
       {onAutoEdit && (
         <button type="button" className="btn" disabled={selectedCount === 0} onClick={onAutoEdit} title={t("auto.batchHint")}>
           ✦ {t("auto.batchButton", { count: selectedCount })}
@@ -64,10 +75,10 @@ export function Toolbar({
       )}
       <span className="sep" />
       <button type="button" className="btn" disabled={importBusy} onClick={onImportFiles} title={t("import.filesHint")}>
-        {t("import.files")}
+        {t("import.filesShort")}
       </button>
       <button type="button" className="btn" disabled={importBusy} onClick={onImportFolder} title={t("import.folderHint")}>
-        {t("import.folder")}
+        {t("import.folderShort")}
       </button>
       <span className="sep" />
       <button type="button" className="btn ghost" onClick={onHelp} title={t("shortcuts.title")}>

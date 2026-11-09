@@ -46,6 +46,13 @@ const SECTIONS: [string, Field[]][] = [
     ["effects", "grainSize", 0, 100, 1, 25],
     ["effects", "grainRoughness", 0, 100, 1, 50],
   ]],
+  ["grading", [
+    ["grading", "shadowsHue", 0, 360, 1, 220],
+    ["grading", "shadowsSat", 0, 100, 1, 0],
+    ["grading", "highlightsHue", 0, 360, 1, 45],
+    ["grading", "highlightsSat", 0, 100, 1, 0],
+    ["grading", "balance", -100, 100, 1, 0],
+  ]],
   ["lens", [
     ["lens", "distortion", -100, 100, 1, 0],
     ["lens", "caRed", -100, 100, 1, 0],
@@ -55,7 +62,10 @@ const SECTIONS: [string, Field[]][] = [
   ]],
 ];
 
+const HUE_GRADIENT = "linear-gradient(90deg, #e5484d, #e2c23b, #46a758, #3cc0c0, #3e8ed0, #8e4ec6, #e5484d)";
 const GRADIENTS: Record<string, string> = {
+  "grading.shadowsHue": HUE_GRADIENT,
+  "grading.highlightsHue": HUE_GRADIENT,
   "wb.temperature": "linear-gradient(90deg, #4a7bd0, #ddd, #e0a94a)",
   "wb.tint": "linear-gradient(90deg, #4ab04a, #ddd, #c04ac0)",
 };
@@ -93,6 +103,7 @@ export function DevelopPanel({
   onPickWb,
   geometry,
   auto,
+  presets,
   retouch,
   ai,
 }: {
@@ -104,13 +115,15 @@ export function DevelopPanel({
   geometry: React.ReactNode;
   /** Secção "Automático" (opções, botão e relatório). */
   auto?: React.ReactNode;
+  /** Secção "Presets". */
+  presets?: React.ReactNode;
   /** Secção "Retoque" (olhos vermelhos, manchas). */
   retouch?: React.ReactNode;
   /** AI Denoise: modelo disponível e progresso do cálculo (0–1) em curso. */
   ai?: { available: boolean; progress: number | null };
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState<Record<string, boolean>>({ auto: true, light: true, wb: true, color: true });
+  const [open, setOpen] = useState<Record<string, boolean>>({ auto: true, presets: true, light: true, wb: true, color: true });
   const [hslTab, setHslTab] = useState<"hue" | "saturation" | "luminance">("hue");
   const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }));
   const fieldSlider = ([block, key, min, max, step, def, digits]: Field) => {
@@ -147,6 +160,11 @@ export function DevelopPanel({
       {auto && (
         <Section id="auto" open={!!open.auto} toggle={() => toggle("auto")}>
           {auto}
+        </Section>
+      )}
+      {presets && (
+        <Section id="presets" open={!!open.presets} toggle={() => toggle("presets")}>
+          {presets}
         </Section>
       )}
       <Section id="light" open={!!open.light} toggle={() => toggle("light")} onReset={resetBlock("light", sectionFields("light"))}>
@@ -240,6 +258,45 @@ export function DevelopPanel({
       </Section>
       <Section id="effects" open={!!open.effects} toggle={() => toggle("effects")} onReset={resetBlock("effects", sectionFields("effects"))}>
         {sectionFields("effects").map(fieldSlider)}
+      </Section>
+      <Section id="grading" open={!!open.grading} toggle={() => toggle("grading")} onReset={resetBlock("grading", sectionFields("grading"))}>
+        {sectionFields("grading").map(fieldSlider)}
+        {settings.lut.id && (
+          <div className="dev-ai">
+            <div className="dev-row">
+              <span className="small">
+                {t("develop.lut")}: <strong>{settings.lut.name || settings.lut.id}</strong>
+              </span>
+              <span className="spacer" />
+              <button type="button" className="btn small ghost" onClick={() => set("lut.remove", (s) => void (s.lut = { id: "", name: "", amount: 100 }), true)}>
+                {t("develop.retouch.remove")}
+              </button>
+            </div>
+            <Slider label={t("develop.field.lut.amount")} value={settings.lut.amount} min={0} max={100} def={100} onChange={(v, done) => set("lut.amount", (s) => void (s.lut.amount = v), done)} />
+          </div>
+        )}
+      </Section>
+      <Section
+        id="bw"
+        open={!!open.bw}
+        toggle={() => toggle("bw")}
+        onReset={() => set("reset.bw", (s) => void (s.bw = { enabled: false, mix: Array(8).fill(0) }), true)}
+      >
+        <label className="small">
+          <input type="checkbox" checked={settings.bw.enabled} onChange={(e) => set("bw.enabled", (s) => void (s.bw.enabled = e.target.checked), true)} /> {t("develop.bwEnable")}
+        </label>
+        {settings.bw.enabled &&
+          HSL_KEYS.map((name, i) => (
+            <Slider
+              key={`bw-${name}`}
+              label={t(`develop.hslColor.${name}`)}
+              value={settings.bw.mix[i]!}
+              min={-100}
+              max={100}
+              gradient={`linear-gradient(90deg, #222, ${HSL_COLORS[i]}, #eee)`}
+              onChange={(v, done) => set("bw.mix", (s) => void (s.bw.mix[i] = v), done)}
+            />
+          ))}
       </Section>
       <Section id="geometry" open={!!open.geometry} toggle={() => toggle("geometry")}>
         {geometry}

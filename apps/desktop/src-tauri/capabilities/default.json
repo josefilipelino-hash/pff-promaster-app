@@ -1,12 +1,13 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permissões mínimas da janela principal. Cada permissão nova tem de ser justificada aqui.",
+  "description": "Permissões mínimas da janela principal. Cada permissão nova tem de ser justificada aqui. dialog:allow-save (Fase 7): escolher onde exportar presets (.momentopreset).",
   "windows": ["main"],
   "permissions": [
     "core:default",
     "core:window:allow-set-fullscreen",
     "core:window:allow-is-fullscreen",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "dialog:allow-save"
   ]
 }

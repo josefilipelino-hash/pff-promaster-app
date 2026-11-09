@@ -400,3 +400,44 @@ progress::-moz-progress-bar { background: var(--accent); }
 .progress { height: 6px; background: var(--bg); border-radius: 999px; overflow: hidden; }
 .progress-bar { height: 100%; background: var(--accent); transition: width 0.25s ease; }
 .ellipsis { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Fase 7 — presets e consistência */
+.preset-list { display: flex; flex-direction: column; gap: 2px; max-height: 320px; overflow-y: auto; margin: 4px 0 6px; }
+.preset-group-title { background: none; border: 0; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; padding: 6px 2px 2px; cursor: pointer; text-align: left; width: 100%; }
+.preset-group ul { list-style: none; margin: 0; padding: 0; }
+.preset-item { display: block; width: 100%; text-align: left; background: none; border: 0; border-radius: 5px; padding: 4px 10px; cursor: pointer; color: var(--text); }
+.preset-item:hover, .preset-item:focus-visible { background: var(--surface-2); outline: none; }
+.preset-item.active { color: var(--accent); background: var(--surface-2); }
+.preset-components { grid-template-columns: 1fr; }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.preset-manager { display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow-y: auto; }
+.preset-manager h4 { margin: 4px 0; font-size: 12px; color: var(--text-muted); text-transform: uppercase; }
+.preset-manager ul { list-style: none; margin: 0; padding: 0; }
+.preset-row { display: flex; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.preset-name { min-width: 150px; display: inline-flex; gap: 6px; align-items: center; }
+.preset-comps { flex: 1; min-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.preset-group-input { width: 120px; }
+.compat-list { max-height: 220px; overflow-y: auto; padding-left: 18px; }
+.apply-preset { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.apply-preset .preset-list { max-height: 50vh; }
+.apply-preset-side { display: flex; flex-direction: column; gap: 10px; }
+.apply-preset-side select { margin-left: 6px; max-width: 60%; }
+.preview-badge { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.7); color: var(--accent); padding: 3px 12px; border-radius: 999px; font-size: 12px; z-index: 30; pointer-events: none; }
+.consistency { position: absolute; inset: 0; display: grid; grid-template-columns: 280px minmax(0, 1fr); min-height: 0; }
+.consistency-groups { border-right: 1px solid var(--border); background: var(--surface); padding: 12px 8px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+.consistency-groups label { display: flex; flex-direction: column; gap: 4px; }
+.consistency-groups ul { list-style: none; margin: 0; padding: 0; }
+.look-group { display: grid; grid-template-columns: 1fr auto; text-align: left; width: 100%; gap: 2px 8px; }
+.look-group .look-sub { grid-column: 1 / -1; }
+.consistency-main { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+.look-hint { margin: 6px 14px; }
+.look-grid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; padding: 6px 14px; align-content: start; }
+.look-cell { position: relative; border: 2px solid transparent; border-radius: 8px; padding: 0; background: var(--surface-2); aspect-ratio: 3 / 2; overflow: hidden; cursor: pointer; }
+.look-cell img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.look-cell.reference { border-color: var(--accent); }
+.look-cell .ref-badge { position: absolute; top: 6px; left: 6px; background: var(--accent); color: #1a1a1a; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; }
+.look-cell .cell-edited { position: absolute; bottom: 4px; right: 6px; }
+.look-actions { border-top: 1px solid var(--border); padding: 10px 14px; background: var(--surface); }
+
+/* Barra superior: em janelas estreitas passa a duas linhas em vez de cortar botões. */
+.toolbar { flex-wrap: wrap; row-gap: 6px; }

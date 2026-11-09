@@ -289,6 +289,18 @@ pub const CATALOG: &[&str] = &[
         created_at INTEGER NOT NULL
     ) STRICT;
     "#,
+    // v7 — Fase 7: características de luz por fotografia (consistência visual).
+    r#"
+    CREATE TABLE look_feature (
+        asset_id    INTEGER PRIMARY KEY REFERENCES asset(id) ON DELETE CASCADE,
+        ev          REAL,
+        warmth      REAL NOT NULL,
+        tint        REAL NOT NULL,
+        key         REAL NOT NULL,
+        flash       INTEGER,
+        computed_at INTEGER NOT NULL
+    ) STRICT;
+    "#,
 ];
 
 /// Migrações da biblioteca global (projetos recentes).
@@ -308,6 +320,17 @@ pub const LIBRARY: &[&str] = &[
         location    TEXT NOT NULL DEFAULT '',
         photo_count INTEGER NOT NULL DEFAULT 0,
         last_opened INTEGER NOT NULL
+    ) STRICT;
+    "#,
+    // v2 — Fase 7: presets do utilizador (os internos estão no código).
+    r#"
+    CREATE TABLE preset (
+        id         TEXT PRIMARY KEY NOT NULL,
+        name       TEXT NOT NULL,
+        group_name TEXT NOT NULL DEFAULT '',
+        position   INTEGER NOT NULL DEFAULT 0,
+        body       TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
     ) STRICT;
     "#,
 ];

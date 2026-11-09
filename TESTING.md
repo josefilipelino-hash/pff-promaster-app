@@ -69,6 +69,18 @@ plataforma, ecrã inicial, validação do formulário, grelha virtualizada com 3
 secções futuras desativadas, classificação por teclado e em seleção múltipla, filtro
 Favoritas + visualizador, reversão quando o núcleo recusa, paridade de traduções.
 
+## Fase 7 — presets e consistência
+
+| Teste | O que verifica |
+|---|---|
+| `presets` (5) | Amount 0/50/100/150 % só nos componentes escolhidos (curvas misturadas, P&B a partir de 50 %, LUT escalada); capturar componentes; 13 internos com os nomes pedidos, todos diferentes, a manter exposição e balanço, P&B só nos P&B; um preset a cores depois de um P&B volta às cores; ficheiro com LUT ida e volta; XMP real: campos interpretados e ignorados (Kelvin, perfil, máscaras, meios-tons) |
+| `develop::lut` (2) + render (+1) | LUT identidade e ordem dos canais, 1D, recusa de LUT log e de ficheiros incompletos; inverter cores a 100 % e 50 %; P&B com mistura (vermelho clareia, azul igual); tonalização (sombras azuladas, realces quentes, brilho igual) |
+| `develop::consistency` (2) | fotografia 1,3 EV mais escura com luz de tungsténio: rosto, branco do vestido, pele, contraste e saturação iguais à referência, valores diferentes (copiar não chegava); opções limitam o que muda; sem rostos usa a cena |
+| `consistency` (1) + `database` (+2) | agrupamento pelos 7 critérios (exceção com flash absorvida, intervalos de 20 min); EV da cena; presets na biblioteca |
+| `preset_store` (1) | criar, renomear, duplicar (incl. internos), organizar, eliminar (internos protegidos), importar LUT, exportar/importar com LUT noutra biblioteca, recusa de LUT log e `.lrtemplate` |
+| `presets_consistency_flow` | caminho real: medir 6 fotografias, 7 critérios, iluminação e balanço corretos (exterior vs. interior quente), Film Warm a 80 % no casamento completo, preset com LUT (copiada para o projeto), sincronização em fila: brilho e branco iguais à referência, não é cópia, **originais intactos** |
+| Interface (+4) | pré-visualização ao passar o rato com Amount, aplicar (histórico "Preset: …"), criar com componentes; gerir (renomear, duplicar, ordenar, eliminar com confirmação, exportar); aplicar à seleção e ao casamento; vista Consistência, referência, sincronizar, medir; sincronizar inteligente vs. copiar valores |
+
 ## Fase 6 — edição automática
 
 | Teste | O que verifica |

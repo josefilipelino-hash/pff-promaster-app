@@ -22,8 +22,10 @@ image.workspace = true
 serde_json.workspace = true
 serde.workspace = true
 tracing.workspace = true
+momento-metadata.workspace = true
+momento-presets.workspace = true
+rayon.workspace = true
 
 [dev-dependencies]
 momento-test-fixtures.workspace = true
 tempfile.workspace = true
-rayon.workspace = true

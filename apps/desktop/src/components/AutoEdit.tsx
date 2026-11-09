@@ -19,7 +19,7 @@ export function AutoEditDialog({ keys, onClose }: { keys: number[]; onClose: () 
   const start = async () => {
     try {
       const total = await api.startAutoEdit(keys, aiAvailable ? options : { ...options, aiDenoise: "off" });
-      setProgress({ total, done: 0, failed: 0, paused: false, cancelled: false, finished: false, current: null });
+      setProgress({ kind: "auto", total, done: 0, failed: 0, paused: false, cancelled: false, finished: false, current: null });
       onClose();
     } catch (e) {
       toast("error", errorText(e, t));
@@ -60,9 +60,9 @@ export function AutoEditQueue() {
   const pct = p.total > 0 ? Math.round((processed / p.total) * 100) : 0;
   const state = p.finished ? (p.cancelled ? "cancelled" : "finished") : p.paused ? "paused" : "running";
   return (
-    <section className="auto-queue" aria-label={t("auto.queueTitle")}>
+    <section className="auto-queue" aria-label={t(p.kind === "sync" ? "sync.queueTitle" : "auto.queueTitle")}>
       <header>
-        <strong>{t("auto.queueTitle")}</strong>
+        <strong>{t(p.kind === "sync" ? "sync.queueTitle" : "auto.queueTitle")}</strong>
         <span className="muted small">{t(`auto.queueState.${state}`)}</span>
       </header>
       <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={p.total} aria-valuenow={processed} aria-label={t("auto.queueTitle")}>

@@ -36,6 +36,8 @@ pub fn run() {
             init_logging(app);
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
+            // LUT importadas (presets) — partilhadas por todos os projetos.
+            momento_project_management::set_lut_search_paths(vec![data_dir.join("luts")]);
             let state = AppState::new(&data_dir.join("library.db"), app.handle().clone())
                 .map_err(|e| Box::<dyn std::error::Error>::from(e.to_string()))?;
             app.manage(state);
@@ -116,6 +118,20 @@ pub fn run() {
             commands::resume_auto_edit,
             commands::cancel_auto_edit,
             commands::ai_denoise_available,
+            commands::list_presets,
+            commands::create_preset,
+            commands::rename_preset,
+            commands::move_preset,
+            commands::reorder_presets,
+            commands::duplicate_preset,
+            commands::delete_preset,
+            commands::import_preset_file,
+            commands::export_presets,
+            commands::preset_preview_settings,
+            commands::apply_preset,
+            commands::measure_consistency,
+            commands::consistency_groups,
+            commands::start_sync,
         ])
         .build(tauri::generate_context!())
         .expect("falha ao iniciar a aplicação");

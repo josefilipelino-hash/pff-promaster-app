@@ -170,6 +170,49 @@ pub fn wb_matrix(temperature: f32, tint: f32) -> [[f32; 3]; 3] {
 
 /// Seletor de balanço de brancos: temperatura/matiz que tornam `sample` (Rec. 2020 linear,
 /// antes do balanço) neutro. Procura em grelha e refina.
+/// (temperatura, matiz) que fazem `sample` (linear Rec. 2020) ficar com a mesma cor que
+/// `target` (normalizado). Com `target` neutro é o mesmo que [`neutralize`].
+pub fn match_white(sample: [f32; 3], target: [f32; 3]) -> (f32, f32) {
+    let ts = mul3(&REC2020_TO_SRGB, target);
+    let tm = (ts[0] + ts[1] + ts[2]) / 3.0;
+    if tm <= 0.0 {
+        return neutralize(sample);
+    }
+    let tn = ts.map(|v| v / tm);
+    let err = |t: f32, n: f32| {
+        let v = mul3(&wb_matrix(t, n), sample);
+        let s = mul3(&REC2020_TO_SRGB, v);
+        let m = (s[0] + s[1] + s[2]) / 3.0;
+        if m <= 0.0 {
+            return f32::MAX;
+        }
+        (0..3).map(|i| (s[i] / m - tn[i]).powi(2)).sum::<f32>()
+    };
+    let mut best = (0.0, 0.0, f32::MAX);
+    for t in (-100..=100).step_by(5) {
+        for n in (-100..=100).step_by(5) {
+            let e = err(t as f32, n as f32);
+            if e < best.2 {
+                best = (t as f32, n as f32, e);
+            }
+        }
+    }
+    let (t0, n0) = (best.0, best.1);
+    for t in -10..=10 {
+        for n in -10..=10 {
+            let (tt, nn) = (
+                (t0 + t as f32 * 0.5).clamp(-100.0, 100.0),
+                (n0 + n as f32 * 0.5).clamp(-100.0, 100.0),
+            );
+            let e = err(tt, nn);
+            if e < best.2 {
+                best = (tt, nn, e);
+            }
+        }
+    }
+    (best.0, best.1)
+}
+
 pub fn neutralize(sample: [f32; 3]) -> (f32, f32) {
     let err = |t: f32, n: f32| {
         let v = mul3(&wb_matrix(t, n), sample);

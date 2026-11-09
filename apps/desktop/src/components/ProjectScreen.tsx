@@ -10,6 +10,8 @@ import { keyToAction, type Action } from "../logic/shortcuts";
 import { errorText, useStore } from "../store";
 import type { Color, GroupRow, ImportMode, Label } from "../types";
 import { AutoEditDialog, AutoEditQueue } from "./AutoEdit";
+import { ConsistencyView } from "./ConsistencyView";
+import { ApplyPresetDialog } from "./Presets";
 import { ClockDialog } from "./ClockDialog";
 import { CompareView, type CompareHandle } from "./CompareView";
 import { PeopleView } from "./PeopleView";
@@ -120,7 +122,8 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
         st.setAutoProgress(p);
         if (p.finished) {
           scheduleReload();
-          st.toast("info", p.cancelled ? t("auto.toastCancelled", { count: p.done }) : t("auto.toastFinished", { count: p.done }));
+          if (p.kind === "sync") st.toast("info", t("sync.toastFinished", { count: p.done }));
+          else st.toast("info", p.cancelled ? t("auto.toastCancelled", { count: p.done }) : t("auto.toastFinished", { count: p.done }));
         }
       }),
       events.analysis((p) => {
@@ -428,7 +431,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const st = useStore.getState();
-            if (isTyping(e.target) || st.pendingImport || st.importSummary || st.helpOpen || st.clockOpen) return;
+            if (isTyping(e.target) || st.pendingImport || st.importSummary || st.helpOpen || st.clockOpen || st.autoDialog || st.presetDialog) return;
       const a = keyToAction(e, mac);
       if (!a) return;
       e.preventDefault();
@@ -483,6 +486,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
             onHelp={() => s.setHelpOpen(true)}
             onCompare={compareFromSelection}
             onAutoEdit={() => s.setAutoDialog(true)}
+            onPresets={() => s.setPresetDialog(true)}
             selectedCount={s.selection.ids.size}
             view={s.view}
             onView={(v) => s.setView(v)}
@@ -504,7 +508,14 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
                 </button>
               </div>
             </div>
-                    ) : s.view === "people" ? (
+                    ) : s.view === "consistency" ? (
+            <ConsistencyView
+              onEdit={(k) => {
+                s.setSelection({ ids: new Set([k]), focus: k, anchor: k });
+                s.setView("develop");
+              }}
+            />
+          ) : s.view === "people" ? (
             <PeopleView
               onShowPerson={(id) => {
                 s.setFilter({ persons: [id] });
@@ -575,6 +586,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
             {s.helpOpen && <HelpOverlay onClose={() => s.setHelpOpen(false)} />}
       {s.clockOpen && <ClockDialog onClose={() => s.setClockOpen(false)} onApplied={() => void reloadAfterClock()} />}
       {s.autoDialog && <AutoEditDialog keys={order.filter((k) => s.selection.ids.has(k))} onClose={() => s.setAutoDialog(false)} />}
+      {s.presetDialog && <ApplyPresetDialog onClose={() => s.setPresetDialog(false)} />}
       <AutoEditQueue />
       {s.dragIds && <div className="drag-badge">{t("moments.dropHint", { count: s.dragIds.length })}</div>}
     </div>

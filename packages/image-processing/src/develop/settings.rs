@@ -225,6 +225,57 @@ impl Default for Lens {
     }
 }
 
+/// Tonalização (color grading simples): cor nas sombras e nos realces.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Grading {
+    /// Matiz (0–360°) e intensidade (0–100) nas sombras.
+    pub shadows_hue: f32,
+    pub shadows_sat: f32,
+    /// Matiz e intensidade nos realces.
+    pub highlights_hue: f32,
+    pub highlights_sat: f32,
+    /// −100 (mais sombras) … +100 (mais realces).
+    pub balance: f32,
+}
+
+impl Default for Grading {
+    fn default() -> Self {
+        Grading {
+            shadows_hue: 220.0,
+            shadows_sat: 0.0,
+            highlights_hue: 45.0,
+            highlights_sat: 0.0,
+            balance: 0.0,
+        }
+    }
+}
+
+/// Preto e branco com mistura por cor (luminância de cada cor na conversão, −100…+100).
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct BlackWhite {
+    pub enabled: bool,
+    /// Vermelho, laranja, amarelo, verde, água, azul, roxo, magenta.
+    pub mix: [f32; 8],
+}
+
+/// LUT de cor (.cube) aplicada no fim, em sRGB. `id` = SHA-256 do ficheiro.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct LutRef {
+    pub id: String,
+    pub name: String,
+    /// 0…100 %.
+    pub amount: f32,
+}
+
+impl Default for LutRef {
+    fn default() -> Self {
+        LutRef { id: String::new(), name: String::new(), amount: 100.0 }
+    }
+}
+
 /// Correção de olho vermelho: círculo em coordenadas normalizadas da fotografia orientada
 /// (x pela largura, y pela altura; raio pelo lado maior).
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
@@ -269,11 +320,16 @@ pub struct Settings {
     pub geometry: Geometry,
     pub lens: Lens,
     pub retouch: Retouch,
+    pub grading: Grading,
+    pub bw: BlackWhite,
+    pub lut: LutRef,
 }
 
 /// Nomes dos blocos (copiar/colar escolhe blocos).
-pub const BLOCKS: [&str; 10] =
-    ["light", "wb", "color", "hsl", "curve", "detail", "effects", "geometry", "lens", "retouch"];
+pub const BLOCKS: [&str; 13] = [
+    "light", "wb", "color", "hsl", "curve", "detail", "effects", "geometry", "lens", "retouch",
+    "grading", "bw", "lut",
+];
 
 fn put<T: Serialize + Default + PartialEq>(r: &mut EditRecipe, name: &str, v: &T) {
     if *v != T::default() {
@@ -300,6 +356,9 @@ impl Settings {
             geometry: get(r, "geometry"),
             lens: get(r, "lens"),
             retouch: get(r, "retouch"),
+            grading: get(r, "grading"),
+            bw: get(r, "bw"),
+            lut: get(r, "lut"),
         }
     }
 
@@ -316,6 +375,9 @@ impl Settings {
         put(&mut r, "geometry", &self.geometry);
         put(&mut r, "lens", &self.lens);
         put(&mut r, "retouch", &self.retouch);
+        put(&mut r, "grading", &self.grading);
+        put(&mut r, "bw", &self.bw);
+        put(&mut r, "lut", &self.lut);
         r
     }
 

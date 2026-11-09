@@ -8,10 +8,13 @@ use momento_database::moments::{AssetMoment, MomentRow};
 use momento_database::people::{FaceRef, PersonRow};
 use momento_project_management::analysis::SelectionSummary;
 use momento_project_management::auto_edit::{AutoEditProgress, AutoEditResult};
+use momento_project_management::consistency::{Criterion, LookGroup};
+use momento_project_management::preset_store::{ImportResult, PresetStore};
 use momento_project_management::AutoOptions;
 use momento_project_management::{
     AnalysisStatus, ImportRequest, NewProject, ProjectInfo, SelectionSettings,
 };
+use momento_project_management::{Component, MatchOptions, Preset};
 use momento_project_management::{
     DevelopSettings, EditView, OffsetSuggestion, OrganizeSummary, RenderQuality,
 };
@@ -501,6 +504,153 @@ pub async fn cancel_auto_edit(state: State<'_, AppState>) -> CmdResult<()> {
 #[tauri::command]
 pub async fn ai_denoise_available(state: State<'_, AppState>) -> CmdResult<bool> {
     state.session().map(|s| s.ai_denoise_available()).map_err(err)
+}
+
+// ---------------------------------------------------------------- presets e consistência (Fase 7)
+
+fn with_store<T>(
+    state: &AppState,
+    f: impl FnOnce(&PresetStore) -> momento_core_types::CoreResult<T>,
+) -> CmdResult<T> {
+    let lib = state.library();
+    let store = PresetStore { lib: &lib, lut_dir: state.lut_dir.clone() };
+    f(&store).map_err(err)
+}
+
+#[tauri::command]
+pub async fn list_presets(state: State<'_, AppState>) -> CmdResult<Vec<Preset>> {
+    with_store(&state, |s| s.list())
+}
+
+#[tauri::command]
+pub async fn create_preset(
+    state: State<'_, AppState>,
+    name: String,
+    group: String,
+    components: Vec<Component>,
+    settings: DevelopSettings,
+) -> CmdResult<Preset> {
+    with_store(&state, |s| s.create(&name, &group, &components, &settings))
+}
+
+#[tauri::command]
+pub async fn rename_preset(
+    state: State<'_, AppState>,
+    id: String,
+    name: String,
+) -> CmdResult<Preset> {
+    with_store(&state, |s| s.rename(&id, &name))
+}
+
+#[tauri::command]
+pub async fn move_preset(
+    state: State<'_, AppState>,
+    id: String,
+    group: String,
+) -> CmdResult<Preset> {
+    with_store(&state, |s| s.move_to(&id, &group, None))
+}
+
+#[tauri::command]
+pub async fn reorder_presets(state: State<'_, AppState>, ids: Vec<String>) -> CmdResult<()> {
+    with_store(&state, |s| s.reorder(&ids))
+}
+
+#[tauri::command]
+pub async fn duplicate_preset(
+    state: State<'_, AppState>,
+    id: String,
+    suffix: String,
+) -> CmdResult<Preset> {
+    with_store(&state, |s| s.duplicate(&id, &suffix))
+}
+
+#[tauri::command]
+pub async fn delete_preset(state: State<'_, AppState>, id: String) -> CmdResult<()> {
+    with_store(&state, |s| s.delete(&id))
+}
+
+#[tauri::command]
+pub async fn import_preset_file(
+    state: State<'_, AppState>,
+    path: String,
+) -> CmdResult<ImportResult> {
+    with_store(&state, |s| s.import(Path::new(&path)))
+}
+
+#[tauri::command]
+pub async fn export_presets(
+    state: State<'_, AppState>,
+    ids: Vec<String>,
+    path: String,
+) -> CmdResult<usize> {
+    with_store(&state, |s| s.export(&ids, Path::new(&path)))
+}
+
+/// Ajustes que resultariam de aplicar um preset (pré-visualização sem gravar).
+#[tauri::command]
+pub async fn preset_preview_settings(
+    state: State<'_, AppState>,
+    settings: DevelopSettings,
+    preset_id: String,
+    amount: f32,
+) -> CmdResult<DevelopSettings> {
+    let p = with_store(&state, |s| s.get(&preset_id))?;
+    Ok(momento_project_management::apply_preset_settings(
+        &settings,
+        &p.settings,
+        &p.components,
+        amount,
+    ))
+}
+
+/// Aplica um preset a fotografias (uma, seleção, momento ou casamento completo).
+#[tauri::command]
+pub async fn apply_preset(
+    state: State<'_, AppState>,
+    keys: Vec<i64>,
+    preset_id: String,
+    amount: f32,
+) -> CmdResult<usize> {
+    let p = with_store(&state, |s| s.get(&preset_id))?;
+    state
+        .session()
+        .and_then(|s| s.apply_preset(&keys, &p.name, &p.settings, &p.components, amount))
+        .map_err(err)
+}
+
+#[tauri::command]
+pub async fn measure_consistency(state: State<'_, AppState>) -> CmdResult<usize> {
+    state.session().and_then(|s| s.measure_consistency()).map_err(err)
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GroupsResult {
+    pub groups: Vec<LookGroup>,
+    pub missing: usize,
+}
+
+#[tauri::command]
+pub async fn consistency_groups(
+    state: State<'_, AppState>,
+    criterion: Criterion,
+) -> CmdResult<GroupsResult> {
+    state
+        .session()
+        .and_then(|s| s.consistency_groups(criterion))
+        .map(|(groups, missing)| GroupsResult { groups, missing })
+        .map_err(err)
+}
+
+#[tauri::command]
+pub async fn start_sync(
+    state: State<'_, AppState>,
+    reference: i64,
+    keys: Vec<i64>,
+    options: MatchOptions,
+) -> CmdResult<u64> {
+    state.session().and_then(|s| s.start_sync(reference, keys, options)).map_err(err)
 }
 
 #[cfg(test)]

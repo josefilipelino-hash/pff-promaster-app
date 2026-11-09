@@ -639,3 +639,71 @@ fn performance_interactive_and_final() {
         assert!(fast.as_millis() < 250, "{fast:?}");
     }
 }
+
+#[test]
+fn black_white_mix_grading_and_lut() {
+    // P&B: cinzento; mix do vermelho clareia a mancha vermelha e não mexe no azul.
+    let bw = Settings { bw: BlackWhite { enabled: true, mix: [0.0; 8] }, ..Default::default() };
+    let r0 = render_with(&bw);
+    let red0 = mean_region(&r0, 10, 120, 90, 180);
+    assert!((red0[0] - red0[2]).abs() < 1.5, "cinzento: {red0:?}");
+    let mut mix = [0.0; 8];
+    mix[0] = 80.0;
+    let r1 = render_with(&Settings { bw: BlackWhite { enabled: true, mix }, ..Default::default() });
+    let red1 = mean_region(&r1, 10, 120, 90, 180);
+    let blue0 = mean_region(&r0, 410, 120, 490, 180);
+    let blue1 = mean_region(&r1, 410, 120, 490, 180);
+    assert!(red1[1] > red0[1] + 15.0, "vermelho mais claro: {red0:?} → {red1:?}");
+    assert!((blue1[1] - blue0[1]).abs() < 2.0);
+    // Tonalização: sombras azuis, realces quentes; o brilho quase não muda.
+    let g = Settings {
+        grading: Grading {
+            shadows_hue: 220.0,
+            shadows_sat: 60.0,
+            highlights_hue: 40.0,
+            highlights_sat: 60.0,
+            balance: 0.0,
+        },
+        ..Default::default()
+    };
+    let rg = render_with(&g);
+    let base = render_with(&Settings::default());
+    let dark = mean_region(&rg, 20, 320, 280, 390);
+    let light = mean_region(&rg, 320, 320, 580, 390);
+    assert!(dark[2] > dark[0] + 3.0, "sombras azuladas: {dark:?}");
+    assert!(light[0] > light[2] + 3.0, "realces quentes: {light:?}");
+    let (l0, l1) = (lum(mean_region(&base, 320, 320, 580, 390)), lum(light));
+    assert!((l0 - l1).abs() < 6.0, "{l0} vs {l1}");
+    // LUT registada: inverter as cores (LUT 2³) com 100 % e 50 %.
+    let mut s = String::from("LUT_3D_SIZE 2\n");
+    for b in 0..2 {
+        for gg in 0..2 {
+            for r in 0..2 {
+                s += &format!("{} {} {}\n", 1 - r, 1 - gg, 1 - b);
+            }
+        }
+    }
+    lut::register("teste-inverter", lut::parse_cube(&s).unwrap());
+    let inv = Settings {
+        lut: LutRef { id: "teste-inverter".into(), name: "Inverter".into(), amount: 100.0 },
+        ..Default::default()
+    };
+    let ri = render_with(&inv);
+    let p0 = px(&base, 300, 50);
+    let p1 = px(&ri, 300, 50);
+    for c in 0..3 {
+        assert!((p0[c] as i32 + p1[c] as i32 - 255).abs() <= 3, "{p0:?} {p1:?}");
+    }
+    let half = render_with(&Settings {
+        lut: LutRef { amount: 50.0, ..inv.lut.clone() },
+        ..Default::default()
+    });
+    let ph = px(&half, 300, 50);
+    assert!((ph[1] as i32 - 128).abs() < 8, "50 % de inverter ≈ cinzento médio: {ph:?}");
+    // LUT desconhecida: ignorada (sem pânico).
+    let unk = Settings {
+        lut: LutRef { id: "nao-existe".into(), ..Default::default() },
+        ..Default::default()
+    };
+    assert_eq!(render_with(&unk).rgba, base.rgba);
+}

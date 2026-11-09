@@ -1,6 +1,12 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  Criterion,
+  LookGroup,
+  MatchOptions,
+  Preset,
+  PresetComponent,
+  PresetImportResult,
   AiDenoiseProgress,
   AutoEditProgress,
   AutoEditResult,
@@ -113,6 +119,23 @@ export const api = {
   resumeAutoEdit: () => invoke<void>("resume_auto_edit"),
   cancelAutoEdit: () => invoke<void>("cancel_auto_edit"),
   aiDenoiseAvailable: () => invoke<boolean>("ai_denoise_available"),
+  // Presets (biblioteca global) e consistência.
+  listPresets: () => invoke<Preset[]>("list_presets"),
+  createPreset: (name: string, group: string, components: PresetComponent[], settings: DevelopSettings) =>
+    invoke<Preset>("create_preset", { name, group, components, settings }),
+  renamePreset: (id: string, name: string) => invoke<Preset>("rename_preset", { id, name }),
+  movePreset: (id: string, group: string) => invoke<Preset>("move_preset", { id, group }),
+  reorderPresets: (ids: string[]) => invoke<void>("reorder_presets", { ids }),
+  duplicatePreset: (id: string, suffix: string) => invoke<Preset>("duplicate_preset", { id, suffix }),
+  deletePreset: (id: string) => invoke<void>("delete_preset", { id }),
+  importPresetFile: (path: string) => invoke<PresetImportResult>("import_preset_file", { path }),
+  exportPresets: (ids: string[], path: string) => invoke<number>("export_presets", { ids, path }),
+  presetPreviewSettings: (settings: DevelopSettings, presetId: string, amount: number) =>
+    invoke<DevelopSettings>("preset_preview_settings", { settings, presetId, amount }),
+  applyPreset: (keys: number[], presetId: string, amount: number) => invoke<number>("apply_preset", { keys, presetId, amount }),
+  measureConsistency: () => invoke<number>("measure_consistency"),
+  consistencyGroups: (criterion: Criterion) => invoke<{ groups: LookGroup[]; missing: number }>("consistency_groups", { criterion }),
+  startSync: (reference: number, keys: number[], options: MatchOptions) => invoke<number>("start_sync", { reference, keys, options }),
 };
 
 export const events = {

@@ -32,6 +32,9 @@ pub struct ExifSummary {
     pub focal_length_35mm: Option<u32>,
     /// Coordenadas GPS em graus decimais (latitude, longitude), quando existem.
     pub gps: Option<(f64, f64)>,
+    /// Flash disparado (bit 0 da etiqueta EXIF `Flash`), quando a câmara o grava.
+    #[serde(default)]
+    pub flash: Option<bool>,
 }
 
 impl Default for ExifSummary {
@@ -50,6 +53,7 @@ impl Default for ExifSummary {
             focal_length: None,
             focal_length_35mm: None,
             gps: None,
+            flash: None,
         }
     }
 }
@@ -179,6 +183,7 @@ fn summarize(e: &Exif) -> ExifSummary {
         focal_length: rational(e, Tag::FocalLength),
         focal_length_35mm: uint(e, Tag::FocalLengthIn35mmFilm).filter(|v| *v > 0),
         gps: gps(e),
+        flash: uint(e, Tag::Flash).map(|v| v & 1 == 1),
     }
 }
 

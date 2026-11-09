@@ -5,6 +5,9 @@ import { ASPECTS, cloneSettings, DEFAULT_COPY_BLOCKS, defaultSettings, fitCropTo
 import { errorText, useStore } from "../../store";
 import { SETTINGS_BLOCKS, type AutoOptions, type AutoReport, type DevelopSettings, type EditView } from "../../types";
 import { AutoOptionsForm, AutoReportView } from "./AutoPanel";
+import { CreatePresetDialog, ImportReportDialog, importPresets, PresetList, PresetManager } from "../Presets";
+import { defaultMatchOptions } from "../../logic/develop";
+import type { MatchOptions, Preset, PresetImportResult } from "../../types";
 import { Modal } from "../Modal";
 import { DevelopPanel, type SetField } from "./DevelopPanel";
 import { Slider } from "./Slider";
@@ -41,6 +44,7 @@ export const SETTLE_MS = 220;
 
 /** Etiqueta do histórico → texto. */
 export function historyLabel(label: string, t: (k: string, o?: Record<string, unknown>) => string): string {
+  if (label.startsWith("preset:")) return t("develop.history.preset", { name: label.slice(7) });
   if (label.startsWith("reset.")) return t("develop.history.resetSection", { section: t(`develop.section.${label.slice(6)}`) });
   for (const p of ["develop.history.", "develop.field."]) {
     const k = p + label;
@@ -95,9 +99,24 @@ function useRenderer(key: number, settings: DevelopSettings, before: boolean, un
   };
 }
 
-function CopyDialog({ title, action, onClose, onConfirm }: { title: string; action: string; onClose: () => void; onConfirm: (blocks: string[]) => void }) {
+function CopyDialog({
+  title,
+  action,
+  onClose,
+  onConfirm,
+  onSmart,
+}: {
+  title: string;
+  action: string;
+  onClose: () => void;
+  onConfirm: (blocks: string[]) => void;
+  /** Sincronizar: modo "ajustar cada fotografia à referência". */
+  onSmart?: (o: MatchOptions) => void;
+}) {
   const { t } = useTranslation();
   const [sel, setSel] = useState<string[]>(DEFAULT_COPY_BLOCKS);
+  const [smart, setSmart] = useState(!!onSmart);
+  const [opts, setOpts] = useState<MatchOptions>(defaultMatchOptions());
   return (
     <Modal
       title={title}
@@ -107,20 +126,51 @@ function CopyDialog({ title, action, onClose, onConfirm }: { title: string; acti
           <button type="button" className="btn" onClick={onClose} data-close>
             {t("common.cancel")}
           </button>
-          <button type="button" className="btn primary" disabled={sel.length === 0} onClick={() => onConfirm(sel)}>
+          <button
+            type="button"
+            className="btn primary"
+            disabled={smart ? !Object.values(opts).some(Boolean) : sel.length === 0}
+            onClick={() => (smart && onSmart ? onSmart(opts) : onConfirm(sel))}
+          >
             {action}
           </button>
         </>
       }
     >
-      <div className="copy-blocks">
-        {SETTINGS_BLOCKS.map((b) => (
-          <label key={b}>
-            <input type="checkbox" checked={sel.includes(b)} onChange={(e) => setSel(e.target.checked ? [...sel, b] : sel.filter((x) => x !== b))} /> {t(`develop.section.${b}`)}
+      {onSmart && (
+        <fieldset className="options">
+          <label>
+            <input type="radio" name="sync-mode" checked={smart} onChange={() => setSmart(true)} /> {t("sync.smart")}
           </label>
-        ))}
-      </div>
-      <p className="small muted">{t("develop.copyNote")}</p>
+          <label>
+            <input type="radio" name="sync-mode" checked={!smart} onChange={() => setSmart(false)} /> {t("sync.copyValues")}
+          </label>
+        </fieldset>
+      )}
+      {smart && onSmart ? (
+        <>
+          <p className="small">{t("sync.smartIntro")}</p>
+          <div className="copy-blocks">
+            {(["look", "exposure", "whiteBalance", "skin", "contrast", "color"] as const).map((k) => (
+              <label key={k}>
+                <input type="checkbox" checked={opts[k]} onChange={(e) => setOpts({ ...opts, [k]: e.target.checked })} /> {t(`sync.option.${k}`)}
+              </label>
+            ))}
+          </div>
+          <p className="small muted">{t("sync.smartNote")}</p>
+        </>
+      ) : (
+        <>
+          <div className="copy-blocks">
+            {SETTINGS_BLOCKS.map((b) => (
+              <label key={b}>
+                <input type="checkbox" checked={sel.includes(b)} onChange={(e) => setSel(e.target.checked ? [...sel, b] : sel.filter((x) => x !== b))} /> {t(`develop.section.${b}`)}
+              </label>
+            ))}
+          </div>
+          <p className="small muted">{t("develop.copyNote")}</p>
+        </>
+      )}
     </Modal>
   );
 }
@@ -151,6 +201,17 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
   const [split, setSplit] = useState(false);
   const [splitX, setSplitX] = useState(0.5);
   const beforeCanvas = useRef<HTMLCanvasElement>(null);
+  // Presets: pré-visualização ao passar o rato, Amount e diálogos.
+  const presets = useStore((s) => s.presets);
+  const reloadPresets = useStore((s) => s.reloadPresets);
+  const [preview, setPreview] = useState<DevelopSettings | null>(null);
+  const [presetAmount, setPresetAmount] = useState(100);
+  const [presetDialog, setPresetDialog] = useState<"create" | "manage" | null>(null);
+  const [importReport, setImportReport] = useState<PresetImportResult | null>(null);
+  const hoverSeq = useRef(0);
+  useEffect(() => {
+    if (presets.length === 0) reloadPresets().catch(() => {});
+  }, [presets.length, reloadPresets]);
   const stage = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const [box, setBox] = useState({ w: 900, h: 600 });
@@ -202,7 +263,12 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
       /* ImageData indisponível (testes) */
     }
   }, []);
-  const renderer = useRenderer(photoKey, settings, before, cropMode, box, onFrame, fail);
+  const renderer = useRenderer(photoKey, preview ?? settings, before, cropMode, box, onFrame, fail);
+  // A pré-visualização de um preset pede um render quando muda.
+  useEffect(() => {
+    if (view) renderer.request(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preview]);
   const loaded = view !== null && view.key === photoKey;
   // AI Denoise calculado em segundo plano: progresso e novo render quando acaba.
   useEffect(() => {
@@ -292,6 +358,35 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
     if (!r) return;
     const n = kind === "redEye" ? r.report.redEyes : r.report.spots;
     toast("info", n > 0 ? t(`develop.retouch.found.${kind}`, { count: n }) : t(`develop.retouch.none.${kind}`));
+  };
+  const hoverPreset = (p: Preset | null) => {
+    const seq = ++hoverSeq.current;
+    if (!p) return setPreview(null);
+    api
+      .presetPreviewSettings(settings, p.id, presetAmount)
+      .then((s) => seq === hoverSeq.current && setPreview(s))
+      .catch(fail);
+  };
+  const applyPresetHere = async (p: Preset) => {
+    try {
+      const s = await api.presetPreviewSettings(settings, p.id, presetAmount);
+      hoverSeq.current++;
+      setPreview(null);
+      set(`preset:${p.name}`, (cur) => void Object.assign(cur, s), true);
+    } catch (e) {
+      fail(e);
+    }
+  };
+  const smartSync = async (o: MatchOptions) => {
+    setDialog(null);
+    const keys = [...selection.ids].filter((k) => k !== photoKey);
+    if (keys.length === 0) return toast("info", t("develop.syncNeedSelection"));
+    try {
+      const total = await api.startSync(photoKey, keys, o);
+      useStore.getState().setAutoProgress({ kind: "sync", total, done: 0, failed: 0, paused: false, cancelled: false, finished: false, current: null });
+    } catch (e) {
+      fail(e);
+    }
   };
   const undo = () => api.undoEdit(photoKey).then(replace).catch(fail);
   const redo = () => api.redoEdit(photoKey).then(replace).catch(fail);
@@ -698,6 +793,7 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
           </div>
           {!frame && <div className="viewer-loading">{t("develop.loading")}</div>}
           {before && <div className="before-badge">{t("develop.before")}</div>}
+          {preview && <div className="preview-badge">{t("presets.previewing")}</div>}
           {aiProgress !== null && settings.detail.aiDenoise > 0 && (
             <div className="ai-badge" role="status">
               {t("develop.aiRunning", { pct: Math.round(aiProgress * 100) })}
@@ -712,6 +808,23 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
         wbPicking={wbPicking}
         onPickWb={() => setWbPicking(!wbPicking)}
         geometry={geometry}
+        presets={
+          <div className="dev-presets">
+            <Slider label={t("presets.amount")} value={presetAmount} min={0} max={150} def={100} onChange={(v) => setPresetAmount(v)} />
+            <PresetList presets={presets} onPick={(p) => void applyPresetHere(p)} onHover={hoverPreset} />
+            <div className="dev-row">
+              <button type="button" className="btn small" onClick={() => setPresetDialog("create")}>
+                + {t("presets.create")}
+              </button>
+              <button type="button" className="btn small" onClick={() => void importPresets(t, setImportReport)}>
+                {t("presets.import")}
+              </button>
+              <button type="button" className="btn small" onClick={() => setPresetDialog("manage")}>
+                {t("presets.manage")}
+              </button>
+            </div>
+          </div>
+        }
         ai={{ available: aiAvailable, progress: settings.detail.aiDenoise > 0 ? aiProgress : null }}
         auto={
           <div className="dev-auto">
@@ -770,7 +883,19 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
           }}
         />
       )}
-      {dialog === "sync" && <CopyDialog title={t("develop.syncTitle", { count: selection.ids.size - 1 })} action={t("develop.sync")} onClose={() => setDialog(null)} onConfirm={(b) => void sync(b)} />}
+      {dialog === "sync" && (
+        <CopyDialog
+          title={t("develop.syncTitle", { count: selection.ids.size - 1 })}
+          action={t("develop.sync")}
+          onClose={() => setDialog(null)}
+          onConfirm={(b) => void sync(b)}
+          onSmart={(o) => void smartSync(o)}
+        />
+      )}
+      {presetDialog === "create" && <CreatePresetDialog settings={settings} onClose={() => setPresetDialog(null)} />}
+      {presetDialog === "manage" && <PresetManager onClose={() => setPresetDialog(null)} />}
+      {importReport && <ImportReportDialog result={importReport} onClose={() => setImportReport(null)} />}
+
     </div>
   );
 }

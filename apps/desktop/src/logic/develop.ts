@@ -1,4 +1,4 @@
-import type { AutoOptions, DevelopSettings } from "../types";
+import type { AutoOptions, DevelopSettings, MatchOptions, Preset } from "../types";
 
 /** Ajustes neutros (iguais aos do núcleo: uma receita vazia reproduz o original). */
 export function defaultSettings(): DevelopSettings {
@@ -13,6 +13,9 @@ export function defaultSettings(): DevelopSettings {
     geometry: { crop: { x: 0, y: 0, w: 1, h: 1 }, quarterTurns: 0, flipHorizontal: false, straighten: 0, aspect: "original", vertical: 0, horizontal: 0 },
     lens: { distortion: 0, caRed: 0, caBlue: 0, vignetting: 0, vignettingMidpoint: 50 },
     retouch: { redEyes: [], spots: [] },
+    grading: { shadowsHue: 220, shadowsSat: 0, highlightsHue: 45, highlightsSat: 0, balance: 0 },
+    bw: { enabled: false, mix: Array(8).fill(0) },
+    lut: { id: "", name: "", amount: 100 },
   };
 }
 
@@ -76,7 +79,7 @@ export function fitCropToAspect(crop: { x: number; y: number; w: number; h: numb
 }
 
 /** Blocos copiados por omissão (a geometria/recorte raramente se quer em todas as fotografias). */
-export const DEFAULT_COPY_BLOCKS = ["light", "wb", "color", "hsl", "curve", "detail", "effects", "lens"];
+export const DEFAULT_COPY_BLOCKS = ["light", "wb", "color", "hsl", "curve", "detail", "effects", "lens", "grading", "bw", "lut"];
 
 /** Opções por omissão da edição automática (iguais às do núcleo). */
 export function defaultAutoOptions(): AutoOptions {
@@ -95,4 +98,19 @@ export function defaultAutoOptions(): AutoOptions {
     redEye: true,
     dust: false,
   };
+}
+
+export function defaultMatchOptions(): MatchOptions {
+  return { exposure: true, whiteBalance: true, skin: true, contrast: true, color: true, look: true };
+}
+
+/** Presets agrupados (internos primeiro, pela ordem do núcleo). */
+export function groupPresets(list: Preset[], noGroup: string): [string, Preset[]][] {
+  const m = new Map<string, Preset[]>();
+  for (const p of list) {
+    const g = p.group || noGroup;
+    if (!m.has(g)) m.set(g, []);
+    m.get(g)!.push(p);
+  }
+  return [...m.entries()];
 }

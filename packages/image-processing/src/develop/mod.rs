@@ -5,9 +5,11 @@
 
 pub mod auto;
 pub mod color;
+pub mod consistency;
 pub mod curves;
 pub mod filters;
 pub mod geometry;
+pub mod lut;
 pub mod render;
 pub mod settings;
 pub mod source;

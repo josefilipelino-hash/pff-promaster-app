@@ -102,7 +102,9 @@
     "formatsNote": "Imports JPEG, PNG, TIFF/BigTIFF, WebP, JPEG XL, JPEG 2000, PSD/PSB (composite), BMP, GIF, OpenEXR, HDR and camera RAW (LibRaw), plus HEIC/HEIF/AVIF on macOS and Windows. Unsupported, corrupted or codec-less files are listed in the report. Duplicates (same content) are skipped.",
     "dropHere": "Drop here to import",
     "busy": "An import is already running.",
-    "imagesFilter": "Images and RAW"
+    "imagesFilter": "Images and RAW",
+    "filesShort": "+ Files",
+    "folderShort": "+ Folder"
   },
   "report": {
     "title": "Import finished",
@@ -426,7 +428,8 @@
     "grid": "Grid",
     "sequences": "Sequences",
     "people": "People",
-    "develop": "Develop"
+    "develop": "Develop",
+    "consistency": "Consistency"
   },
   "moment": {
     "bride_prep": "Bride getting ready",
@@ -574,7 +577,11 @@
       "geometry": "Geometry",
       "lens": "Lens corrections",
       "auto": "Automatic",
-      "retouch": "Retouch"
+      "retouch": "Retouch",
+      "presets": "Presets",
+      "grading": "Toning and LUT",
+      "bw": "Black & white",
+      "lut": "LUT"
     },
     "resetSection": "Reset this section",
     "panel": "Adjustments",
@@ -649,6 +656,21 @@
       "retouch": {
         "redEye": "Red eyes",
         "dust": "Sensor dust"
+      },
+      "grading": {
+        "shadowsHue": "Shadows: hue",
+        "shadowsSat": "Shadows: amount",
+        "highlightsHue": "Highlights: hue",
+        "highlightsSat": "Highlights: amount",
+        "balance": "Balance"
+      },
+      "lut": {
+        "amount": "LUT: amount",
+        "remove": "Remove LUT"
+      },
+      "bw": {
+        "enabled": "Black & white",
+        "mix": "B&W mix"
       }
     },
     "wbPicker": "Picker",
@@ -677,7 +699,9 @@
       "snapshot": "Snapshot applied",
       "virtualCopy": "Virtual copy",
       "resetSection": "Reset {{section}}",
-      "auto": "Automatic edit"
+      "auto": "Automatic edit",
+      "preset": "Preset: {{name}}",
+      "sync": "Synced with reference"
     },
     "copyNote": "Geometry (crop, rotation) is not copied by default.",
     "loading": "Loading the photo…",
@@ -744,7 +768,9 @@
         "redEye": "No red eyes found.",
         "dust": "No sensor dust found."
       }
-    }
+    },
+    "lut": "LUT",
+    "bwEnable": "Convert to black & white"
   },
   "auto": {
     "intensity": "Intensity",
@@ -846,5 +872,160 @@
     "toastFinished_other": "Automatic editing finished: {{count}} photos.",
     "toastCancelled_one": "Automatic editing cancelled ({{count}} photo edited).",
     "toastCancelled_other": "Automatic editing cancelled ({{count}} photos edited)."
+  },
+  "presets": {
+    "button": "Presets…",
+    "applyHint": "Apply a preset to the selection, a moment or the whole wedding",
+    "amount": "Amount (%)",
+    "create": "Create preset",
+    "createTitle": "Create preset from this photo",
+    "name": "Name",
+    "group": "Group",
+    "noGroup": "My presets",
+    "components": "Included components",
+    "component": {
+      "exposure": "Exposure",
+      "tone": "Tone (contrast, highlights, shadows, whites, blacks)",
+      "whiteBalance": "White balance",
+      "presence": "Presence (vibrance, saturation, clarity, texture, dehaze)",
+      "hsl": "HSL",
+      "curve": "Curve",
+      "grading": "Toning",
+      "blackWhite": "Black & white",
+      "sharpening": "Sharpening",
+      "noiseReduction": "Noise reduction",
+      "effects": "Vignette and grain",
+      "lens": "Lens",
+      "lut": "LUT"
+    },
+    "componentsNote": "Only the chosen components are saved and applied; the rest of each photo stays as it is. By default only the look (no exposure or white balance, which change from photo to photo).",
+    "created": "Preset \"{{name}}\" created.",
+    "import": "Import…",
+    "manage": "Manage…",
+    "manageTitle": "Manage presets",
+    "export_one": "Export ({{count}})",
+    "export_other": "Export ({{count}})",
+    "exported_one": "{{count}} preset exported.",
+    "exported_other": "{{count}} presets exported.",
+    "select": "Select {{name}}",
+    "builtin": "built-in",
+    "up": "Move {{name}} up",
+    "down": "Move {{name}} down",
+    "rename": "Rename",
+    "groupOf": "Group of {{name}}",
+    "duplicate": "Duplicate",
+    "copySuffix": "(copy)",
+    "delete": "Delete",
+    "deleteTitle": "Delete the preset \"{{name}}\"?",
+    "deleteNote": "Photos where it was already applied do not change (each edit has its own recipe).",
+    "fileFilter": "Presets (Momento, Lightroom XMP, .cube LUT)",
+    "imported": {
+      "momentopreset_one": "{{count}} preset imported.",
+      "momentopreset_other": "{{count}} presets imported.",
+      "xmp_one": "XMP preset imported (approximate)",
+      "xmp_other": "XMP presets imported (approximate)",
+      "cube_one": "LUT imported",
+      "cube_other": "LUTs imported"
+    },
+    "xmpWarning": "The Lightroom/Camera Raw values were interpreted by the Momento Studio engine. The names are similar but the engines are not: the look will not match Lightroom. Check the preset on one photo before using it in batch.",
+    "interpreted_one": "{{count}} field interpreted",
+    "interpreted_other": "{{count}} fields interpreted",
+    "ignored_one": "{{count}} field ignored",
+    "ignored_other": "{{count}} fields ignored",
+    "cubeNote": "Color LUT applied in sRGB at the end of processing, with trilinear interpolation (as in video editors). LUTs for log/HDR footage are refused.",
+    "applyTitle": "Apply preset",
+    "scope": "Apply to",
+    "scopeSelection_one": "Selection ({{count}} photo)",
+    "scopeSelection_other": "Selection ({{count}} photos)",
+    "scopeMoment": "Moment",
+    "scopeAll_one": "Whole wedding ({{count}} photo)",
+    "scopeAll_other": "Whole wedding ({{count}} photos)",
+    "applyN_one": "Apply to {{count}} photo",
+    "applyN_other": "Apply to {{count}} photos",
+    "applied_one": "\"{{name}}\" applied to {{count}} photo.",
+    "applied_other": "\"{{name}}\" applied to {{count}} photos.",
+    "applyNote": "Each photo keeps its exposure, white balance and crop (unless the preset includes them) and it can be undone in the history.",
+    "previewing": "Preset preview",
+    "groups": {
+      "Cor": "Color",
+      "Película": "Film",
+      "Luz": "Light",
+      "Preto e branco": "Black & white",
+      "Importados": "Imported",
+      "LUT": "LUT"
+    }
+  },
+  "look": {
+    "viewHint": "Group by light, camera, scene, time, white balance and flash; sync with a reference",
+    "groupsTitle": "Groups",
+    "criterion": "Group by",
+    "criteria": {
+      "combined": "Similar light (combined)",
+      "lighting": "Lighting",
+      "camera": "Camera",
+      "scene": "Scene (moment)",
+      "time": "Time",
+      "whiteBalance": "White balance",
+      "flash": "Flash / natural"
+    },
+    "missing_one": "{{count}} photo not yet measured.",
+    "missing_other": "{{count}} photos not yet measured.",
+    "measure": "Measure now",
+    "measuring": "Measuring…",
+    "lighting": {
+      "bright": "Bright light (outdoors)",
+      "shade": "Outdoor shade / overcast",
+      "indoor": "Lit interior",
+      "dark": "Dark interior / night",
+      "unknown": "No exposure data"
+    },
+    "wb": {
+      "warm": "Warm light",
+      "slightlyWarm": "Slightly warm",
+      "neutral": "Neutral light",
+      "slightlyCool": "Slightly cool",
+      "cool": "Cool light",
+      "unknown": "No color measurement"
+    },
+    "flash": {
+      "on": "With flash",
+      "off": "Natural light (no flash)",
+      "unknown": "Flash unknown"
+    },
+    "camera": {
+      "unknown": "Unknown camera"
+    },
+    "scene": {
+      "unclassified": "Unclassified",
+      "moment": "Moment"
+    },
+    "time": "Time",
+    "photos_one": "{{count}} photo",
+    "photos_other": "{{count}} photos",
+    "selectGroup": "Select the group",
+    "presetGroup": "Apply preset to the group…",
+    "referenceHint": "Click a photo to make it the reference (double-click opens it in the editor). Edit the reference, then sync the others.",
+    "reference": "Reference",
+    "editReference": "Edit the reference",
+    "syncGroup_one": "Sync {{count}} photo with the reference",
+    "syncGroup_other": "Sync {{count}} photos with the reference",
+    "empty": "No photos."
+  },
+  "sync": {
+    "smart": "Adjust each photo to the reference (smart)",
+    "copyValues": "Copy the same values",
+    "smartIntro": "Each photo receives this photo's look and is adjusted until the result matches — the same values are not copied:",
+    "option": {
+      "look": "Look (tone, color, curve, toning, B&W, effects, LUT)",
+      "exposure": "Consistent exposure (faces or scene)",
+      "whiteBalance": "White balance (same white)",
+      "skin": "Skin tones",
+      "contrast": "Contrast",
+      "color": "Color (saturation)"
+    },
+    "smartNote": "Measured on each photo's result; runs in the background and each one can be undone in the history. Skin tones need the analysis (faces).",
+    "queueTitle": "Sync with reference",
+    "toastFinished_one": "Sync finished: {{count}} photo.",
+    "toastFinished_other": "Sync finished: {{count}} photos."
   }
 }

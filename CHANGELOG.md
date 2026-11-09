@@ -5,6 +5,25 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [0.7.0] — 2026-11-09 — Fase 7: presets e consistência visual
+
+### Adicionado
+- **Presets**: criar a partir da fotografia (escolhendo os componentes), renomear, organizar
+  em grupos e ordem, duplicar, eliminar, importar e exportar (`.momentopreset` com LUT);
+  pré-visualização ao passar o rato; aplicar a uma fotografia, à seleção, a um momento ou
+  ao casamento completo, com **Amount** 0–150 %.
+- 13 presets internos: Natural Wedding, Clean Editorial, Fine Art, Romantic Soft, Film Warm,
+  Film Clean, Golden Hour, Ceremony Indoor, Reception Night, Flash Clean, B&W Classic,
+  B&W Documentary, B&W Fine Art.
+- Importação **aproximada** de XMP do Lightroom/Camera Raw com relatório; LUT `.cube`
+  (sRGB, 1D/3D); documento `docs/COMPATIBILIDADE-PRESETS.md`.
+- Motor: tonalização de sombras/realces, preto e branco com mistura por cor, LUT.
+- **Consistência**: vista nova com grupos por luz semelhante, iluminação, câmara, cenário,
+  horário, balanço de brancos e flash/natural; fotografia de referência e **sincronização
+  inteligente** (exposição, balanço, pele, contraste, cor ajustados medindo o resultado), em
+  segundo plano; também no "Sincronizar" do editor.
+- Catálogo v7 (`look_feature`), biblioteca v2 (`preset`), EXIF `Flash`.
+
 ## [0.6.0] — 2026-11-09 — Fase 6: edição automática
 
 ### Adicionado

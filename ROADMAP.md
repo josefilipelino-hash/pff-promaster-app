@@ -80,23 +80,31 @@ intensidades, AI Denoise local opcional (FFDNet), redução rápida com preserva
 detalhe, recorte automático opcional, olhos vermelhos, manchas do sensor, antes/depois
 dividido, "Editar automaticamente seleção" em segundo plano com pausa/retoma/cancelar.
 
-## Fase 7 — Exportação
+## Fase 7 — Presets e consistência visual ✅ *(concluída 2026-11-09, ver PROJECT_STATUS.md)*
+
+Presets (criar, guardar, renomear, organizar, duplicar, eliminar, importar, exportar,
+pré-visualizar, aplicar a fotografia/seleção/momento/casamento), Amount, componentes, 13
+presets internos, XMP aproximado com relatório, LUT .cube; tonalização e P&B; consistência:
+agrupamento por iluminação/câmara/cenário/horário/balanço/flash e sincronização inteligente
+com uma referência.
+
+## Fase 8 — Exportação
 
 Receitas e lotes múltiplos, presets de exportação, gestão de cor completa (soft proofing,
 gamut), marca de água, metadados e privacidade, impressão, redes sociais, arquivo
 TIFF/DNG.
 
-## Fase 8 — Galerias
+## Fase 9 — Galerias
 
 Galeria estática com temas, slideshow, downloads, favoritas, palavra-passe (cifra), e
 publicação opcional (S3/R2/B2/SFTP).
 
-## Fase 9 — Álbuns
+## Fase 10 — Álbuns
 
 Editor, templates, montagem automática, margens, sangria, perfis, validações, exportação
 PDF/JPEG/TIFF.
 
-## Fase 10 — Otimização e distribuição
+## Fase 11 — Otimização e distribuição
 
 GPU (wgpu), otimização Apple Silicon, projetos grandes, recuperação, testes de carga,
 assinatura de instaladores.

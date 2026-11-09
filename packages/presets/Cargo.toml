@@ -9,3 +9,9 @@ publish.workspace = true
 authors.workspace = true
 
 [dependencies]
+momento-image-processing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+image.workspace = true

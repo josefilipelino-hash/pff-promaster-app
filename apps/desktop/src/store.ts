@@ -5,6 +5,7 @@ import { EMPTY_SELECTION, type Selection } from "./logic/selection";
 import type { RecMap } from "./logic/filters";
 import { defaultAutoOptions } from "./logic/develop";
 import type {
+  Preset,
   AutoEditProgress,
   AutoOptions,
   DevelopSettings,
@@ -45,7 +46,7 @@ export interface UiState {
 }
 
 /** Vista principal: grelha de fotografias ou lista de sequências/grupos. */
-export type View = "grid" | "sequences" | "people" | "develop";
+export type View = "grid" | "sequences" | "people" | "develop" | "consistency";
 
 interface State {
   project: ProjectInfo | null;
@@ -95,6 +96,10 @@ interface State {
   /** Estado da fila em segundo plano (null = sem fila visível). */
   autoProgress: AutoEditProgress | null;
   autoDialog: boolean;
+  // Presets (Fase 7)
+  presets: Preset[];
+  /** Diálogo "Aplicar preset" (seleção, momento, casamento). */
+  presetDialog: boolean;
 }
 
 interface Actions {
@@ -129,6 +134,8 @@ interface Actions {
   setAutoOptions(o: AutoOptions): void;
   setAutoProgress(p: AutoEditProgress | null): void;
   setAutoDialog(o: boolean): void;
+  reloadPresets(): Promise<void>;
+  setPresetDialog(o: boolean): void;
   /** Miniaturas/previews editadas mudaram: novas URLs e recarregar a lista. */
   bumpEdited(keys: number[]): void;
 }
@@ -208,6 +215,8 @@ export const useStore = create<State & Actions>((set, get) => ({
   autoOptions: loadAutoOptions(),
   autoProgress: null,
   autoDialog: false,
+  presets: [],
+  presetDialog: false,
 
 
 
@@ -450,6 +459,14 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   setAutoDialog(o) {
     set({ autoDialog: o });
+  },
+
+  async reloadPresets() {
+    set({ presets: await api.listPresets() });
+  },
+
+  setPresetDialog(o) {
+    set({ presetDialog: o });
   },
 
   bumpEdited(keys) {

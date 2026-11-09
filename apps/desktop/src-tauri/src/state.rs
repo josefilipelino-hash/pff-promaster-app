@@ -67,6 +67,8 @@ pub struct OpenProject {
 }
 
 pub struct AppState {
+    /// Pasta das LUT importadas.
+    pub lut_dir: std::path::PathBuf,
     pub library: Arc<Mutex<Library>>,
     pub project: RwLock<Option<OpenProject>>,
     next_token: AtomicU64,
@@ -76,6 +78,7 @@ pub struct AppState {
 impl AppState {
     pub fn new(library_path: &Path, app: AppHandle) -> CoreResult<Self> {
         Ok(AppState {
+            lut_dir: library_path.parent().map(|d| d.join("luts")).unwrap_or_else(|| "luts".into()),
             library: Arc::new(Mutex::new(Library::open(library_path)?)),
             project: RwLock::new(None),
             next_token: AtomicU64::new(1),

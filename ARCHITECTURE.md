@@ -218,7 +218,7 @@ das capacidades do SQLite.
 
 ---
 
-## 5. Pipeline de imagem **[implementado na Fase 5 — ver D-034 a D-039; automático na Fase 6 — D-040 a D-045]**
+## 5. Pipeline de imagem **[implementado na Fase 5 — ver D-034 a D-039; automático na Fase 6 — D-040 a D-045; presets e consistência na Fase 7 — D-046 a D-051]**
 
 ### 5.0 O que está implementado (`momento-image-processing::develop`)
 
@@ -557,7 +557,7 @@ D-024 a D-028.
 
 ---
 
-## 13. Presets **[definido]**
+## 13. Presets **[implementado na Fase 7 — D-046 a D-049]**
 
 - Um preset é uma **receita parcial** + metadados (nome, pasta, descrição, miniatura de
   referência, versão do esquema, blocos incluídos).
@@ -750,4 +750,10 @@ ficheiros a partir do frontend (caminhos sempre resolvidos e verificados no núc
 | D-043 | 2026-11-09 | **AI Denoise com FFDNet** (KAIR, MIT), reconstruído em ONNX a partir dos pesos (sem PyTorch, sem executar pickle) e executado pelo tract por mosaicos de 256 px com sobreposição; o nível de ruído medido entra como mapa de σ; aplicado à **fonte** (antes dos outros ajustes) em memória, nunca escrito | Modelos maiores (NAFNet/Restormer: lentos em CPU, licenças/proveniência menos claras); denoise só tradicional | ≈ 3 s/MP em 4 núcleos (6 MP ≈ 17 s); no editor calcula em segundo plano (a pré-visualização usa a fonte sem ele até estar pronto); é treinado com ruído gaussiano em sRGB, não com RAW reais |
 | D-044 | 2026-11-09 | Retoque básico como bloco `retouch` da receita: olhos vermelhos (círculos nas íris da malha MediaPipe, só píxeis muito vermelhos no domínio de visualização) e manchas do sensor (clonagem suave a partir de uma zona vizinha), aplicados na amostragem do original | Pincel de correção; edição de píxeis | Não destrutivo, sobrevive a qualquer mudança de recorte/geometria; zero falsos positivos em 33 rostos reais |
 | D-045 | 2026-11-09 | Fila de edição automática própria (até 2 trabalhadores, cada fotografia usa todos os núcleos via rayon) com **pausa por condição** entre fotografias, cancelamento que não toca nas restantes, e acrescento à fila em curso | Reutilizar `WorkQueue` sem pausa | A pausa/cancelamento atuam entre fotografias (a que está em curso termina); a interface nunca bloqueia |
+| D-046 | 2026-11-09 | Presets por **componentes** (13: exposição, tons, balanço, presença, HSL, curva, tonalização, P&B, nitidez, ruído, efeitos, objetiva, LUT) aplicados com **Amount** 0–150 % (interpolação entre a fotografia e o preset; acima de 100 % exagera a partir do neutro; curvas misturadas por amostragem); os internos só mudam o aspeto (sem exposição nem balanço) | Blocos inteiros; substituir a receita | Um preset nunca estraga a exposição/balanço já acertados; pode aplicar-se a meio |
+| D-047 | 2026-11-09 | Presets do utilizador na **biblioteca global** (`library.db` v2), partilhados por todos os projetos; internos no código (não editáveis, duplicáveis); formato próprio `.momentopreset` (JSON com as LUT incluídas) | Ficheiros soltos; presets por projeto | Organizar (grupos, ordem) com transações; exportar/importar sem perder LUT |
+| D-048 | 2026-11-09 | Novos blocos de receita: tonalização (sombras/realces), **P&B com mistura por cor** e **LUT `.cube`** (sRGB, trilinear, no fim do pipeline); LUT log/HDR recusadas | Implementar só o que o XMP pede | Necessários para looks de película e P&B; a LUT é reproduzida exatamente dentro do seu domínio |
+| D-049 | 2026-11-09 | XMP: **só importação, aproximada, com relatório** (interpretado/ignorado); sem exportação XMP. Leitor tolerante sem dependência XML | Exportar XMP; prometer compatibilidade | Ver `docs/COMPATIBILIDADE-PRESETS.md` |
+| D-050 | 2026-11-09 | Agrupamento de consistência a partir de características baratas: EV da cena (EXIF), dominante residual e chave da miniatura, flash (EXIF no 1.º MB do ficheiro), câmara, hora corrigida e momento; critério "combinado" = sequências contínuas com a mesma luz (exceções de 1–2 fotografias absorvidas) | Embeddings de cena; clustering global | ~10 ms por fotografia; explicável |
+| D-051 | 2026-11-09 | **Sincronização inteligente**: copia o aspeto da referência e ajusta cada fotografia **medindo o resultado** (exposição pelos rostos ou pela chave; balanço para o branco ter a mesma cor; contraste; saturação; pele via HSL laranja/vermelho), em renders de 384 px, na fila de fundo | Copiar valores (o "Sincronizar" da Fase 5 continua disponível) | Testado: fotografia 1,3 EV mais escura com tungsténio fica com rosto, vestido e pele iguais à referência; copiar os valores não chegava |
 

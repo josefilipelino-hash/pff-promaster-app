@@ -1,91 +1,75 @@
 # Estado do projeto
 
-**Última atualização:** 2026-11-09 · **Fase atual:** 6 — Edição automática · **Estado:** ✅ concluída
-**Versão:** 0.6.0 · **Branch:** `main` · **Plataformas-alvo:** macOS (Apple Silicon e Intel) e Windows 10/11
+**Última atualização:** 2026-11-09 · **Fase atual:** 7 — Presets e consistência visual · **Estado:** ✅ concluída
+**Versão:** 0.7.0 · **Branch:** `main` · **Plataformas-alvo:** macOS (Apple Silicon e Intel) e Windows 10/11
 
 ---
 
 ## Resumo
 
-O motor de edição ganhou **edição automática por fotografia**: cada imagem é medida
-(histograma, rostos, balanço de cinzentos, saturação, ruído com o ISO e o sensor da câmara,
-horizonte, objetiva) e recebe uma receita própria — editável e desfazível como qualquer
-ajuste. Há 6 intensidades, **AI Denoise** local opcional, olhos vermelhos, manchas do
-sensor, recorte automático opcional, antes/depois dividido e **"Editar automaticamente
-seleção"** para centenas de fotografias em segundo plano (progresso, pausa, retoma,
-cancelar). Tudo continua **não destrutivo** (originais verificados por hash nos testes).
+Sistema de **presets** completo (biblioteca global, componentes, Amount, 13 internos, formato
+próprio com LUT, importação XMP aproximada com relatório, LUT `.cube`) e **consistência
+visual**: grupos por luz semelhante, iluminação, câmara, cenário, horário, balanço de brancos
+e flash/natural, e **sincronização inteligente** com uma fotografia de referência — cada
+fotografia recebe o aspeto da referência e é ajustada **medindo o resultado** (exposição,
+balanço, pele, contraste, cor), em vez de copiar os mesmos valores. Tudo não destrutivo.
 
 ## Funcional (verificado)
 
 | Funcionalidade | Verificação |
 |---|---|
-| Análise por fotografia → exposição (com rostos), balanço, realces, sombras, brancos, pretos, contraste, curva, vibração/saturação, nitidez, horizonte, aberração cromática, vinheta (RAW) | Testes (escura clareia, dominante azul aquece, quente arrefece menos, escura e normal convergem); 8 fotografias numa fila → ≥ 6 combinações de luz diferentes; 10 fotografias reais avaliadas antes/depois |
-| Intensidades: Muito suave, Suave, Natural, Equilibrada, Intensa, Personalizada (força + grupos) | Testes (exposição e vibração ordenadas; personalizada só mexe nos grupos pedidos) + interface |
-| Ruído: medição (Immerkær nas zonas lisas), ISO × fator do sensor, sem redução forte em fotografias limpas | Testes (limpa → 0; σ ≈ 9/255 → alto; ISO 100 limita a 12) |
-| Redução rápida com **preservação de detalhe** e de cor | Testes do motor (a omissão = comportamento da Fase 5) |
-| **AI Denoise** (FFDNet, local) com o nível medido; no editor em segundo plano | Teste: PSNR 20,2 → 39,8 dB; render não bloqueia e o editor é avisado quando acaba |
-| Antes/depois: alternar (\\) e **dividido** com divisória (Y) | Interface + aplicação real |
-| Endireitar automático integrado (só inclinações de 0,25°–10°) | Teste (3° corrigido, 0° intacto) |
-| Recorte automático opcional (só com pessoas, mantém proporção, nunca corta o rosto) | Teste |
-| Olhos vermelhos (íris da deteção de rostos local) | Teste sintético + fotografias reais: **0 falsos em 33 rostos**, 2/2 simulados corrigidos |
-| Manchas do sensor (céu/paredes) | Teste: 3/3 manchas num degradê, removidas; 0 numa imagem sem pó |
-| Editar automaticamente seleção: fila com progresso, pausa, retoma, cancelar, acrescentar | Teste de integração + interface + aplicação real |
-| Não destrutivo: entrada "Edição automática" no histórico, desfazer, originais intactos | Teste de integração (hash dos originais) |
+| Criar preset (componentes escolhidos), guardar, renomear, organizar (grupos e ordem), duplicar (incl. internos), eliminar (com confirmação; internos protegidos) | Testes do armazenamento + interface + aplicação real |
+| Importar/exportar `.momentopreset` (com as LUT), importar XMP e `.cube` | Testes (ida e volta noutra biblioteca; LUT log e `.lrtemplate` recusados) |
+| Pré-visualizar ao passar o rato; aplicar a uma fotografia, seleção, momento, casamento completo | Interface + teste de integração (6 fotografias) + aplicação real ("Preset: Fine Art" no histórico) |
+| Amount 0–150 % | Testes (0 = nada, 50 = a meio, 150 = exagero; curvas e LUT incluídas) |
+| 13 presets internos com os nomes pedidos | Testes (todos diferentes; mantêm exposição e balanço; P&B só nos P&B) + folha de contactos numa fotografia real |
+| Tonalização, P&B com mistura por cor, LUT `.cube` 1D/3D | Testes de render |
+| XMP: interpretação aproximada com relatório (interpretado/ignorado e porquê) | Teste com um XMP do Lightroom; ver `docs/COMPATIBILIDADE-PRESETS.md` |
+| Agrupamento: luz semelhante, iluminação (EV), câmara, cenário (momento), horário, balanço, flash/natural | Testes (7 critérios) + integração (exterior vs. interior quente separados) + aplicação real |
+| Referência + sincronização (exposição, balanço, pele, contraste, cor, aspeto), em fila com progresso/pausa/cancelar | Teste: fotografia 1,3 EV mais escura com tungsténio fica igual à referência e **copiar os valores não chegava**; aplicação real com retratos em sombra fria e tungsténio |
+| "Sincronizar" do editor: inteligente ou copiar valores | Interface |
+| Originais intactos | Teste de integração (hash) |
 
 ## Desempenho medido (Linux x86_64, 4 núcleos, release)
 
 | Operação | Resultado |
 |---|---|
-| Edição automática de um JPEG (análise + rostos + gravação) | ≈ 1,6–3,4 s (mais rostos = mais tempo) |
-| Edição automática de um RAW (Canon 7D / Nikon D810 / Fuji X-E1) | ≈ 3–11 s (inclui revelação linear) |
-| AI Denoise | ≈ 2,8–3,6 s por megapíxel (fonte de 6 MP ≈ 17–20 s) |
+| Aplicar um preset a 6 fotografias (gravação) | instantâneo (miniaturas editadas em segundo plano) |
+| Medir a luz de uma fotografia (miniatura) | ≈ 10–20 ms |
+| Sincronizar uma fotografia com a referência (JPEG 1–2 MP) | ≈ 1–2 s (inclui carregar a fonte e ~10 renders de 384 px) |
 
-Num Mac com 8–10 núcleos espera-se 2–3× mais rápido, **não medido**.
+Num RAW soma-se a revelação linear (≈ 1 s). Mac/Windows: **não medido**.
 
 ## Não funcional / limitações
 
-- **AI Denoise:** FFDNet foi treinado com ruído gaussiano em sRGB, não com RAW reais; é
-  melhor do que a redução rápida mas não é uma reconstrução a partir do sensor. Lento em
-  CPU; o resultado fica só em memória (é recalculado ao reabrir; as miniaturas editadas já
-  o incluem). Sem o modelo (`prepare-models.py`), usa-se só a redução rápida.
-- **Pausa/cancelar** atuam entre fotografias: a que está em curso termina.
-- **Correção de objetiva:** sem perfis (Lensfun): a aberração cromática é medida; a vinheta
-  só nos RAW e só quando os 4 cantos são uniformemente escuros; a distorção não é corrigida
-  automaticamente.
-- **Balanço automático:** cenas dominadas por uma cor (relva, pôr do sol) podem enganar a
-  estimativa; por isso a correção é parcial e limitada.
-- **Recorte automático:** só com pessoas; sem pessoas não recorta.
-- **Olhos vermelhos:** precisam dos modelos de rostos; olhos muito pequenos (íris < 1,5 px) são ignorados.
-- **Manchas:** só manchas pequenas e redondas em zonas lisas; não usa a repetição da mesma
-  mancha em várias fotografias.
-- Ainda da Fase 5: saída sRGB (sem perfil do monitor), sem máscaras/ajustes locais.
-- macOS/Windows: compilação verificada, **não executada** nesses sistemas.
+- **XMP:** só importação e **aproximada** (motores diferentes); não exportamos XMP; perfis de
+  câmara, máscaras, Kelvin absolutos, meios-tons do color grading e perfis de objetiva são
+  ignorados (o relatório diz quais). `.lrtemplate` não suportado.
+- **LUT:** só LUT criativas sRGB (domínio 0–1); LUT log/HDR recusadas.
+- **Tons de pele na sincronização:** precisam dos rostos da análise; ajustam o HSL laranja e
+  vermelho (também afetam outros objetos dessas cores, de forma limitada a ±20/±25).
+- **Agrupamento por iluminação:** usa o EV do EXIF; fotografias sem EXIF ficam em "Sem dados
+  de exposição". O flash vem do EXIF no início do ficheiro (CR3/RAF podem ficar "desconhecido").
+  A dominante de cor é medida na miniatura **depois** do balanço da câmara (dominante residual).
+- **Cenário** = momento (Fase 4); sem momentos atribuídos fica "Por classificar".
+- Ainda: saída sRGB; sem máscaras; macOS/Windows não executados.
 
 ## Arquitetura
 
-Decisões D-040 a D-045 em `ARCHITECTURE.md`. Novos módulos: `develop::auto` (análise e
-receita), `face-analysis::denoise` (FFDNet por mosaicos), `project-management::auto_edit`
-(fila, AI Denoise em segundo plano). Novo bloco de receita `retouch`; novos campos
-`detail.noiseDetail` e `detail.aiDenoise` (receitas antigas dão o mesmo resultado).
+Decisões D-046 a D-051 em `ARCHITECTURE.md`. Novos módulos: `momento-presets` (componentes,
+Amount, internos, ficheiro, XMP), `develop::lut`, `develop::consistency`,
+`project-management::{consistency, preset_store}`; fila de fundo generalizada (auto/sync).
+Catálogo v7 (`look_feature`), biblioteca v2 (`preset`), EXIF `Flash`. Nova permissão
+`dialog:allow-save` (exportar presets).
 
 ## Dependências novas
 
-Nenhuma biblioteca nova na aplicação. Modelo novo `denoise_ffdnet.onnx` (FFDNet, KAIR,
-MIT, 3,3 MB), preparado por `scripts/prepare-models.py --only denoise` (SHA-256 da origem e
-do resultado fixados; lido sem PyTorch e sem executar pickle).
+Nenhuma biblioteca externa nova (o `blake3` já existia no projeto).
 
 ## Comandos exatos
 
 ```bash
-git submodule update --init --recursive
-```
-
-```bash
 pnpm install
-```
-
-```bash
-.venv-models/bin/python scripts/prepare-models.py --only denoise
 ```
 
 ```bash
@@ -96,32 +80,29 @@ pnpm dev
 ./scripts/check.sh
 ```
 
-Avaliar a edição automática com fotografias tuas (nada é escrito nos originais):
+Ver os presets internos numa fotografia tua:
 
 ```bash
-cargo run --release -p momento-project-management --example auto_eval -- /pasta/fotos /pasta/saida natural
+cargo run --release -p momento-presets --example preset_sheet -- foto.jpg folha.jpg
 ```
 
 ## Testes realizados (2026-11-09)
 
 | Verificação | Resultado |
 |---|---|
-| `cargo test --workspace --release` (com RAW reais e referências) | ✅ 174 passados, 1 ignorado (débito de análise 24 MP) |
-| `pnpm -r test` | ✅ 59 (53 da aplicação, 6 de traduções) |
+| `cargo test --workspace --release` (com RAW reais e referências) | ✅ 189 passados, 1 ignorado (débito de análise 24 MP) |
+| `pnpm -r test` | ✅ 63 (57 da aplicação, 6 de traduções) |
 | `pnpm -r typecheck`, `cargo fmt --check`, `cargo clippy -D warnings` | ✅ |
-| Fotografias reais (`auto_eval`, 10 ficheiros JPEG/CR2/RAF/NEF) | ✅ resultados plausíveis; **0 olhos vermelhos falsos em 33 rostos**; 2/2 simulados corrigidos; 2 defeitos encontrados e corrigidos (falsos olhos vermelhos em luz linear; linha colorida na borda com aberração cromática) |
-| Aplicação real (release, Linux, Xvfb): "Auto (8)" → diálogo → fila; pausa a 5/8 sem avançar; retomar → 8/8; miniaturas editadas na grelha; editor com relatório, vista dividida, olhos vermelhos corrigidos; AI Denoise de um RAW D810 com progresso e novo render no fim | ✅ (1 defeito encontrado e corrigido: o AI Denoise era calculado duas vezes em paralelo — editor e miniatura) |
-| `cargo check --workspace --target x86_64-pc-windows-gnu` | ✅ |
-| `cargo check` edição + automático + codecs `--target aarch64-apple-darwin` | ✅ (o `tract-linalg` dos modelos só compila num Mac/CI, como desde a Fase 3) |
+| Aplicação real (release, Linux): presets no editor (pré-visualização, aplicar, histórico), vista Consistência (medir, grupos, referência), sincronização em fila de 5 fotografias | ✅ — 4 defeitos encontrados e corrigidos: título do grupo combinado não era o da maioria; barra de ferramentas cortava "Fechar projeto"; aviso de pré-visualização por cima dos botões; "Exportação · Fase 7" na barra lateral |
 | macOS / Windows reais | ⏳ não executado |
 
 ## Riscos
 
 | Risco | Impacto | Mitigação |
 |---|---|---|
-| Gosto da edição automática diferente do do fotógrafo | Médio | Intensidades, personalizada, tudo editável/desfazível; próximo passo: aprender com as correções |
-| AI Denoise lento em portáteis | Médio | Opcional, em segundo plano; GPU na fase de otimização |
-| Balanço automático em cenas de cor única | Baixo | Correção parcial e limitada; conta-gotas |
+| Expectativa de que XMP do Lightroom dê o mesmo aspeto | Médio | Relatório na importação, documento de compatibilidade, sem exportação XMP |
+| Sincronização em fotografias muito diferentes (outra cena) | Médio | Agrupamento prévio por luz/cenário; cada sincronização pode ser desfeita |
+| Pele em cenas sem análise | Baixo | Ignorada sem rostos (indicado na interface) |
 
 ## Histórico de fases
 
@@ -134,15 +115,16 @@ cargo run --release -p momento-project-management --example auto_eval -- /pasta/
 | 4 — Organização do casamento | ✅ | 2026-11-09 |
 | 5 — Motor de edição | ✅ | 2026-11-09 |
 | 6 — Edição automática | ✅ | 2026-11-09 |
-| 7 — Exportação | ⏸ próxima | — |
+| 7 — Presets e consistência visual | ✅ | 2026-11-09 |
+| 8 — Exportação | ⏸ próxima | — |
 
 ## Próximo passo
 
-**Recomendado:** correr `auto_eval` (ou "Editar automaticamente seleção") num casamento teu
-com várias câmaras e ISO altos, e dizer-me onde o resultado não te agrada (exposição,
-balanço, ruído) — afino as regras com exemplos reais.
+**Recomendado:** num casamento teu, abrir **Consistência → Luz semelhante**, editar uma
+fotografia de referência por grupo (ou aplicar um preset interno) e sincronizar; depois rever
+a cerimónia e a festa e dizer-me onde a sincronização falha.
 
-**Fase 7 — Exportação:** receitas e lotes, gestão de cor completa (perfis, soft proofing),
+**Fase 8 — Exportação:** receitas e lotes, gestão de cor completa (perfis, soft proofing),
 marca de água, metadados e privacidade.
 
 **Pendente do utilizador:** repositório GitHub (CI em macOS/Windows); fotografias de teste;
