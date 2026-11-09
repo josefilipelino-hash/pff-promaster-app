@@ -5,6 +5,24 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [0.5.0] — 2026-11-09 — Fase 5: motor de edição
+
+### Adicionado
+- Motor de revelação **não destrutivo** em `f32` (Rec. 2020 linear → sRGB): exposição,
+  contraste, realces, sombras, brancos, pretos; temperatura, matiz e conta-gotas de balanço
+  de brancos; saturação e vibração; HSL por 8 cores; curva paramétrica, curva de pontos RGB
+  e por canal; nitidez (quantidade, raio, detalhe, máscara), ruído de luminância e de cor;
+  textura, clareza, remover névoa, vinheta pós-recorte, grão; recorte com proporções,
+  rotação de 90°, espelho, endireitar e endireitar automático, perspetiva vertical e
+  horizontal; distorção, aberração cromática e vinheta da objetiva.
+- RAW editados a partir dos dados lineares do sensor (LibRaw).
+- Qualidade dinâmica (render rápido ao arrastar, final ao parar) e histograma RGB.
+- Desfazer/refazer, histórico, repor, antes/depois, copiar/colar/sincronizar definições,
+  cópias virtuais, instantâneos.
+- Miniaturas, previews e resolução total editadas em cache; sidecar JSON na pasta do
+  projeto. Catálogo v6.
+
+
 ## [0.4.0] — 2026-11-09 — Fase 4: organização do casamento
 
 ### Adicionado

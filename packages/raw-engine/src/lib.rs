@@ -16,5 +16,5 @@ mod file;
 pub use codec::{RawCodec, EMBEDDED_GOOD_ENOUGH_LONG_EDGE};
 pub use file::{
     flip_to_exif_orientation, libraw_camera_count, libraw_version, Bitmap, EmbeddedPreview,
-    RawFile, RawInfo,
+    LinearBitmap, RawFile, RawInfo,
 };

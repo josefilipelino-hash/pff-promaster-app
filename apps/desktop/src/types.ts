@@ -5,7 +5,14 @@ export type Color = "red" | "yellow" | "green" | "blue" | "purple";
 export const COLORS: Color[] = ["red", "yellow", "green", "blue", "purple"];
 
 export interface PhotoRow {
+  /** Chave da fotografia (versão principal = id do ficheiro; cópias virtuais ≥ 2^40). */
   id: number;
+  /** Ficheiro (asset) da fotografia. */
+  asset: number;
+  variant: number;
+  /** Nome da cópia virtual (null = versão principal). */
+  virtualCopy: string | null;
+  edited: boolean;
   fileName: string;
   captureTime: string | null;
   width: number;
@@ -356,3 +363,75 @@ export interface OrganizeSummary {
   unclassified: number;
   durationMs: number;
 }
+
+// --- Edição (Fase 5) -----------------------------------------------------------------------
+
+export interface DevelopSettings {
+  light: { exposure: number; contrast: number; highlights: number; shadows: number; whites: number; blacks: number };
+  wb: { temperature: number; tint: number };
+  color: { saturation: number; vibrance: number };
+  hsl: { hue: number[]; saturation: number[]; luminance: number[] };
+  curve: {
+    highlights: number;
+    lights: number;
+    darks: number;
+    shadows: number;
+    splitShadows: number;
+    splitMidtones: number;
+    splitHighlights: number;
+    rgb: [number, number][];
+    red: [number, number][];
+    green: [number, number][];
+    blue: [number, number][];
+  };
+  detail: { sharpenAmount: number; sharpenRadius: number; sharpenDetail: number; sharpenMasking: number; noiseLuminance: number; noiseColor: number };
+  effects: {
+    texture: number;
+    clarity: number;
+    dehaze: number;
+    vignette: number;
+    vignetteMidpoint: number;
+    vignetteFeather: number;
+    vignetteRoundness: number;
+    grain: number;
+    grainSize: number;
+    grainRoughness: number;
+  };
+  geometry: {
+    crop: { x: number; y: number; w: number; h: number };
+    quarterTurns: number;
+    flipHorizontal: boolean;
+    straighten: number;
+    aspect: string;
+    vertical: number;
+    horizontal: number;
+  };
+  lens: { distortion: number; caRed: number; caBlue: number; vignetting: number; vignettingMidpoint: number };
+}
+
+export interface HistoryEntry {
+  seq: number;
+  label: string;
+  createdAt: number;
+}
+
+export interface SnapshotRow {
+  id: number;
+  name: string;
+  createdAt: number;
+}
+
+export interface EditView {
+  key: number;
+  asset: number;
+  variant: number;
+  position: number;
+  history: HistoryEntry[];
+  canUndo: boolean;
+  canRedo: boolean;
+  snapshots: SnapshotRow[];
+  settings: DevelopSettings;
+}
+
+export const SETTINGS_BLOCKS = ["light", "wb", "color", "hsl", "curve", "detail", "effects", "geometry", "lens"] as const;
+export type SettingsBlock = (typeof SETTINGS_BLOCKS)[number];

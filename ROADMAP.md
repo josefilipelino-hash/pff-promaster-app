@@ -60,11 +60,13 @@ madrinhas, pesquisas “noiva + mãe”, “noivos juntos”), 25 momentos autom
 confiança e “Por classificar”, momentos personalizados, arrastar entre momentos,
 sincronização de hora entre câmaras com sugestão automática e cronologia reconstruída.
 
-## Fase 5 — Edição
+## Fase 5 — Edição ✅ *(concluída 2026-11-09, ver PROJECT_STATUS.md)*
 
-Motor não destrutivo (luz, cor, curvas, HSL, color grading, nitidez, denoise, correção de
-lente, geometria), histórico, snapshots, cópias virtuais, copiar/colar/sincronizar,
-presets (próprios, XMP, LUT), edição em lote, correção automática por fotografia.
+Motor não destrutivo (luz, balanço de brancos, cor, HSL, curvas, detalhe, efeitos,
+geometria, objetiva), histórico, instantâneos, cópias virtuais, copiar/colar/sincronizar,
+antes/depois, histograma, qualidade dinâmica. **Por fazer (próximas fases):** máscaras e
+ajustes locais, color grading, presets (próprios, XMP, LUT), perfis de objetiva
+automáticos, correção automática por fotografia.
 
 Também: consistência de cor entre câmaras e condições de luz; workflow de revisão.
 

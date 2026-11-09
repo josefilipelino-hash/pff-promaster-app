@@ -140,7 +140,9 @@
   },
   "grid": {
     "thumbFailed": "Could not create the thumbnail. See the info panel.",
-    "partial": "Partial"
+    "partial": "Partial",
+    "edited": "Edited",
+    "virtualCopy": "Virtual copy"
   },
   "viewer": {
     "back": "Grid",
@@ -231,7 +233,12 @@
     "info": "Show/hide info panel",
     "import": "Import files",
     "help": "Show this help",
-    "compare": "Compare side by side (selection or sequence)"
+    "compare": "Compare side by side (selection or sequence)",
+    "develop": "Develop (edit the photo)",
+    "undoRedo": "Undo / redo (editor)",
+    "beforeAfter": "Before / after (editor)",
+    "crop": "Crop tool (editor)",
+    "copyPaste": "Copy / paste settings (editor)"
   },
   "error": {
     "io": "Error reading or writing a file.",
@@ -416,7 +423,8 @@
     "label": "View",
     "grid": "Grid",
     "sequences": "Sequences",
-    "people": "People"
+    "people": "People",
+    "develop": "Develop"
   },
   "moment": {
     "bride_prep": "Bride getting ready",
@@ -537,5 +545,172 @@
     "auto": "Automatic · confidence {{confidence}} %",
     "backToAuto": "back to automatic",
     "showPerson": "Show all photos of this person"
+  },
+  "develop": {
+    "resetHint": "Double-click to reset",
+    "value": "value",
+    "histogram": "RGB histogram",
+    "clipShadows": "◀ clipped shadows",
+    "clipHighlights": "clipped highlights ▶",
+    "curveChannel": "Curve channel",
+    "channel": {
+      "rgb": "RGB",
+      "red": "Red",
+      "green": "Green",
+      "blue": "Blue"
+    },
+    "pointCurve": "Point curve (click adds, double-click removes)",
+    "resetCurve": "Reset curve",
+    "section": {
+      "light": "Light",
+      "wb": "White balance",
+      "color": "Color",
+      "hsl": "HSL / Color",
+      "curve": "Tone curve",
+      "detail": "Detail",
+      "effects": "Effects",
+      "geometry": "Geometry",
+      "lens": "Lens corrections"
+    },
+    "resetSection": "Reset this section",
+    "panel": "Adjustments",
+    "field": {
+      "light": {
+        "exposure": "Exposure",
+        "contrast": "Contrast",
+        "highlights": "Highlights",
+        "shadows": "Shadows",
+        "whites": "Whites",
+        "blacks": "Blacks"
+      },
+      "wb": {
+        "temperature": "Temperature",
+        "tint": "Tint",
+        "picker": "White balance picker"
+      },
+      "color": {
+        "vibrance": "Vibrance",
+        "saturation": "Saturation"
+      },
+      "detail": {
+        "sharpenAmount": "Sharpening",
+        "sharpenRadius": "Radius",
+        "sharpenDetail": "Detail",
+        "sharpenMasking": "Masking",
+        "noiseLuminance": "Luminance noise",
+        "noiseColor": "Color noise"
+      },
+      "effects": {
+        "texture": "Texture",
+        "clarity": "Clarity",
+        "dehaze": "Dehaze",
+        "vignette": "Vignette",
+        "vignetteMidpoint": "Midpoint",
+        "vignetteFeather": "Feather",
+        "vignetteRoundness": "Roundness",
+        "grain": "Grain",
+        "grainSize": "Grain size",
+        "grainRoughness": "Roughness"
+      },
+      "lens": {
+        "distortion": "Distortion",
+        "caRed": "Red/cyan fringe",
+        "caBlue": "Blue/yellow fringe",
+        "vignetting": "Lens vignetting",
+        "vignettingMidpoint": "Midpoint"
+      },
+      "curve": {
+        "highlights": "Highlights",
+        "lights": "Lights",
+        "darks": "Darks",
+        "shadows": "Shadows",
+        "splitShadows": "Shadows split",
+        "splitMidtones": "Midtones split",
+        "splitHighlights": "Highlights split",
+        "points": "Point curve"
+      },
+      "geometry": {
+        "straighten": "Straighten",
+        "vertical": "Vertical",
+        "horizontal": "Horizontal",
+        "crop": "Crop",
+        "aspect": "Aspect ratio",
+        "rotateLeft": "Rotate left",
+        "rotateRight": "Rotate right",
+        "flip": "Flip",
+        "autoStraighten": "Auto straighten"
+      }
+    },
+    "wbPicker": "Picker",
+    "wbPickerHint": "Click an area that should be neutral (grey or white) (W)",
+    "wbNoSample": "Click inside the image.",
+    "hsl": {
+      "hue": "Hue",
+      "saturation": "Saturation",
+      "luminance": "Luminance"
+    },
+    "hslColor": {
+      "red": "Red",
+      "orange": "Orange",
+      "yellow": "Yellow",
+      "green": "Green",
+      "aqua": "Aqua",
+      "blue": "Blue",
+      "purple": "Purple",
+      "magenta": "Magenta"
+    },
+    "detailNote": "Sharpening and noise reduction show in the final render (when you release the control).",
+    "history": {
+      "original": "Import (original)",
+      "reset": "Reset all",
+      "paste": "Paste settings",
+      "snapshot": "Snapshot applied",
+      "virtualCopy": "Virtual copy",
+      "resetSection": "Reset {{section}}"
+    },
+    "copyNote": "Geometry (crop, rotation) is not copied by default.",
+    "loading": "Loading the photo…",
+    "cropTool": "Crop",
+    "cropArea": "Crop area (drag; corners resize)",
+    "aspect": "Aspect ratio",
+    "aspects": {
+      "original": "Original",
+      "free": "Free"
+    },
+    "rotateLeft": "Rotate 90° left",
+    "rotateRight": "Rotate 90° right",
+    "flip": "Flip",
+    "autoStraighten": "Auto",
+    "autoStraightenNone": "No reliable lines found to straighten.",
+    "resetGeometry": "Reset geometry",
+    "historyTitle": "History",
+    "noHistory": "No changes.",
+    "snapshots": "Snapshots",
+    "applySnapshot": "Apply this snapshot",
+    "deleteSnapshot": "Delete snapshot {{name}}",
+    "snapshotName": "Snapshot name",
+    "deleteVirtualCopy": "Delete this virtual copy",
+    "virtualCopy": "Virtual copy {{name}}",
+    "makeVirtualCopy": "Virtual copy",
+    "virtualCopyCreated": "Virtual copy created.",
+    "undo": "Undo",
+    "redo": "Redo",
+    "reset": "Reset",
+    "beforeAfter": "Before/after",
+    "before": "Before",
+    "after": "After",
+    "copy": "Copy",
+    "paste": "Paste",
+    "sync": "Sync",
+    "syncHint": "Apply this photo's adjustments to the other selected photos",
+    "image": "Photo being edited",
+    "copyTitle": "Copy settings",
+    "copied": "Settings copied.",
+    "syncTitle_one": "Sync with {{count}} photo",
+    "syncTitle_other": "Sync with {{count}} photos",
+    "clipboardEmpty": "You have not copied settings yet.",
+    "pasted_one": "Settings applied to {{count}} photo.",
+    "pasted_other": "Settings applied to {{count}} photos.",
+    "syncNeedSelection": "Select the photos to sync in the grid."
   }
 }

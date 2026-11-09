@@ -2,12 +2,13 @@
 //!
 //! URL: `momento://localhost/<token>/<nível>/<id>` (no Windows:
 //! `http://momento.localhost/…`). Só serve ficheiros identificados por ID de fotografia
-//! do projeto aberto — nunca caminhos arbitrários.
+//! do projeto aberto — nunca caminhos arbitrários. O `id` é a chave da fotografia (versão
+//! principal ou cópia virtual); as versões editadas mudam de URL com `?v=` na interface.
 
 use crate::state::AppState;
 use momento_core_types::AssetId;
 use momento_project_management::paths::CacheLevel;
-use momento_project_management::previews;
+
 use tauri::http::{header, Request, Response, StatusCode};
 use tauri::{Manager, Runtime, UriSchemeContext, UriSchemeResponder};
 
@@ -64,8 +65,10 @@ pub fn handle<R: Runtime>(
         let Ok(session) = state.session() else {
             return responder.respond(not_found("projeto não está aberto"));
         };
-        let res = previews::ensure(&session.paths, session.registry(), id, level)
-            .and_then(|s| Ok((std::fs::read(&s.path)?, s.mime)));
+        // A chave designa a versão principal ou uma cópia virtual; com ajustes, serve a
+        // versão editada (gerada a pedido).
+        let res =
+            session.serve_image(id.0, level).and_then(|s| Ok((std::fs::read(&s.path)?, s.mime)));
         responder.respond(match res {
             Ok((bytes, mime)) => respond(StatusCode::OK, mime, bytes, true),
             Err(e) => not_found(&e.to_string()),

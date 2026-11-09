@@ -6,10 +6,12 @@ use crate::paths::{project_folder_name, ProjectPaths};
 use crate::thumbnails::{ThumbBatch, ThumbnailService};
 pub use momento_ai_analysis::clock::OffsetSuggestion;
 pub use momento_ai_analysis::selection::{Mode as SelectionMode, Settings as SelectionSettings};
+use momento_core_types::recipe::EditRecipe;
 use momento_core_types::{AssetId, CoreError, CoreResult};
 use momento_database::analysis::{AnalysisCounts, AnalysisDetails, GroupRow, RecommendationBrief};
 use momento_database::assets::{PhotoDetails, PhotoRow};
 use momento_database::clock::{CameraOffset, CameraRow};
+use momento_database::edits::EditState;
 use momento_database::import::{ImportMode, ItemIssue, SessionCounts};
 use momento_database::library::RecentProject;
 use momento_database::moments::{AssetMoment, MomentRow};
@@ -17,6 +19,9 @@ use momento_database::people::{FaceRef, PersonRow};
 use momento_database::project::ProjectRecord;
 use momento_database::Catalog;
 use momento_image_codecs::CodecRegistry;
+pub use momento_image_processing::develop::{
+    Quality as RenderQuality, Settings as DevelopSettings,
+};
 use momento_import_engine::{ImportControl, ImportEvent, ImportOptions, ImportProgress};
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -73,6 +78,17 @@ pub trait SessionEvents: Send + Sync {
     fn import_finished(&self, s: &ImportSummary);
     fn thumbnails(&self, b: &ThumbBatch);
     fn analysis(&self, _p: &AnalysisProgress) {}
+    /// Edições gravadas (as miniaturas destas chaves mudaram).
+    fn edits_changed(&self, _keys: &[i64]) {}
+}
+
+/// Estado de edição + ajustes já interpretados (a interface trabalha com `settings`).
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EditView {
+    #[serde(flatten)]
+    pub state: EditState,
+    pub settings: DevelopSettings,
 }
 
 /// Estado da análise para a interface.
@@ -198,6 +214,7 @@ pub struct ProjectSession {
     events: Arc<dyn SessionEvents>,
     import: Mutex<Option<RunningImport>>,
     analysis: Mutex<Option<AnalysisService>>,
+    edits: crate::edit::EditService,
 }
 
 impl ProjectSession {
@@ -241,6 +258,7 @@ impl ProjectSession {
             events,
             import: Mutex::new(None),
             analysis: Mutex::new(None),
+            edits: crate::edit::EditService::new(),
         });
         if let Some(s) = unfinished {
             tracing::info!(sessao = s.id.0, "a retomar importação interrompida");
@@ -292,6 +310,222 @@ impl ProjectSession {
 
     pub fn photo_details(&self, id: AssetId) -> CoreResult<Option<PhotoDetails>> {
         self.catalog().photo_details(id)
+    }
+
+    // ------------------------------------------------------------------ edição (Fase 5)
+
+    fn view(&self, key: i64) -> CoreResult<EditView> {
+        let state = self.catalog().edit_state(key)?;
+        let settings = DevelopSettings::from_recipe(&state.recipe);
+        Ok(EditView { state, settings })
+    }
+
+    pub fn edit_view(&self, key: i64) -> CoreResult<EditView> {
+        self.view(key)
+    }
+
+    /// Render para a interface (frame binário: dimensões, histograma, RGBA). Não grava nada.
+    pub fn render_edit(
+        &self,
+        key: i64,
+        settings: &DevelopSettings,
+        max_w: u32,
+        max_h: u32,
+        quality: RenderQuality,
+        uncropped: bool,
+    ) -> CoreResult<Vec<u8>> {
+        let (_, asset) = self.catalog().resolve_key(key)?;
+        let src = self.edits.source(&self.open_catalog()?, &self.registry, asset)?;
+        Ok(self.edits.render_frame(&src, settings, max_w, max_h, quality, uncropped))
+    }
+
+    /// Ligação própria para operações longas (não bloqueia a do resto da interface).
+    fn open_catalog(&self) -> CoreResult<Catalog> {
+        Catalog::open_existing(&self.paths.catalog())
+    }
+
+    fn after_edit(self: &Arc<Self>, keys: Vec<i64>) {
+        // Sidecars e miniaturas editadas em segundo plano.
+        let me = self.clone();
+        std::thread::spawn(move || {
+            let Ok(cat) = me.open_catalog() else { return };
+            for &k in &keys {
+                let Ok((variant, asset)) = cat.resolve_key(k) else { continue };
+                let Ok(recipe) = cat.recipe_of(variant) else { continue };
+                if let Err(e) = crate::edit::write_sidecar(&me.paths, &cat, asset, variant, &recipe)
+                {
+                    tracing::warn!(erro = %e, "sidecar da edição não gravado");
+                }
+                if !recipe.is_identity() {
+                    let src = |edge: Option<u32>| -> CoreResult<Arc<momento_image_processing::develop::Source>> {
+                        match edge {
+                            Some(_) => me.edits.source(&cat, &me.registry, asset),
+                            None => crate::edit::load_source(&cat, &me.registry, asset, None).map(Arc::new),
+                        }
+                    };
+                    if let Err(e) =
+                        crate::edit::ensure_edited(&me.paths, &src, variant, &recipe, "thumbs")
+                    {
+                        tracing::warn!(erro = %e, "miniatura editada não gerada");
+                    }
+                }
+            }
+            me.events.edits_changed(&keys);
+        });
+    }
+
+    /// Grava os ajustes (nova entrada no histórico com a etiqueta indicada).
+    pub fn commit_edit(
+        self: &Arc<Self>,
+        key: i64,
+        label: &str,
+        settings: &DevelopSettings,
+    ) -> CoreResult<EditView> {
+        {
+            let mut c = self.catalog();
+            let (variant, _) = c.resolve_key(key)?;
+            let base = c.recipe_of(variant)?;
+            let recipe = settings.to_recipe(&base);
+            if recipe != base {
+                c.commit_edit(variant, label, &recipe)?;
+            }
+        }
+        self.after_edit(vec![key]);
+        self.view(key)
+    }
+
+    pub fn undo_edit(self: &Arc<Self>, key: i64) -> CoreResult<EditView> {
+        let (variant, _) = self.catalog().resolve_key(key)?;
+        self.catalog().undo(variant)?;
+        self.after_edit(vec![key]);
+        self.view(key)
+    }
+
+    pub fn redo_edit(self: &Arc<Self>, key: i64) -> CoreResult<EditView> {
+        let (variant, _) = self.catalog().resolve_key(key)?;
+        self.catalog().redo(variant)?;
+        self.after_edit(vec![key]);
+        self.view(key)
+    }
+
+    pub fn goto_history(self: &Arc<Self>, key: i64, seq: i64) -> CoreResult<EditView> {
+        let (variant, _) = self.catalog().resolve_key(key)?;
+        self.catalog().goto_history(variant, seq)?;
+        self.after_edit(vec![key]);
+        self.view(key)
+    }
+
+    /// Repor: volta ao original (fica no histórico; pode ser desfeito).
+    pub fn reset_edit(self: &Arc<Self>, key: i64) -> CoreResult<EditView> {
+        self.commit_edit(key, "reset", &DevelopSettings::default())
+    }
+
+    pub fn create_snapshot(&self, key: i64, name: &str) -> CoreResult<EditView> {
+        let (variant, _) = self.catalog().resolve_key(key)?;
+        self.catalog().create_snapshot(variant, name)?;
+        self.view(key)
+    }
+
+    pub fn apply_snapshot(self: &Arc<Self>, key: i64, id: i64) -> CoreResult<EditView> {
+        let (variant, _) = self.catalog().resolve_key(key)?;
+        let (sv, _, recipe) = self.catalog().snapshot_recipe(id)?;
+        if sv != variant {
+            return Err(CoreError::Other("o instantâneo pertence a outra fotografia".into()));
+        }
+        self.catalog().commit_edit(variant, "snapshot", &recipe)?;
+        self.after_edit(vec![key]);
+        self.view(key)
+    }
+
+    pub fn delete_snapshot(&self, key: i64, id: i64) -> CoreResult<EditView> {
+        self.catalog().delete_snapshot(id)?;
+        self.view(key)
+    }
+
+    pub fn create_virtual_copy(self: &Arc<Self>, key: i64) -> CoreResult<i64> {
+        let k = self.catalog().create_virtual_copy(key)?;
+        self.after_edit(vec![k]);
+        Ok(k)
+    }
+
+    pub fn delete_virtual_copy(&self, key: i64) -> CoreResult<()> {
+        self.catalog().delete_virtual_copy(key)
+    }
+
+    /// Colar/sincronizar: copia os blocos escolhidos de `settings` para cada fotografia.
+    pub fn paste_settings(
+        self: &Arc<Self>,
+        keys: &[i64],
+        settings: &DevelopSettings,
+        blocks: &[String],
+    ) -> CoreResult<usize> {
+        let from = settings.to_recipe(&EditRecipe::default());
+        let mut n = 0;
+        {
+            let mut c = self.catalog();
+            for &k in keys {
+                let (variant, _) = c.resolve_key(k)?;
+                let base = c.recipe_of(variant)?;
+                let merged = momento_image_processing::develop::merge_blocks(&base, &from, blocks);
+                if merged != base {
+                    c.commit_edit(variant, "paste", &merged)?;
+                    n += 1;
+                }
+            }
+        }
+        self.after_edit(keys.to_vec());
+        Ok(n)
+    }
+
+    /// Seletor de balanço de brancos: (temperatura, matiz) que neutralizam o ponto (u, v).
+    pub fn pick_white_balance(
+        &self,
+        key: i64,
+        settings: &DevelopSettings,
+        u: f32,
+        v: f32,
+    ) -> CoreResult<Option<(f32, f32)>> {
+        let (_, asset) = self.catalog().resolve_key(key)?;
+        let src = self.edits.source(&self.open_catalog()?, &self.registry, asset)?;
+        Ok(momento_image_processing::develop::sample_for_white_balance(&src, settings, u, v)
+            .map(momento_image_processing::develop::color::neutralize))
+    }
+
+    pub fn auto_straighten(&self, key: i64, settings: &DevelopSettings) -> CoreResult<Option<f32>> {
+        let (_, asset) = self.catalog().resolve_key(key)?;
+        let src = self.edits.source(&self.open_catalog()?, &self.registry, asset)?;
+        Ok(momento_image_processing::develop::auto_straighten(&src, settings))
+    }
+
+    /// Ficheiro a servir à interface para uma chave (`thumb`/`preview`/`full`): a versão
+    /// editada quando há ajustes, senão os ficheiros normais do asset.
+    pub fn serve_image(
+        &self,
+        key: i64,
+        level: crate::paths::CacheLevel,
+    ) -> CoreResult<crate::previews::Servable> {
+        let cat = self.open_catalog()?;
+        let (variant, asset) = cat.resolve_key(key)?;
+        let recipe = cat.recipe_of(variant)?;
+        if recipe.is_identity() {
+            return crate::previews::ensure(&self.paths, &self.registry, asset, level);
+        }
+        let name = match level {
+            crate::paths::CacheLevel::Thumb => "thumbs",
+            crate::paths::CacheLevel::Preview => "previews",
+            crate::paths::CacheLevel::Full => "full",
+        };
+        let src =
+            |edge: Option<u32>| -> CoreResult<Arc<momento_image_processing::develop::Source>> {
+                match edge {
+                    Some(_) => self.edits.source(&cat, &self.registry, asset),
+                    None => {
+                        crate::edit::load_source(&cat, &self.registry, asset, None).map(Arc::new)
+                    }
+                }
+            };
+        let path = crate::edit::ensure_edited(&self.paths, &src, variant, &recipe, name)?;
+        Ok(crate::previews::Servable { path, mime: "image/jpeg" })
     }
 
     pub fn set_stars(&self, ids: &[AssetId], stars: u8) -> CoreResult<usize> {

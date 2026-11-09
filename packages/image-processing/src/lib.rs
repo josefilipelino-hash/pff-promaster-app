@@ -4,8 +4,9 @@
 //! orientação EXIF e codificação JPEG com o perfil ICC original preservado (o WebView
 //! faz a gestão de cor das imagens com perfil embutido).
 //!
-//! O pipeline de revelação não destrutivo em `f32` (ARCHITECTURE.md §5) chega na Fase 4.
+//! Fase 5: [`develop`] — motor de revelação não destrutivo em `f32` (Rec. 2020 linear).
 
+pub mod develop;
 pub mod thumbnail;
 
 pub use thumbnail::{

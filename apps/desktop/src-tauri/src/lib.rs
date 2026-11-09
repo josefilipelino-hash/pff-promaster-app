@@ -93,7 +93,22 @@ pub fn run() {
             commands::reclassify_moments,
             commands::list_cameras,
             commands::suggest_offsets,
-            commands::set_camera_offsets,
+                        commands::set_camera_offsets,
+            commands::edit_view,
+            commands::render_edit,
+            commands::commit_edit,
+            commands::undo_edit,
+            commands::redo_edit,
+            commands::goto_history,
+            commands::reset_edit,
+            commands::create_snapshot,
+            commands::apply_snapshot,
+            commands::delete_snapshot,
+            commands::create_virtual_copy,
+            commands::delete_virtual_copy,
+            commands::paste_settings,
+            commands::pick_white_balance,
+            commands::auto_straighten,
         ])
         .build(tauri::generate_context!())
         .expect("falha ao iniciar a aplicação");

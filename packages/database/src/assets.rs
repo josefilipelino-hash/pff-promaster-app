@@ -6,6 +6,9 @@
 //! exposto é o `AssetId`.
 
 use crate::{db_err, now_unix, Catalog, CLOCK_JOIN_SQL, CORRECTED_ORDER_SQL, CORRECTED_TIME_SQL};
+
+/// Variante designada pela chave `?3` (principal do asset, ou cópia virtual).
+const VARIANT_OF_KEY_3: &str = "(CASE WHEN ?3 >= 1099511627776 THEN ?3 - 1099511627776 ELSE (SELECT id FROM variant WHERE asset_id = ?3 AND is_master = 1) END)";
 use momento_core_types::{AssetId, CoreError, CoreResult, ImportSessionId};
 use rusqlite::{params, ErrorCode, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -83,7 +86,15 @@ pub enum InsertResult {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PhotoRow {
+    /// Chave da fotografia na interface (ver `momento_core_types::decode_key`).
     pub id: AssetId,
+    /// Asset (ficheiro) desta fotografia (igual a `id` na versão principal).
+    pub asset: AssetId,
+    pub variant: i64,
+    /// Nome da cópia virtual (`None` = versão principal).
+    pub virtual_copy: Option<String>,
+    /// Tem ajustes de edição.
+    pub edited: bool,
     pub file_name: String,
     pub capture_time: Option<String>,
     /// Dimensões já orientadas (troca largura/altura para orientações 5–8).
@@ -303,13 +314,16 @@ impl Catalog {
         let mut st = self
             .connection()
             .prepare(&format!(
-                "SELECT a.id, a.file_name, {CORRECTED_TIME_SQL}, a.width, a.height, a.orientation,
-                        r.stars, r.flag, r.color, a.thumb_state, a.support, a.format
+                                "SELECT CASE WHEN v.is_master = 1 THEN a.id ELSE 1099511627776 + v.id END,
+                        a.file_name, {CORRECTED_TIME_SQL}, a.width, a.height, a.orientation,
+                        r.stars, r.flag, r.color, a.thumb_state, a.support, a.format,
+                        a.id, v.id, CASE WHEN v.is_master = 1 THEN NULL ELSE v.name END,
+                        EXISTS(SELECT 1 FROM edit e WHERE e.variant_id = v.id AND e.recipe != '{{\"v\":1}}')
                  FROM asset a
-                 JOIN variant v ON v.asset_id = a.id AND v.is_master = 1
+                 JOIN variant v ON v.asset_id = a.id
                  JOIN rating r ON r.variant_id = v.id
                  {CLOCK_JOIN_SQL}
-                 ORDER BY {CORRECTED_ORDER_SQL}"
+                 ORDER BY {CORRECTED_ORDER_SQL}, v.is_master DESC, v.id"
             ))
             .map_err(db_err)?;
         let rows = st
@@ -327,6 +341,10 @@ impl Catalog {
                     thumb: ThumbState::from_i64(r.get(9)?),
                     partial: r.get::<_, String>(10)? == "partial",
                     format: r.get(11)?,
+                    asset: AssetId(r.get(12)?),
+                    variant: r.get(13)?,
+                    virtual_copy: r.get(14)?,
+                    edited: r.get::<_, i64>(15)? != 0,
                 })
             })
             .map_err(db_err)?;
@@ -403,8 +421,7 @@ impl Catalog {
         value: &dyn rusqlite::ToSql,
     ) -> CoreResult<usize> {
         let sql = format!(
-            "UPDATE rating SET {column} = ?1, updated_at = ?2
-             WHERE variant_id = (SELECT id FROM variant WHERE asset_id = ?3 AND is_master = 1)"
+                        "UPDATE rating SET {column} = ?1, updated_at = ?2 WHERE variant_id = {VARIANT_OF_KEY_3}"
         );
         let now = now_unix();
         let tx = self.connection_mut().transaction().map_err(db_err)?;

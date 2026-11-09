@@ -42,7 +42,9 @@ interface CellProps {
   onOpen: (id: number) => void;
   failedLabel: string;
   partialLabel: string;
-  rec?: RecommendationBrief;
+    rec?: RecommendationBrief;
+  editedLabel: string;
+  virtualLabel: string;
 }
 
 /** Extensão do ficheiro em maiúsculas (ex.: CR3), mostrada no rodapé da célula. */
@@ -51,7 +53,7 @@ export function extLabel(fileName: string): string {
   return i >= 0 ? fileName.slice(i + 1).toUpperCase().slice(0, 5) : "";
 }
 
-const Cell = memo(function Cell({ photo, size, token, version, selected, focused, onClick, onOpen, failedLabel, partialLabel, rec }: CellProps) {
+const Cell = memo(function Cell({ photo, size, token, version, selected, focused, onClick, onOpen, failedLabel, partialLabel, rec, editedLabel, virtualLabel }: CellProps) {
   return (
     <div
       className={`cell${selected ? " selected" : ""}${focused ? " focused" : ""}${photo.flag === -1 ? " rejected" : ""}`}
@@ -86,6 +88,8 @@ const Cell = memo(function Cell({ photo, size, token, version, selected, focused
       </div>
       <div className="cell-footer">
         <span className="cell-stars">{photo.stars > 0 ? "★".repeat(photo.stars) : ""}</span>
+                {photo.virtualCopy && <span className="cell-vc" title={virtualLabel}>{`⧉${photo.virtualCopy}`}</span>}
+        {photo.edited && <span className="cell-edited" title={editedLabel}>✎</span>}
         <span className="cell-ext">{extLabel(photo.fileName)}</span>
         <span className={`cell-flag${photo.flag === 1 ? " pick" : photo.flag === -1 ? " reject" : ""}`}>{photo.flag === 1 ? "♥" : photo.flag === -1 ? "✕" : ""}</span>
       </div>
@@ -214,7 +218,9 @@ export function PhotoGrid({
             onOpen={onOpen}
             failedLabel={t("grid.thumbFailed")}
             partialLabel={t("grid.partial")}
-            rec={recs.get(p.id)}
+                        rec={recs.get(p.asset ?? p.id)}
+            editedLabel={t("grid.edited")}
+            virtualLabel={t("grid.virtualCopy")}
           />
         ))}
       </div>,

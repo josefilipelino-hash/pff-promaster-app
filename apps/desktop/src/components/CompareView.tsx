@@ -80,7 +80,8 @@ function Pane({
   const photos = useStore((s) => s.photos);
   const index = useStore((s) => s.index);
   const recs = useStore((s) => s.recs);
-  const loadAnalysisDetails = useStore((s) => s.loadAnalysisDetails);
+    const loadAnalysisDetails = useStore((s) => s.loadAnalysisDetails);
+  const version = useStore((s) => s.thumbVersion.get(photo.id) ?? 0);
   const dpr = window.devicePixelRatio || 1;
 
   useLayoutEffect(() => {
@@ -145,8 +146,8 @@ function Pane({
         onPointerCancel={() => (drag.current = null)}
       >
         <div className="viewer-image" style={{ width: dispW, height: dispH, transform: `translate(${tx}px, ${ty}px)` }}>
-          <img src={imageUrl(token, "preview", photo.id)} alt={photo.fileName} draggable={false} />
-          {needFull && <img key={`full-${photo.id}`} className={`full${fullLoaded ? " loaded" : ""}`} src={imageUrl(token, "full", photo.id)} alt="" draggable={false} onLoad={() => setFullLoaded(true)} />}
+          <img src={`${imageUrl(token, "preview", photo.id)}?v=${version}`} alt={photo.fileName} draggable={false} />
+          {needFull && <img key={`full-${photo.id}`} className={`full${fullLoaded ? " loaded" : ""}`} src={`${imageUrl(token, "full", photo.id)}?v=${version}`} alt="" draggable={false} onLoad={() => setFullLoaded(true)} />}
         </div>
         {needFull && !fullLoaded && <div className="viewer-loading">{t("viewer.loadingFull")}</div>}
       </div>

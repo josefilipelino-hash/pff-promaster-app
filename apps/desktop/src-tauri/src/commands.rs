@@ -10,7 +10,9 @@ use momento_project_management::analysis::SelectionSummary;
 use momento_project_management::{
     AnalysisStatus, ImportRequest, NewProject, ProjectInfo, SelectionSettings,
 };
-use momento_project_management::{OffsetSuggestion, OrganizeSummary};
+use momento_project_management::{
+    DevelopSettings, EditView, OffsetSuggestion, OrganizeSummary, RenderQuality,
+};
 use serde::Serialize;
 use std::path::Path;
 use tauri::State;
@@ -335,6 +337,123 @@ pub async fn set_camera_offsets(
     offsets: Vec<CameraOffset>,
 ) -> CmdResult<OrganizeSummary> {
     state.session().and_then(|s| s.set_camera_offsets(&offsets)).map_err(err)
+}
+
+// ------------------------------------------------------------------ edição (Fase 5)
+
+#[tauri::command]
+pub async fn edit_view(state: State<'_, AppState>, key: i64) -> CmdResult<EditView> {
+    state.session().and_then(|s| s.edit_view(key)).map_err(err)
+}
+
+/// Frame binário (ArrayBuffer na interface): u32 largura, u32 altura, histograma 3×256 u32,
+/// RGBA. `quality`: "fast" durante a interação, "final" depois de parar.
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub async fn render_edit(
+    state: State<'_, AppState>,
+    key: i64,
+    settings: DevelopSettings,
+    max_width: u32,
+    max_height: u32,
+    quality: String,
+    uncropped: bool,
+) -> CmdResult<tauri::ipc::Response> {
+    let q = if quality == "fast" { RenderQuality::Fast } else { RenderQuality::Final };
+    let bytes = state
+        .session()
+        .and_then(|s| s.render_edit(key, &settings, max_width, max_height, q, uncropped))
+        .map_err(err)?;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
+#[tauri::command]
+pub async fn commit_edit(
+    state: State<'_, AppState>,
+    key: i64,
+    label: String,
+    settings: DevelopSettings,
+) -> CmdResult<EditView> {
+    state.session().and_then(|s| s.commit_edit(key, &label, &settings)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn undo_edit(state: State<'_, AppState>, key: i64) -> CmdResult<EditView> {
+    state.session().and_then(|s| s.undo_edit(key)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn redo_edit(state: State<'_, AppState>, key: i64) -> CmdResult<EditView> {
+    state.session().and_then(|s| s.redo_edit(key)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn goto_history(state: State<'_, AppState>, key: i64, seq: i64) -> CmdResult<EditView> {
+    state.session().and_then(|s| s.goto_history(key, seq)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn reset_edit(state: State<'_, AppState>, key: i64) -> CmdResult<EditView> {
+    state.session().and_then(|s| s.reset_edit(key)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn create_snapshot(
+    state: State<'_, AppState>,
+    key: i64,
+    name: String,
+) -> CmdResult<EditView> {
+    state.session().and_then(|s| s.create_snapshot(key, &name)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn apply_snapshot(state: State<'_, AppState>, key: i64, id: i64) -> CmdResult<EditView> {
+    state.session().and_then(|s| s.apply_snapshot(key, id)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn delete_snapshot(state: State<'_, AppState>, key: i64, id: i64) -> CmdResult<EditView> {
+    state.session().and_then(|s| s.delete_snapshot(key, id)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn create_virtual_copy(state: State<'_, AppState>, key: i64) -> CmdResult<i64> {
+    state.session().and_then(|s| s.create_virtual_copy(key)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn delete_virtual_copy(state: State<'_, AppState>, key: i64) -> CmdResult<()> {
+    state.session().and_then(|s| s.delete_virtual_copy(key)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn paste_settings(
+    state: State<'_, AppState>,
+    keys: Vec<i64>,
+    settings: DevelopSettings,
+    blocks: Vec<String>,
+) -> CmdResult<usize> {
+    state.session().and_then(|s| s.paste_settings(&keys, &settings, &blocks)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn pick_white_balance(
+    state: State<'_, AppState>,
+    key: i64,
+    settings: DevelopSettings,
+    u: f32,
+    v: f32,
+) -> CmdResult<Option<(f32, f32)>> {
+    state.session().and_then(|s| s.pick_white_balance(key, &settings, u, v)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn auto_straighten(
+    state: State<'_, AppState>,
+    key: i64,
+    settings: DevelopSettings,
+) -> CmdResult<Option<f32>> {
+    state.session().and_then(|s| s.auto_straighten(key, &settings)).map_err(err)
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 [package]
 name = "momento-image-processing"
-description = "Processamento de imagem: miniaturas e previews (Fase 1); pipeline de revelação (Fase 4)."
+description = "Processamento de imagem: miniaturas e previews (Fase 1); motor de revelação não destrutivo (Fase 5)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,6 +12,10 @@ authors.workspace = true
 momento-core-types.workspace = true
 momento-image-codecs.workspace = true
 image.workspace = true
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+momento-ai-analysis.workspace = true
 
 [dev-dependencies]
 momento-test-fixtures.workspace = true

@@ -12,6 +12,7 @@
 pub mod analysis;
 pub mod cache;
 pub mod codecs;
+pub mod edit;
 pub mod organize;
 pub mod paths;
 pub mod previews;

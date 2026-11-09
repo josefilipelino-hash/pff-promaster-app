@@ -4,6 +4,7 @@ import { DEFAULT_FILTER, type Filter } from "./logic/filters";
 import { EMPTY_SELECTION, type Selection } from "./logic/selection";
 import type { RecMap } from "./logic/filters";
 import type {
+  DevelopSettings,
   AssetMoment,
   MomentRow,
   PersonRow,
@@ -41,7 +42,7 @@ export interface UiState {
 }
 
 /** Vista principal: grelha de fotografias ou lista de sequências/grupos. */
-export type View = "grid" | "sequences" | "people";
+export type View = "grid" | "sequences" | "people" | "develop";
 
 interface State {
   project: ProjectInfo | null;
@@ -81,8 +82,10 @@ interface State {
   /** Momento efetivo de cada fotografia (null = por classificar). */
   photoMoment: Map<number, number | null>;
   /** Fotografias a ser arrastadas (para um momento), ou null. */
-  dragIds: number[] | null;
+    dragIds: number[] | null;
   clockOpen: boolean;
+  /** Definições copiadas (Copiar/Colar). */
+  clipboard: { settings: DevelopSettings; blocks: string[] } | null;
 }
 
 interface Actions {
@@ -112,7 +115,10 @@ interface Actions {
     openCompare(ids: number[] | null): void;
   reloadOrganization(): Promise<void>;
   setDrag(ids: number[] | null): void;
-  setClockOpen(o: boolean): void;
+    setClockOpen(o: boolean): void;
+  setClipboard(c: State["clipboard"]): void;
+  /** Miniaturas/previews editadas mudaram: novas URLs e recarregar a lista. */
+  bumpEdited(keys: number[]): void;
 }
 
 let toastSeq = 1;
@@ -171,8 +177,10 @@ export const useStore = create<State & Actions>((set, get) => ({
   moments: [],
   assetMoments: new Map(),
   photoMoment: new Map(),
-  dragIds: null,
+    dragIds: null,
   clockOpen: false,
+  clipboard: null,
+
 
 
   setProject(p) {
@@ -389,8 +397,18 @@ export const useStore = create<State & Actions>((set, get) => ({
     set({ dragIds: ids && ids.length > 0 ? ids : null });
   },
 
-  setClockOpen(o) {
+    setClockOpen(o) {
     set({ clockOpen: o });
+  },
+
+  setClipboard(c) {
+    set({ clipboard: c });
+  },
+
+  bumpEdited(keys) {
+    const versions = new Map(get().thumbVersion);
+    for (const k of keys) versions.set(k, (versions.get(k) ?? 0) + 1);
+    set({ thumbVersion: versions });
   },
 }));
 

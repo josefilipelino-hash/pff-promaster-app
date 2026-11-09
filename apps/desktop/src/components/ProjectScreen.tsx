@@ -12,6 +12,7 @@ import type { Color, GroupRow, ImportMode, Label } from "../types";
 import { ClockDialog } from "./ClockDialog";
 import { CompareView, type CompareHandle } from "./CompareView";
 import { PeopleView } from "./PeopleView";
+import { DevelopView } from "./develop/DevelopView";
 import { SequencesView } from "./SequencesView";
 import { HelpOverlay } from "./HelpOverlay";
 import { ImportDialog, ImportReport } from "./ImportDialogs";
@@ -33,8 +34,10 @@ const BASE_EXTENSIONS = [
 const IMAGE_EXTENSIONS = [...BASE_EXTENSIONS, ...BASE_EXTENSIONS.map((e) => e.toUpperCase())];
 
 function isTyping(target: EventTarget | null): boolean {
-  const el = target as HTMLElement | null;
-  return !!el && (el.tagName === "INPUT" || el.tagName === "SELECT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+  const el = target as HTMLInputElement | null;
+  if (!el) return false;
+  if (el.tagName === "INPUT") return !["range", "checkbox", "radio", "button"].includes(el.type);
+  return el.tagName === "SELECT" || el.tagName === "TEXTAREA" || el.isContentEditable;
 }
 
 export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
@@ -105,7 +108,12 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
         if (sum.issues.length > 0 || sum.cancelled || sum.error || sum.counts.pending > 0) st.setImportSummary(sum);
         else st.toast("info", t("report.toast", { count: sum.counts.imported }));
       }),
-      events.thumbnails((b) => useStore.getState().applyThumbBatch(b)),
+            events.thumbnails((b) => useStore.getState().applyThumbBatch(b)),
+      events.editsChanged((keys) => {
+        const st = useStore.getState();
+        st.bumpEdited(keys);
+        st.reloadPhotos().catch(() => {});
+      }),
       events.analysis((p) => {
         const st = useStore.getState();
         st.setAnalysisProgress(p.finished ? null : p);
@@ -203,28 +211,33 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
   );
 
     // Organização: momentos (arrastar/escolher) e pessoas.
+    // Momentos e pessoas são do ficheiro: converte chaves (inclui cópias virtuais) em ficheiros.
+  const assetsOf = useCallback((keys: number[]) => {
+    const st = useStore.getState();
+    return [...new Set(keys.map((k) => st.photos[st.index.get(k) ?? -1]?.asset ?? k))];
+  }, []);
   const assignMoment = useCallback(
-    async (ids: number[], moment: number | null) => {
+    async (keys: number[], moment: number | null) => {
       try {
-        const n = await api.assignMoment(ids, moment);
+        const n = await api.assignMoment(assetsOf(keys), moment);
         await useStore.getState().reloadOrganization();
         useStore.getState().toast("info", t("moments.moved", { count: n }));
       } catch (e) {
         fail(e);
       }
     },
-    [fail, t],
+        [fail, t, assetsOf],
   );
   const resetMoments = useCallback(
-    async (ids: number[]) => {
+    async (keys: number[]) => {
       try {
-        await api.resetMoments(ids);
+        await api.resetMoments(assetsOf(keys));
         await useStore.getState().reloadOrganization();
       } catch (e) {
         fail(e);
       }
     },
-    [fail],
+        [fail, assetsOf],
   );
   const reloadAfterClock = useCallback(async () => {
     const st = useStore.getState();
@@ -301,7 +314,29 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
   // Teclado.
   const handleAction = useCallback(
     (a: Action) => {
-      const st = useStore.getState();
+            const st = useStore.getState();
+      // No editor: classificar, navegar e sair; o resto dos atalhos é do próprio editor.
+      if (st.view === "develop") {
+        const cur = st.selection.focus ?? order[0];
+        switch (a.type) {
+          case "stars":
+          case "flag":
+            return cur !== undefined ? rate(a.type, a.value, [cur]) : undefined;
+          case "move": {
+            if (a.dx === 0 || cur === undefined) return;
+            const i = order.indexOf(cur) + a.dx;
+            if (i >= 0 && i < order.length) st.setSelection({ ids: new Set([order[i]!]), focus: order[i]!, anchor: order[i]! });
+            return;
+          }
+          case "close":
+          case "develop":
+            return st.setView("grid");
+          case "help":
+            return st.setHelpOpen(true);
+          default:
+            return;
+        }
+      }
       // Na comparação: teclas aplicam-se ao painel ativo; ← → mudam de painel.
       if (st.compare) {
         switch (a.type) {
@@ -325,7 +360,11 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
             return;
         }
       }
-      switch (a.type) {
+            switch (a.type) {
+        case "develop":
+          if (st.selection.focus === null && order.length > 0) st.setSelection({ ids: new Set([order[0]!]), focus: order[0]!, anchor: order[0]! });
+          st.openViewer(null);
+          return st.setView("develop");
         case "compare":
           return compareFromSelection();
         case "stars":
@@ -390,7 +429,8 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [handleAction, mac]);
 
-  const immersive = fullscreen && viewerPhoto !== null;
+    const immersive = (fullscreen && viewerPhoto !== null) || s.view === "develop";
+  const developKey = s.view === "develop" ? (s.selection.focus !== null && order.includes(s.selection.focus) ? s.selection.focus : order[0]) : undefined;
 
   return (
     <div className={`project${immersive ? " immersive" : ""}${s.infoOpen ? "" : " no-info"}`}>
@@ -424,7 +464,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
         />
       )}
       <section className="main">
-        {!immersive && (
+                {(!immersive || s.view === "develop") && (
           <Toolbar
             project={project}
             importBusy={s.importRunning}
@@ -438,7 +478,9 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
           />
         )}
         <div className="content">
-          {s.photos.length === 0 ? (
+                    {s.view === "develop" && developKey !== undefined ? (
+            <DevelopView photoKey={developKey} order={order} onNavigate={(k) => s.setSelection({ ids: new Set([k]), focus: k, anchor: k })} />
+          ) : s.photos.length === 0 ? (
             <div className="empty-state">
               <h2>{t("project.emptyTitle")}</h2>
               <p className="muted">{t("project.emptyHint")}</p>

@@ -15,6 +15,7 @@ pub const EV_IMPORT_PROGRESS: &str = "import-progress";
 pub const EV_IMPORT_FINISHED: &str = "import-finished";
 pub const EV_THUMBNAILS: &str = "thumbnails";
 pub const EV_ANALYSIS: &str = "analysis-progress";
+pub const EV_EDITS: &str = "edits-changed";
 
 struct Emitter2 {
     app: AppHandle,
@@ -44,6 +45,9 @@ impl SessionEvents for Emitter2 {
     }
     fn analysis(&self, p: &momento_project_management::analysis::AnalysisProgress) {
         let _ = self.app.emit(EV_ANALYSIS, p);
+    }
+    fn edits_changed(&self, keys: &[i64]) {
+        let _ = self.app.emit(EV_EDITS, keys);
     }
 }
 

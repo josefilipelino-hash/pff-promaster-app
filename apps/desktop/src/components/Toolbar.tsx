@@ -42,8 +42,11 @@ export function Toolbar({
         <button type="button" className={`btn small${view === "sequences" ? " active" : ""}`} aria-pressed={view === "sequences"} onClick={() => onView("sequences")}>
                     {t("view.sequences")}
         </button>
-        <button type="button" className={`btn small${view === "people" ? " active" : ""}`} aria-pressed={view === "people"} onClick={() => onView("people")}>
+                <button type="button" className={`btn small${view === "people" ? " active" : ""}`} aria-pressed={view === "people"} onClick={() => onView("people")}>
           {t("view.people")}
+        </button>
+        <button type="button" className={`btn small${view === "develop" ? " active" : ""}`} aria-pressed={view === "develop"} onClick={() => onView("develop")} title={`${t("view.develop")} (D)`}>
+          {t("view.develop")}
         </button>
       </span>
       <button type="button" className="btn" onClick={onCompare} title={`${t("compare.openHint")} (C)`}>

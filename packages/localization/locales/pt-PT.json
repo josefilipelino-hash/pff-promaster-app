@@ -140,7 +140,9 @@
   },
   "grid": {
     "thumbFailed": "Não foi possível gerar a miniatura. Veja o painel de informação.",
-    "partial": "Parcial"
+    "partial": "Parcial",
+    "edited": "Editada",
+    "virtualCopy": "Cópia virtual"
   },
   "viewer": {
     "back": "Grelha",
@@ -231,7 +233,12 @@
     "info": "Mostrar/ocultar o painel de informação",
     "import": "Importar ficheiros",
     "help": "Mostrar esta ajuda",
-    "compare": "Comparar lado a lado (seleção ou sequência)"
+    "compare": "Comparar lado a lado (seleção ou sequência)",
+    "develop": "Revelar (editar a fotografia)",
+    "undoRedo": "Desfazer / refazer (editor)",
+    "beforeAfter": "Antes / depois (editor)",
+    "crop": "Ferramenta de recorte (editor)",
+    "copyPaste": "Copiar / colar definições (editor)"
   },
   "error": {
     "io": "Erro ao ler ou escrever um ficheiro.",
@@ -416,7 +423,8 @@
     "label": "Vista",
     "grid": "Grelha",
     "sequences": "Sequências",
-    "people": "Pessoas"
+    "people": "Pessoas",
+    "develop": "Revelar"
   },
   "moment": {
     "bride_prep": "Preparação da noiva",
@@ -537,5 +545,172 @@
     "auto": "Automático · confiança {{confidence}} %",
     "backToAuto": "voltar ao automático",
     "showPerson": "Ver todas as fotografias desta pessoa"
+  },
+  "develop": {
+    "resetHint": "Duplo clique para repor",
+    "value": "valor",
+    "histogram": "Histograma RGB",
+    "clipShadows": "◀ sombras cortadas",
+    "clipHighlights": "realces cortados ▶",
+    "curveChannel": "Canal da curva",
+    "channel": {
+      "rgb": "RGB",
+      "red": "Vermelho",
+      "green": "Verde",
+      "blue": "Azul"
+    },
+    "pointCurve": "Curva de pontos (clicar acrescenta, duplo clique remove)",
+    "resetCurve": "Repor curva",
+    "section": {
+      "light": "Luz",
+      "wb": "Balanço de brancos",
+      "color": "Cor",
+      "hsl": "HSL / Cor",
+      "curve": "Curva de tons",
+      "detail": "Detalhe",
+      "effects": "Efeitos",
+      "geometry": "Geometria",
+      "lens": "Correções da objetiva"
+    },
+    "resetSection": "Repor esta secção",
+    "panel": "Ajustes",
+    "field": {
+      "light": {
+        "exposure": "Exposição",
+        "contrast": "Contraste",
+        "highlights": "Realces",
+        "shadows": "Sombras",
+        "whites": "Brancos",
+        "blacks": "Pretos"
+      },
+      "wb": {
+        "temperature": "Temperatura",
+        "tint": "Matiz",
+        "picker": "Conta-gotas de balanço de brancos"
+      },
+      "color": {
+        "vibrance": "Vibração",
+        "saturation": "Saturação"
+      },
+      "detail": {
+        "sharpenAmount": "Nitidez",
+        "sharpenRadius": "Raio",
+        "sharpenDetail": "Detalhe",
+        "sharpenMasking": "Máscara",
+        "noiseLuminance": "Ruído de luminância",
+        "noiseColor": "Ruído de cor"
+      },
+      "effects": {
+        "texture": "Textura",
+        "clarity": "Clareza",
+        "dehaze": "Remover névoa",
+        "vignette": "Vinheta",
+        "vignetteMidpoint": "Ponto médio",
+        "vignetteFeather": "Suavização",
+        "vignetteRoundness": "Arredondamento",
+        "grain": "Grão",
+        "grainSize": "Tamanho do grão",
+        "grainRoughness": "Aspereza"
+      },
+      "lens": {
+        "distortion": "Distorção",
+        "caRed": "Aberração vermelho/ciano",
+        "caBlue": "Aberração azul/amarelo",
+        "vignetting": "Vinheta da objetiva",
+        "vignettingMidpoint": "Ponto médio"
+      },
+      "curve": {
+        "highlights": "Realces",
+        "lights": "Claros",
+        "darks": "Escuros",
+        "shadows": "Sombras",
+        "splitShadows": "Divisão sombras",
+        "splitMidtones": "Divisão meios-tons",
+        "splitHighlights": "Divisão realces",
+        "points": "Curva de pontos"
+      },
+      "geometry": {
+        "straighten": "Endireitar",
+        "vertical": "Vertical",
+        "horizontal": "Horizontal",
+        "crop": "Recorte",
+        "aspect": "Proporção",
+        "rotateLeft": "Rodar à esquerda",
+        "rotateRight": "Rodar à direita",
+        "flip": "Espelhar",
+        "autoStraighten": "Endireitar automático"
+      }
+    },
+    "wbPicker": "Conta-gotas",
+    "wbPickerHint": "Clique numa zona que devia ser neutra (cinzento ou branco) (W)",
+    "wbNoSample": "Clique dentro da imagem.",
+    "hsl": {
+      "hue": "Matiz",
+      "saturation": "Saturação",
+      "luminance": "Luminância"
+    },
+    "hslColor": {
+      "red": "Vermelho",
+      "orange": "Laranja",
+      "yellow": "Amarelo",
+      "green": "Verde",
+      "aqua": "Água",
+      "blue": "Azul",
+      "purple": "Roxo",
+      "magenta": "Magenta"
+    },
+    "detailNote": "A nitidez e a redução de ruído veem-se no render final (ao largar o controlo).",
+    "history": {
+      "original": "Importação (original)",
+      "reset": "Repor tudo",
+      "paste": "Colar definições",
+      "snapshot": "Instantâneo aplicado",
+      "virtualCopy": "Cópia virtual",
+      "resetSection": "Repor {{section}}"
+    },
+    "copyNote": "A geometria (recorte, rotação) não é copiada por omissão.",
+    "loading": "A carregar a fotografia…",
+    "cropTool": "Recortar",
+    "cropArea": "Área de recorte (arraste; cantos redimensionam)",
+    "aspect": "Proporção",
+    "aspects": {
+      "original": "Original",
+      "free": "Livre"
+    },
+    "rotateLeft": "Rodar 90° à esquerda",
+    "rotateRight": "Rodar 90° à direita",
+    "flip": "Espelhar",
+    "autoStraighten": "Auto",
+    "autoStraightenNone": "Não foram encontradas linhas fiáveis para endireitar.",
+    "resetGeometry": "Repor geometria",
+    "historyTitle": "Histórico",
+    "noHistory": "Sem alterações.",
+    "snapshots": "Instantâneos",
+    "applySnapshot": "Aplicar este instantâneo",
+    "deleteSnapshot": "Apagar o instantâneo {{name}}",
+    "snapshotName": "Nome do instantâneo",
+    "deleteVirtualCopy": "Apagar esta cópia virtual",
+    "virtualCopy": "Cópia virtual {{name}}",
+    "makeVirtualCopy": "Cópia virtual",
+    "virtualCopyCreated": "Cópia virtual criada.",
+    "undo": "Desfazer",
+    "redo": "Refazer",
+    "reset": "Repor",
+    "beforeAfter": "Antes/depois",
+    "before": "Antes",
+    "after": "Depois",
+    "copy": "Copiar",
+    "paste": "Colar",
+    "sync": "Sincronizar",
+    "syncHint": "Aplicar os ajustes desta fotografia às outras selecionadas",
+    "image": "Fotografia em edição",
+    "copyTitle": "Copiar definições",
+    "copied": "Definições copiadas.",
+    "syncTitle_one": "Sincronizar com {{count}} fotografia",
+    "syncTitle_other": "Sincronizar com {{count}} fotografias",
+    "clipboardEmpty": "Ainda não copiou definições.",
+    "pasted_one": "Definições aplicadas a {{count}} fotografia.",
+    "pasted_other": "Definições aplicadas a {{count}} fotografias.",
+    "syncNeedSelection": "Selecione na grelha as fotografias a sincronizar."
   }
 }

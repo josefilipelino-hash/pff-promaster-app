@@ -203,6 +203,39 @@ extern "C" int mlr_develop(mlr_handle *h, int half_size, mlr_image *out) {
   }
 }
 
+extern "C" int mlr_develop_linear(mlr_handle *h, int half_size, mlr_image *out) {
+  memset(out, 0, sizeof(*out));
+  if (!h || !h->raw) return LIBRAW_OUT_OF_ORDER_CALL;
+  try {
+    libraw_output_params_t &p = h->raw->imgdata.params;
+    p.use_camera_wb = 1;
+    p.output_color = 8;   // Rec. 2020 (espaço de trabalho da edição)
+    p.output_bps = 16;
+    p.gamm[0] = 1.0;      // linear
+    p.gamm[1] = 1.0;
+    p.no_auto_bright = 1; // sem “brilho automático”: valores do sensor
+    p.highlight = 2;      // mistura nos realces (evita magenta nos realces cortados)
+    p.half_size = half_size ? 1 : 0;
+    p.user_flip = 0;
+    if (!h->unpacked) {
+      int rc = h->raw->unpack();
+      if (rc != LIBRAW_SUCCESS) return rc;
+      h->unpacked = true;
+    }
+    int rc = h->raw->dcraw_process();
+    if (rc != LIBRAW_SUCCESS) return rc;
+    int err = 0;
+    libraw_processed_image_t *img = h->raw->dcraw_make_mem_image(&err);
+    if (!img) return err != 0 ? err : LIBRAW_DATA_ERROR;
+    to_image(img, out);
+    return LIBRAW_SUCCESS;
+  } catch (const std::bad_alloc &) {
+    return LIBRAW_UNSUFFICIENT_MEMORY;
+  } catch (...) {
+    return MLR_EXCEPTION;
+  }
+}
+
 extern "C" void mlr_image_free(mlr_image *img) {
   if (img && img->opaque) {
     LibRaw::dcraw_clear_mem((libraw_processed_image_t *)img->opaque);

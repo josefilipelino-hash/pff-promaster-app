@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { imageUrl } from "../api";
+import { useStore } from "../store";
 import type { PhotoRow } from "../types";
 
 /** Níveis de zoom em “píxeis da imagem por píxel físico do ecrã” (1 = 100 %). */
@@ -46,7 +47,9 @@ export function Viewer({
   onFullscreen: () => void;
   handleRef: React.MutableRefObject<ViewerHandle | null>;
 }) {
-  const { t } = useTranslation();
+    const { t } = useTranslation();
+  // Versões editadas mudam de URL a cada gravação (o protocolo serve ficheiros imutáveis).
+  const version = useStore((s) => s.thumbVersion.get(photo.id) ?? 0);
   const stage = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ w: 800, h: 600 });
   const [zoom, setZoom] = useState<Zoom>("fit");
@@ -191,7 +194,7 @@ export function Viewer({
       >
         <div className="viewer-image" style={{ width: cssW, height: cssH, transform: `translate(${offset.x}px, ${offset.y}px)` }}>
           {!previewFailed ? (
-            <img src={imageUrl(token, "preview", photo.id)} alt={photo.fileName} draggable={false} onError={() => setPreviewFailed(true)} />
+            <img src={`${imageUrl(token, "preview", photo.id)}?v=${version}`} alt={photo.fileName} draggable={false} onError={() => setPreviewFailed(true)} />
           ) : (
             <div className="viewer-error">{t("viewer.loadFailed")}</div>
           )}
@@ -199,7 +202,7 @@ export function Viewer({
             <img
               key={`full-${photo.id}`}
               className={`full${fullLoaded ? " loaded" : ""}`}
-              src={imageUrl(token, "full", photo.id)}
+              src={`${imageUrl(token, "full", photo.id)}?v=${version}`}
               alt=""
               draggable={false}
               onLoad={() => setFullLoaded(true)}

@@ -8,8 +8,8 @@ import { personName } from "./PeoplePanel";
 export function OrganizationSection({ photo, onMoment, onReset, onPerson }: { photo: PhotoRow; onMoment: (moment: number | null) => void; onReset: () => void; onPerson: (id: number) => void }) {
   const { t } = useTranslation();
   const moments = useStore((s) => s.moments);
-  const am = useStore((s) => s.assetMoments.get(photo.id));
-  const ids = useStore((s) => s.photoPersons.get(photo.id));
+  const am = useStore((s) => s.assetMoments.get(photo.asset ?? photo.id));
+  const ids = useStore((s) => s.photoPersons.get(photo.asset ?? photo.id));
   const personById = useStore((s) => s.personById);
   if (moments.length === 0) return null;
   const current = am ? (am.momentId === null ? "none" : String(am.momentId)) : "none";

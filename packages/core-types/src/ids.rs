@@ -31,6 +31,29 @@ id_type!(
     PresetId
 );
 
+/// Chave de uma fotografia na interface: o `AssetId` para a versão principal e
+/// `VIRTUAL_KEY_BASE + VariantId` para as cópias virtuais (gamas que nunca se cruzam).
+pub const VIRTUAL_KEY_BASE: i64 = 1 << 40;
+
+/// O que uma chave da interface designa.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PhotoRef {
+    Master(AssetId),
+    Variant(VariantId),
+}
+
+pub fn decode_key(key: i64) -> PhotoRef {
+    if key >= VIRTUAL_KEY_BASE {
+        PhotoRef::Variant(VariantId(key - VIRTUAL_KEY_BASE))
+    } else {
+        PhotoRef::Master(AssetId(key))
+    }
+}
+
+pub fn virtual_key(v: VariantId) -> i64 {
+    VIRTUAL_KEY_BASE + v.0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -40,5 +63,11 @@ mod tests {
         assert_eq!(serde_json::to_string(&AssetId(42)).unwrap(), "42");
         let v: VariantId = serde_json::from_str("7").unwrap();
         assert_eq!(v, VariantId(7));
+    }
+
+    #[test]
+    fn photo_keys_never_collide() {
+        assert_eq!(decode_key(42), PhotoRef::Master(AssetId(42)));
+        assert_eq!(decode_key(virtual_key(VariantId(42))), PhotoRef::Variant(VariantId(42)));
     }
 }

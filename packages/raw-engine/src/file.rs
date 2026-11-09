@@ -88,6 +88,15 @@ pub struct RawInfo {
     pub preview: Option<(i32, i32, u32, u32)>,
 }
 
+/// Imagem linear de 16 bits (Rec. 2020) para a edição.
+#[derive(Debug, Clone)]
+pub struct LinearBitmap {
+    pub width: u32,
+    pub height: u32,
+    /// RGB intercalado, 0–65535, linear.
+    pub rgb: Vec<u16>,
+}
+
 /// Bitmap RGB/cinzento devolvido pela LibRaw.
 #[derive(Debug, Clone)]
 pub struct Bitmap {
@@ -263,6 +272,33 @@ impl<'a> RawFile<'a> {
             return Err(CoreError::Corrupt("revelação não devolveu um bitmap".into()));
         }
         img.to_bitmap()
+    }
+}
+
+impl RawFile<'_> {
+    /// Revela para edição: RGB 16 bits linear em Rec. 2020 (sem rotação).
+    pub fn develop_linear(&mut self, half_size: bool) -> CoreResult<LinearBitmap> {
+        if !self.info.sensor_supported {
+            return Err(CoreError::UnsupportedFormat(format!(
+                "compressão do sensor não suportada pela LibRaw nesta compilação ({})",
+                self.info.decoder
+            )));
+        }
+        let mut img = Image(unsafe { std::mem::zeroed() });
+        // SAFETY: handle válido; `img` libertada no Drop.
+        let rc = unsafe { sys::mlr_develop_linear(self.handle, half_size as c_int, &mut img.0) };
+        if rc != sys::LIBRAW_SUCCESS {
+            return Err(map_error(rc, "revelar RAW (linear)"));
+        }
+        let (w, h) = (img.0.width.max(0) as u32, img.0.height.max(0) as u32);
+        let px = w as usize * h as usize;
+        let data = img.bytes();
+        if img.0.type_ != 2 || img.0.colors != 3 || img.0.bits != 16 || data.len() < px * 6 {
+            return Err(CoreError::Corrupt("revelação linear inesperada".into()));
+        }
+        let rgb =
+            data[..px * 6].chunks_exact(2).map(|b| u16::from_ne_bytes([b[0], b[1]])).collect();
+        Ok(LinearBitmap { width: w, height: h, rgb })
     }
 }
 

@@ -218,7 +218,36 @@ das capacidades do SQLite.
 
 ---
 
-## 5. Pipeline de imagem **[definido]**
+## 5. Pipeline de imagem **[implementado na Fase 5 — ver D-034 a D-039]**
+
+### 5.0 O que está implementado (`momento-image-processing::develop`)
+
+```
+fonte em memória (Rec. 2020 linear f32, orientada, pirâmide ½ ¼ …)
+  RAW: LibRaw linear 16 bits Rec. 2020 (meia resolução para editar; total para 100 %/exportar)
+  outros: sRGB 8 bits → linear → Rec. 2020 (lado maior ≤ 3072 para editar)
+        │
+        ├─ guia 384 px (mesma imagem): luminância local (sombras/realces), dehaze
+        │  (canal escuro), base da clareza — igual para render rápido e final
+        ▼
+por píxel (rayon): geometria + objetiva numa reamostragem (recorte, endireitar, perspetiva,
+  90°/espelho, distorção, aberração cromática) → vinheta da objetiva → balanço de brancos
+  (Planck) × exposição → dehaze → sombras/realces locais → curva sRGB →
+  pretos/brancos/contraste/curva paramétrica/curva de pontos/curvas por canal (tabelas) →
+  clareza → vibração/saturação/HSL
+        ▼
+filtros à resolução do render: textura · ruído de cor · ruído de luminância · nitidez
+  (raio definido em píxeis da resolução total; ruído/nitidez só no render final)
+        ▼
+vinheta (pós-recorte) · grão (grelha da resolução total) → Rec. 2020 → sRGB 8 bits RGBA
+  + histograma RGB
+```
+
+Receita neutra = original (±1 nível, testado). O texto seguinte (§5.1) é o plano da Fase 0;
+LittleCMS e saída para o perfil do monitor ficam para a exportação/gestão de cor (Fase 6).
+
+### 5.1 Plano original (Fase 0)
+
 
 ```
 Ficheiro ─► detect() ─► CodecRegistry ─► adaptador
@@ -709,4 +738,10 @@ ficheiros a partir do frontend (caminhos sempre resolvidos e verificados no núc
 | D-031 | 2026-11-09 | Momentos por **regras explicáveis + linha temporal + exemplos do utilizador**, com confiança mínima 0,5 e margem 0,08; sub-momentos vencem o “pai” (beijo > cerimónia); sem confiança → “Por classificar” | Classificador treinado | Sem dados de treino de casamentos reais nesta fase; cada atribuição tem razões guardadas |
 | D-032 | 2026-11-09 | Sincronização de câmaras guardada como correção por câmara (marca+modelo+série) aplicada **na leitura** (SQL); a hora EXIF original fica intacta | Reescrever datas no catálogo/ficheiros | Reversível; seleção e momentos usam a hora corrigida |
 | D-033 | 2026-11-09 | Arrastar para momentos com eventos do rato (não HTML5 drag-and-drop) | HTML5 DnD | O WebView2 (Windows) bloqueia o DnD HTML5 quando a importação por arrastar de ficheiros está ativa |
+| D-034 | 2026-11-09 | Motor de revelação em Rust (CPU, rayon), o **mesmo código** para pré-visualização, miniaturas, previews e exportação; espaço de trabalho Rec. 2020 linear (D-003), saída sRGB | WebGL na interface + Rust para exportar | Cor consistente entre ecrã e ficheiros; testável numericamente. GPU (wgpu) continua prevista para a Fase 9 |
+| D-035 | 2026-11-09 | RAW editados a partir dos **dados lineares do sensor** (LibRaw 16 bits, gama 1, Rec. 2020, sem brilho automático; exposição base automática ≤ +2 EV), meia resolução em memória para editar | Editar a partir da preview embutida | Recuperação real de realces e balanço de brancos; 1 s para abrir um RAW de 36 MP |
+| D-036 | 2026-11-09 | **Qualidade dinâmica**: durante o arrasto, render rápido (60 % do ecrã, nível da pirâmide, sem nitidez/ruído); 220 ms depois de parar, render final à resolução do ecrã com sobreamostragem; operações de grande raio numa guia de 384 px fixa | Render único | ~35 ms/frame a arrastar a exposição (4 núcleos); rápido e final dão o mesmo aspeto (diferença média < 2 níveis, testado) |
+| D-037 | 2026-11-09 | Frames enviados à interface como **binário** (RGBA + histograma) pela IPC do Tauri e desenhados num canvas | JPEG por protocolo | Sem codificar/descodificar JPEG em cada frame |
+| D-038 | 2026-11-09 | Receita por **variante** no catálogo (+ histórico completo e instantâneos) e cópia em **sidecar JSON na pasta do projeto**; nada é escrito junto dos originais | XMP ao lado dos originais | Os cartões/pastas do cliente nunca são tocados; XMP compatível fica para a exportação |
+| D-039 | 2026-11-09 | Cópias virtuais = variantes; na interface, uma **chave** por fotografia (`AssetId` na principal, 2⁴⁰ + `VariantId` nas cópias) | Refazer a interface toda à volta de variantes | Classificação e edição por cópia; análise, pessoas e momentos continuam por ficheiro |
 

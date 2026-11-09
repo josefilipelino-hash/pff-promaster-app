@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "../i18n";
 import type { PhotoRow, ProjectInfo } from "../types";
 
@@ -52,8 +52,33 @@ const apiMock = {
   reclassifyMoments: vi.fn(async () => [0, 0]),
   listCameras: vi.fn(async () => [] as unknown[]),
   suggestOffsets: vi.fn(async () => [] as unknown[]),
-  setCameraOffsets: vi.fn(async () => ({})),
+    setCameraOffsets: vi.fn(async () => ({})),
+  editView: vi.fn(async (key: number) => editViewOf(key)),
+  renderEdit: vi.fn(async (..._args: unknown[]) => frameBuffer(40, 30)),
+  commitEdit: vi.fn(async (key: number, _label: string, settings: unknown) => ({ ...editViewOf(key), settings, position: 1, canUndo: true, history: [{ seq: 0, label: "original", createdAt: 0 }, { seq: 1, label: "light.exposure", createdAt: 1 }] })),
+  undoEdit: vi.fn(async (key: number) => editViewOf(key)),
+  redoEdit: vi.fn(async (key: number) => editViewOf(key)),
+  gotoHistory: vi.fn(async (key: number) => editViewOf(key)),
+  resetEdit: vi.fn(async (key: number) => editViewOf(key)),
+  createSnapshot: vi.fn(async (key: number) => ({ ...editViewOf(key), snapshots: [{ id: 5, name: "Quente", createdAt: 1 }] })),
+  applySnapshot: vi.fn(async (key: number) => editViewOf(key)),
+  deleteSnapshot: vi.fn(async (key: number) => editViewOf(key)),
+  createVirtualCopy: vi.fn(async () => 2 ** 40 + 77),
+  deleteVirtualCopy: vi.fn(async () => {}),
+  pasteSettings: vi.fn(async (keys: number[]) => keys.length),
+  pickWhiteBalance: vi.fn(async () => [23.4, -7.6] as [number, number]),
+  autoStraighten: vi.fn(async () => 2.34),
 };
+/** Frame binário como o do núcleo (dimensões, histograma, RGBA cinzento). */
+function frameBuffer(w: number, h: number): ArrayBuffer {
+  const buf = new ArrayBuffer(8 + 3 * 256 * 4 + w * h * 4);
+  const dv = new DataView(buf);
+  dv.setUint32(0, w, true);
+  dv.setUint32(4, h, true);
+  new Uint32Array(buf, 8, 768)[128] = w * h;
+  new Uint8Array(buf, 8 + 3072).fill(128);
+  return buf;
+}
 const summary = { best: 1, alternative: 1, review: 0, reject: 1, duplicate: 0, groups: 1, sequences: 1, durationMs: 1 };
 function analysisStatus(analyzed: number, total: number) {
   return {
@@ -67,7 +92,7 @@ function analysisStatus(analyzed: number, total: number) {
 vi.mock("../api", async (orig) => {
   const real = await orig<typeof import("../api")>();
   const noop = async () => () => {};
-  return { ...real, api: apiMock, events: { importProgress: noop, importFinished: noop, thumbnails: noop, analysis: noop } };
+  return { ...real, api: apiMock, events: { importProgress: noop, importFinished: noop, thumbnails: noop, analysis: noop, editsChanged: noop } };
 });
 vi.mock("@tauri-apps/api/webview", () => ({ getCurrentWebview: () => ({ onDragDropEvent: async () => () => {} }) }));
 vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ isFullscreen: async () => false, setFullscreen: vi.fn(async () => {}) }) }));
@@ -90,6 +115,11 @@ const { clampCenter, fitCss, zoomAt, FIT_VIEW } = await import("./CompareView");
 const { explain, joinList } = await import("../logic/explain");
 const { parseOffset, formatOffset } = await import("../logic/clock");
 const { faceCrop } = await import("./FaceThumb");
+const { defaultSettings, parseFrame, fitCropToAspect } = await import("../logic/develop");
+const { historyLabel } = await import("./develop/DevelopView");
+function editViewOf(key: number) {
+  return { key, asset: key, variant: key, position: 0, history: [], canUndo: false, canRedo: false, snapshots: [], settings: defaultSettings() };
+}
 const i18n = (await import("../i18n")).default;
 
 const project: ProjectInfo = {
@@ -111,8 +141,12 @@ const project: ProjectInfo = {
 };
 
 const rows = (n: number): PhotoRow[] =>
-  Array.from({ length: n }, (_, i) => ({
+    Array.from({ length: n }, (_, i) => ({
     id: i + 1,
+    asset: i + 1,
+    variant: i + 1,
+    virtualCopy: null,
+    edited: false,
     fileName: `IMG_${String(i + 1).padStart(5, "0")}.jpg`,
     captureTime: null,
     width: 6000,
@@ -510,6 +544,129 @@ describe("organização do casamento (Fase 4)", () => {
       { key: "SONY ILCE-7M4", offsetMs: -222000, reference: false },
       { key: "DJI FC3582", offsetMs: 75000, reference: false },
     ]);
+  });
+});
+
+describe("edição (Fase 5)", () => {
+  async function openDevelop(n = 4) {
+    vi.useRealTimers();
+    apiMock.listPhotos.mockResolvedValue(rows(n).map((r) => ({ ...r, flag: 0 })));
+    act(() => useStore.getState().setProject(project));
+    render(<App />);
+    await screen.findByText("Casamento Ana & Pedro");
+    await act(async () => {});
+    fireEvent.mouseDown(document.querySelector('[data-id="2"]')!);
+    fireEvent.keyDown(window, { key: "d" });
+    await act(async () => {});
+    return screen.getByRole("complementary", { name: "Ajustes" });
+  }
+  const slider = (name: string) => screen.getByRole("slider", { name }) as HTMLInputElement;
+
+  it("abrir o editor (D), arrastar a exposição: renders rápidos e, ao largar, final + gravação", async () => {
+    await openDevelop();
+    expect(apiMock.editView).toHaveBeenCalledWith(2);
+    await waitFor(() => expect(apiMock.renderEdit).toHaveBeenCalled());
+    expect(apiMock.renderEdit.mock.calls.at(-1)![4]).toBe("final");
+    apiMock.renderEdit.mockClear();
+    fireEvent.change(slider("Exposição"), { target: { value: "0.5" } });
+    fireEvent.change(slider("Exposição"), { target: { value: "0.8" } });
+    await act(async () => {});
+    const firstFast = apiMock.renderEdit.mock.calls[0]!;
+    expect(firstFast[4]).toBe("fast");
+    expect((firstFast[1] as { light: { exposure: number } }).light.exposure).toBeGreaterThan(0);
+    expect(apiMock.commitEdit).not.toHaveBeenCalled(); // durante o arrasto não grava
+        fireEvent.pointerUp(slider("Exposição"), { target: { value: "0.8" } });
+    await act(async () => {});
+    // Regressão: com o foco no deslizador, os atalhos do editor continuam a funcionar.
+    fireEvent.keyDown(slider("Exposição"), { key: "\\" });
+    expect(screen.getByRole("button", { name: /^Antes$/ })).toBeTruthy();
+    fireEvent.keyDown(slider("Exposição"), { key: "\\" });
+    expect(apiMock.commitEdit).toHaveBeenCalledWith(2, "light.exposure", expect.objectContaining({ light: expect.objectContaining({ exposure: 0.8 }) }));
+    // Depois de parar, o render final chega.
+    await waitFor(() => expect(apiMock.renderEdit.mock.calls.at(-1)![4]).toBe("final"), { timeout: 2000 });
+    expect(screen.getByText("Exposição", { selector: ".history-list *" })).toBeTruthy();
+  });
+
+  it("desfazer, antes/depois, conta-gotas, endireitar automático", async () => {
+    await openDevelop();
+    await act(async () => {});
+    fireEvent.keyDown(window, { key: "z", ctrlKey: true });
+    await act(async () => {});
+    expect(apiMock.undoEdit).toHaveBeenCalledWith(2);
+    apiMock.renderEdit.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: /^Depois$/ }));
+    await act(async () => {});
+    expect(screen.getByRole("button", { name: /^Antes$/ })).toBeTruthy();
+    const call = apiMock.renderEdit.mock.calls.at(-1)!;
+    expect(call[1]).toEqual(defaultSettings()); // antes = original
+    fireEvent.click(screen.getByRole("button", { name: /Conta-gotas/ }));
+    fireEvent.click(document.querySelector(".develop-image")!, { clientX: 5, clientY: 5 });
+    await act(async () => {});
+    expect(apiMock.pickWhiteBalance).toHaveBeenCalled();
+    expect(apiMock.commitEdit).toHaveBeenCalledWith(2, "wb.picker", expect.objectContaining({ wb: { temperature: 23, tint: -8 } }));
+    fireEvent.click(screen.getByRole("button", { name: /Geometria/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Auto" }));
+    await act(async () => {});
+    expect(apiMock.commitEdit).toHaveBeenCalledWith(2, "geometry.autoStraighten", expect.objectContaining({ geometry: expect.objectContaining({ straighten: 2.3 }) }));
+  });
+
+  it("copiar (sem geometria por omissão), colar, sincronizar com a seleção, cópia virtual, instantâneos", async () => {
+    await openDevelop();
+    fireEvent.click(screen.getByRole("button", { name: "Copiar" }));
+    const dlg = screen.getByRole("dialog", { name: "Copiar definições" });
+    expect((within(dlg).getByRole("checkbox", { name: "Geometria" }) as HTMLInputElement).checked).toBe(false);
+    fireEvent.click(within(dlg).getByRole("button", { name: "Copiar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Colar" }));
+    await act(async () => {});
+    expect(apiMock.pasteSettings).toHaveBeenCalledWith([2], expect.anything(), expect.not.arrayContaining(["geometry"]));
+    act(() => useStore.getState().setSelection({ ids: new Set([2, 3, 4]), focus: 2, anchor: 2 }));
+    fireEvent.click(screen.getByRole("button", { name: "Sincronizar" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Sincronizar com 2 fotografias" })).getByRole("button", { name: "Sincronizar" }));
+    await act(async () => {});
+    expect(apiMock.pasteSettings).toHaveBeenLastCalledWith([3, 4], expect.anything(), expect.any(Array));
+    fireEvent.change(screen.getByRole("textbox", { name: "Nome do instantâneo" }), { target: { value: "Quente" } });
+    fireEvent.submit(screen.getByRole("textbox", { name: "Nome do instantâneo" }));
+    await act(async () => {});
+    expect(apiMock.createSnapshot).toHaveBeenCalledWith(2, "Quente");
+    fireEvent.click(await screen.findByRole("button", { name: "Quente" }));
+    await act(async () => {});
+    expect(apiMock.applySnapshot).toHaveBeenCalledWith(2, 5);
+    fireEvent.click(screen.getByRole("button", { name: "Cópia virtual" }));
+    await act(async () => {});
+    expect(apiMock.createVirtualCopy).toHaveBeenCalledWith(2);
+    expect(useStore.getState().selection.focus).toBe(2 ** 40 + 77);
+  });
+
+  it("recorte: renderiza sem recorte, proporção e sair com Esc volta à grelha", async () => {
+    await openDevelop();
+    await act(async () => {});
+    apiMock.renderEdit.mockClear();
+    fireEvent.keyDown(window, { key: "r" });
+    await act(async () => {});
+    expect(apiMock.renderEdit.mock.calls.at(-1)![5]).toBe(true);
+    expect(screen.getByRole("group", { name: /Área de recorte/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Geometria/ }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Proporção" }), { target: { value: "1:1" } });
+    await act(async () => {});
+    const last = apiMock.commitEdit.mock.calls.at(-1)!;
+    expect(last[1]).toBe("geometry.aspect");
+    const crop = (last[2] as { geometry: { crop: { w: number; h: number } } }).geometry.crop;
+    expect(crop.w * 40).toBeCloseTo(crop.h * 30, 3); // 1:1 em píxeis do frame 40×30
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(useStore.getState().view).toBe("grid");
+  });
+
+  it("frames, recorte com proporção e etiquetas do histórico", () => {
+    const f = parseFrame(frameBuffer(4, 3));
+    expect([f.width, f.height, f.rgba.length, f.histogram[1][128]]).toEqual([4, 3, 48, 0]);
+    expect(f.histogram[0][128]).toBe(12);
+    const c = fitCropToAspect({ x: 0, y: 0, w: 1, h: 1 }, 1, 300, 200);
+    expect(c.w * 300).toBeCloseTo(c.h * 200);
+    expect(c.x).toBeCloseTo((1 - c.w) / 2);
+    const t = i18n.t.bind(i18n) as (k: string, o?: Record<string, unknown>) => string;
+    expect(historyLabel("light.exposure", t)).toBe("Exposição");
+    expect(historyLabel("reset.light", t)).toBe("Repor Luz");
+    expect(historyLabel("paste", t)).toBe("Colar definições");
   });
 });
 

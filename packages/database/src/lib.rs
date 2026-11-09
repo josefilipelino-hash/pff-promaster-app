@@ -13,6 +13,7 @@
 pub mod analysis;
 pub mod assets;
 pub mod clock;
+pub mod edits;
 pub mod import;
 pub mod library;
 pub mod migrations;

@@ -260,7 +260,34 @@ pub const CATALOG: &[&str] = &[
 
     -- A análise ganha identidade facial e cena: as fotografias já analisadas ficam por
     -- reanalisar (as recomendações atuais mantêm-se até lá).
-    UPDATE asset SET analysis_state = 0 WHERE analysis_state = 1;
+        UPDATE asset SET analysis_state = 0 WHERE analysis_state = 1;
+    "#,
+    // v6 — Fase 5: edição não destrutiva (receita por variante, histórico, instantâneos).
+    r#"
+    CREATE TABLE edit (
+        variant_id INTEGER PRIMARY KEY REFERENCES variant(id) ON DELETE CASCADE,
+        recipe     TEXT NOT NULL,
+        position   INTEGER NOT NULL DEFAULT 0,
+        updated_at INTEGER NOT NULL
+    ) STRICT;
+
+    CREATE TABLE edit_history (
+        id         INTEGER PRIMARY KEY,
+        variant_id INTEGER NOT NULL REFERENCES variant(id) ON DELETE CASCADE,
+        seq        INTEGER NOT NULL,
+        label      TEXT NOT NULL,
+        recipe     TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        UNIQUE (variant_id, seq)
+    ) STRICT;
+
+    CREATE TABLE snapshot (
+        id         INTEGER PRIMARY KEY,
+        variant_id INTEGER NOT NULL REFERENCES variant(id) ON DELETE CASCADE,
+        name       TEXT NOT NULL,
+        recipe     TEXT NOT NULL,
+        created_at INTEGER NOT NULL
+    ) STRICT;
     "#,
 ];
 

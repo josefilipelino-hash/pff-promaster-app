@@ -34,15 +34,16 @@ function ScoreBar({ label, value }: { label: string; value: number | null }) {
 /** Secção “Análise” do painel de informação: etiqueta, explicação e pontuações individuais. */
 export function AnalysisSection({ photo, onCompareGroup, onAccept }: { photo: PhotoRow; onCompareGroup: (ids: number[]) => void; onAccept: (id: number) => void }) {
   const { t, i18n } = useTranslation();
-  const d = useStore((s) => s.analysisDetails.get(photo.id));
-  const brief = useStore((s) => s.recs.get(photo.id));
+  const asset = photo.asset ?? photo.id;
+  const d = useStore((s) => s.analysisDetails.get(asset));
+  const brief = useStore((s) => s.recs.get(asset));
   const group = useStore((s) => (brief?.groupId != null ? s.groupById.get(brief.groupId) : undefined));
   const analysisLoaded = useStore((s) => s.analysis !== null);
   const load = useStore((s) => s.loadAnalysisDetails);
 
   useEffect(() => {
-    if (analysisLoaded) void load(photo.id).catch(() => {});
-  }, [photo.id, brief, analysisLoaded, load]);
+    if (analysisLoaded) void load(asset).catch(() => {});
+  }, [asset, brief, analysisLoaded, load]);
 
   if (!analysisLoaded) return null;
   if (!d || (!d.analysis && !d.error)) {
@@ -77,7 +78,7 @@ export function AnalysisSection({ photo, onCompareGroup, onAccept }: { photo: Ph
           <p className="analysis-why">{explain(r.summary, reasons, t, i18n.language)}</p>
           <div className="analysis-actions">
             {canAccept && (
-              <button type="button" className="btn small" onClick={() => onAccept(photo.id)} title={t("analysis.acceptHint")}>
+              <button type="button" className="btn small" onClick={() => onAccept(asset)} title={t("analysis.acceptHint")}>
                 {r.label === "best" ? t("analysis.acceptPick") : t("analysis.acceptReject")}
               </button>
             )}
@@ -86,8 +87,8 @@ export function AnalysisSection({ photo, onCompareGroup, onAccept }: { photo: Ph
                 type="button"
                 className="btn small"
                 onClick={() => {
-                  const others = group.members.filter((m) => m !== photo.id).slice(0, 3);
-                  onCompareGroup([photo.id, ...others]);
+                  const others = group.members.filter((m) => m !== asset).slice(0, 3);
+                  onCompareGroup([asset, ...others]);
                 }}
               >
                 {t("analysis.compareGroup")}

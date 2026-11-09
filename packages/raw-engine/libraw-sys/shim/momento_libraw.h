@@ -87,6 +87,10 @@ int mlr_thumb(mlr_handle *h, int index, mlr_image *out);
  * half_size != 0 → metade da resolução (muito mais rápido, sem demosaico completo). */
 int mlr_develop(mlr_handle *h, int half_size, mlr_image *out);
 
+/* Revelação para edição: RGB 16 bits LINEAR em Rec. 2020, balanço de brancos da câmara,
+ * sem brilho automático, sem rotação. */
+int mlr_develop_linear(mlr_handle *h, int half_size, mlr_image *out);
+
 void mlr_image_free(mlr_image *img);
 void mlr_close(mlr_handle *h);
 

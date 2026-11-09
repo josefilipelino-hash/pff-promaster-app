@@ -8,6 +8,10 @@ import { keyToAction } from "./shortcuts";
 
 const photo = (id: number, over: Partial<PhotoRow> = {}): PhotoRow => ({
   id,
+  asset: id,
+  variant: id,
+  virtualCopy: null,
+  edited: false,
   fileName: `IMG_${id}.jpg`,
   captureTime: null,
   width: 600,

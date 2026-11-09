@@ -1,6 +1,8 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  DevelopSettings,
+  EditView,
   AssetMoment,
   CameraOffset,
   CameraRow,
@@ -81,7 +83,24 @@ export const api = {
   reclassifyMoments: () => invoke<[number, number]>("reclassify_moments"),
   listCameras: () => invoke<CameraRow[]>("list_cameras"),
   suggestOffsets: (reference: string) => invoke<OffsetSuggestion[]>("suggest_offsets", { reference }),
-  setCameraOffsets: (offsets: CameraOffset[]) => invoke<OrganizeSummary>("set_camera_offsets", { offsets }),
+    setCameraOffsets: (offsets: CameraOffset[]) => invoke<OrganizeSummary>("set_camera_offsets", { offsets }),
+  // Edição não destrutiva (os originais nunca são escritos).
+  editView: (key: number) => invoke<EditView>("edit_view", { key }),
+  renderEdit: (key: number, settings: DevelopSettings, maxWidth: number, maxHeight: number, quality: "fast" | "final", uncropped: boolean) =>
+    invoke<ArrayBuffer>("render_edit", { key, settings, maxWidth, maxHeight, quality, uncropped }),
+  commitEdit: (key: number, label: string, settings: DevelopSettings) => invoke<EditView>("commit_edit", { key, label, settings }),
+  undoEdit: (key: number) => invoke<EditView>("undo_edit", { key }),
+  redoEdit: (key: number) => invoke<EditView>("redo_edit", { key }),
+  gotoHistory: (key: number, seq: number) => invoke<EditView>("goto_history", { key, seq }),
+  resetEdit: (key: number) => invoke<EditView>("reset_edit", { key }),
+  createSnapshot: (key: number, name: string) => invoke<EditView>("create_snapshot", { key, name }),
+  applySnapshot: (key: number, id: number) => invoke<EditView>("apply_snapshot", { key, id }),
+  deleteSnapshot: (key: number, id: number) => invoke<EditView>("delete_snapshot", { key, id }),
+  createVirtualCopy: (key: number) => invoke<number>("create_virtual_copy", { key }),
+  deleteVirtualCopy: (key: number) => invoke<void>("delete_virtual_copy", { key }),
+  pasteSettings: (keys: number[], settings: DevelopSettings, blocks: string[]) => invoke<number>("paste_settings", { keys, settings, blocks }),
+  pickWhiteBalance: (key: number, settings: DevelopSettings, u: number, v: number) => invoke<[number, number] | null>("pick_white_balance", { key, settings, u, v }),
+  autoStraighten: (key: number, settings: DevelopSettings) => invoke<number | null>("auto_straighten", { key, settings }),
 };
 
 export const events = {
@@ -91,8 +110,9 @@ export const events = {
     listen<ImportSummary>("import-finished", (e) => cb(e.payload)),
   thumbnails: (cb: (b: ThumbBatch) => void): Promise<UnlistenFn> =>
     listen<ThumbBatch>("thumbnails", (e) => cb(e.payload)),
-  analysis: (cb: (p: AnalysisProgress) => void): Promise<UnlistenFn> =>
+    analysis: (cb: (p: AnalysisProgress) => void): Promise<UnlistenFn> =>
     listen<AnalysisProgress>("analysis-progress", (e) => cb(e.payload)),
+  editsChanged: (cb: (keys: number[]) => void): Promise<UnlistenFn> => listen<number[]>("edits-changed", (e) => cb(e.payload)),
 };
 
 export type ImageLevel = "thumb" | "preview" | "full";

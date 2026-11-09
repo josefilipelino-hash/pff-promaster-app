@@ -69,6 +69,19 @@ plataforma, ecrã inicial, validação do formulário, grelha virtualizada com 3
 secções futuras desativadas, classificação por teclado e em seleção múltipla, filtro
 Favoritas + visualizador, reversão quando o núcleo recusa, paridade de traduções.
 
+## Fase 5 — motor de edição
+
+| Teste | O que verifica |
+|---|---|
+| `image-processing::develop` (27) | receita neutra = original (±1 nível); +1 EV duplica a luz linear; balanço mais quente e conta-gotas neutraliza um cinzento com dominante; sombras/realces mexem só na sua zona; contraste, brancos/pretos; saturação −100 = cinzento; vibração; HSL por cor (o vermelho não muda ao mexer no azul); curvas (invertida, por canal, paramétrica); recorte, 90°, espelho, endireitar sem cantos vazios, perspetiva; endireitar automático corrige um horizonte inclinado 4°; objetiva (vinheta, distorção, aberração só no vermelho); nitidez aumenta e redução de ruído diminui o detalhe fino, máscara protege zonas lisas, ruído de cor; clareza/textura/dehaze/vinheta/grão (determinístico); histograma; rápido ≈ final; receita só com blocos alterados; desempenho |
+| `database::edits` | histórico, desfazer até ao original, refazer, ramificação (o futuro é descartado), instantâneos, cópias virtuais com classificação independente, apagar só cópias |
+| `edit_flow` | caminho real com JPEG e RAW real (Nikon D810): render rápido/final, gravar/desfazer/refazer, instantâneo, repor, colar só a luz, cópia virtual a P&B, miniatura/preview editadas, sidecars, resolução total sem ampliar, **originais com o mesmo hash**, reabrir |
+| Interface (+5) | arrastar a exposição = renders rápidos sem gravar, largar = gravação + render final; atalhos com o foco num deslizador; desfazer; antes/depois; conta-gotas; endireitar automático; copiar sem geometria; colar; sincronizar; instantâneos; cópia virtual; recorte e proporção |
+
+```bash
+MOMENTO_SAMPLES_DIR=/pasta/com/um/raw cargo test -p momento-project-management --release --test edit_flow -- --nocapture
+```
+
 ## Fase 4 — organização do casamento
 
 | Teste | O que verifica |

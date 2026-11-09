@@ -1,0 +1,253 @@
+//! Serviço de edição: fonte em memória (RAW linear ou outros formatos), render para a
+//! interface com qualidade dinâmica, gravação não destrutiva (catálogo + sidecar JSON na
+//! pasta do projeto) e miniaturas/previews editadas em cache.
+//!
+//! Os ficheiros originais são abertos **só para leitura**.
+
+use crate::paths::ProjectPaths;
+use image::{imageops, RgbImage};
+use momento_core_types::recipe::EditRecipe;
+use momento_core_types::{AssetId, CoreError, CoreResult, VariantId};
+use momento_database::Catalog;
+use momento_image_codecs::{format_from_id, CodecRegistry, FormatFamily};
+use momento_image_processing::develop::{self, Quality, RenderOptions, Settings, Source};
+use momento_image_processing::{apply_orientation, encode_jpeg, write_atomic};
+use momento_raw_engine::RawFile;
+use std::collections::VecDeque;
+use std::hash::{Hash, Hasher};
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+
+/// Lado maior da fonte de edição para formatos não RAW (os RAW usam meia resolução do sensor).
+pub const EDIT_EDGE: u32 = 3072;
+/// Fontes em memória (≈ 70–110 MB cada).
+const CACHE_ENTRIES: usize = 3;
+
+pub const THUMB_EDGE: u32 = 640;
+pub const PREVIEW_EDGE: u32 = 2560;
+
+/// Carrega a fonte de edição de um asset. `max_edge = None` → resolução total.
+pub fn load_source(
+    catalog: &Catalog,
+    registry: &CodecRegistry,
+    asset: AssetId,
+    max_edge: Option<u32>,
+) -> CoreResult<Source> {
+    let src = catalog
+        .asset_source(asset)?
+        .ok_or_else(|| CoreError::Other(format!("fotografia {asset} inexistente")))?;
+    let format = format_from_id(&src.format)
+        .ok_or_else(|| CoreError::UnsupportedFormat(src.format.clone()))?;
+    let data = std::fs::read(&src.path)
+        .map_err(|e| CoreError::Other(format!("original não encontrado: {} ({e})", src.path)))?;
+    if format.family() == FormatFamily::Raw {
+        match RawFile::open(&data).and_then(|mut raw| {
+            let info = raw.info().clone();
+            let long = info.width.max(info.height);
+            let half = max_edge.is_some_and(|m| long / 2 >= m.min(long));
+            let bm = raw.develop_linear(half)?;
+            Ok(Source::from_linear16(
+                bm.width,
+                bm.height,
+                &bm.rgb,
+                src.orientation,
+                info.width,
+                info.height,
+            ))
+        }) {
+            Ok(s) => return Ok(s),
+            Err(e) => {
+                tracing::warn!(asset = asset.0, erro = %e, "RAW sem dados do sensor: edição a partir da preview embutida")
+            }
+        }
+    }
+    let probe = registry.probe(&data, format)?;
+    let min_short = max_edge.map(|m| {
+        let (long, short) = (probe.width.max(probe.height), probe.width.min(probe.height));
+        ((m as u64 * short as u64) / long.max(1) as u64).max(1) as u32
+    });
+    let decoded = registry.decode(&data, format, min_short)?;
+    let mut img = apply_orientation(decoded.image, src.orientation);
+    if let Some(m) = max_edge {
+        let (w, h) = img.dimensions();
+        if w.max(h) > m {
+            let s = m as f32 / w.max(h) as f32;
+            img = imageops::resize(
+                &img,
+                ((w as f32 * s) as u32).max(1),
+                ((h as f32 * s) as u32).max(1),
+                imageops::FilterType::Triangle,
+            );
+        }
+    }
+    let (fw, fh) = if (5..=8).contains(&src.orientation) {
+        (decoded.source_height, decoded.source_width)
+    } else {
+        (decoded.source_width, decoded.source_height)
+    };
+    Ok(Source::from_srgb(&img, fw, fh))
+}
+
+/// Cabeçalho binário de um frame: largura, altura (u32 LE), histograma 3×256 (u32 LE), RGBA.
+pub fn encode_frame(r: &develop::Rendered) -> Vec<u8> {
+    let mut out = Vec::with_capacity(8 + 3 * 256 * 4 + r.rgba.len());
+    out.extend_from_slice(&r.width.to_le_bytes());
+    out.extend_from_slice(&r.height.to_le_bytes());
+    for ch in &r.histogram {
+        for v in ch {
+            out.extend_from_slice(&v.to_le_bytes());
+        }
+    }
+    out.extend_from_slice(&r.rgba);
+    out
+}
+
+fn recipe_hash(r: &EditRecipe) -> String {
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    serde_json::to_string(r).unwrap_or_default().hash(&mut h);
+    format!("{:016x}", h.finish())
+}
+
+/// Ficheiros editados em cache: `cache/edits/<nível>/<variante>-<hash>.jpg`.
+pub fn edited_path(
+    paths: &ProjectPaths,
+    level: &str,
+    variant: VariantId,
+    recipe: &EditRecipe,
+) -> PathBuf {
+    paths.cache().join("edits").join(level).join(format!(
+        "{}-{}.jpg",
+        variant.0,
+        recipe_hash(recipe)
+    ))
+}
+
+/// Remove versões antigas do mesmo nível/variante.
+fn prune_old(dir: &std::path::Path, variant: VariantId, keep: &std::path::Path) {
+    if let Ok(rd) = std::fs::read_dir(dir) {
+        let prefix = format!("{}-", variant.0);
+        for e in rd.flatten() {
+            let p = e.path();
+            if p != keep && p.file_name().is_some_and(|n| n.to_string_lossy().starts_with(&prefix))
+            {
+                let _ = std::fs::remove_file(p);
+            }
+        }
+    }
+}
+
+pub struct EditService {
+    cache: Mutex<VecDeque<(AssetId, Arc<Source>)>>,
+}
+
+impl Default for EditService {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl EditService {
+    pub fn new() -> Self {
+        EditService { cache: Mutex::new(VecDeque::new()) }
+    }
+
+    /// Fonte de edição (em cache).
+    pub fn source(
+        &self,
+        catalog: &Catalog,
+        registry: &CodecRegistry,
+        asset: AssetId,
+    ) -> CoreResult<Arc<Source>> {
+        if let Some(s) = self
+            .cache
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .find(|e| e.0 == asset)
+            .map(|e| e.1.clone())
+        {
+            return Ok(s);
+        }
+        let s = Arc::new(load_source(catalog, registry, asset, Some(EDIT_EDGE))?);
+        let mut c = self.cache.lock().unwrap_or_else(|e| e.into_inner());
+        c.retain(|e| e.0 != asset);
+        c.push_front((asset, s.clone()));
+        c.truncate(CACHE_ENTRIES);
+        Ok(s)
+    }
+
+    pub fn forget(&self) {
+        self.cache.lock().unwrap_or_else(|e| e.into_inner()).clear();
+    }
+
+    pub fn render_frame(
+        &self,
+        src: &Source,
+        s: &Settings,
+        max_w: u32,
+        max_h: u32,
+        quality: Quality,
+        uncropped: bool,
+    ) -> Vec<u8> {
+        let r = develop::render(
+            src,
+            s,
+            &RenderOptions {
+                max_width: max_w.clamp(16, 8192),
+                max_height: max_h.clamp(16, 8192),
+                quality,
+                uncropped,
+            },
+        );
+        encode_frame(&r)
+    }
+}
+
+/// Gera (se necessário) o ficheiro editado de um nível e devolve o caminho.
+pub fn ensure_edited(
+    paths: &ProjectPaths,
+    src: &dyn Fn(Option<u32>) -> CoreResult<Arc<Source>>,
+    variant: VariantId,
+    recipe: &EditRecipe,
+    level: &str,
+) -> CoreResult<PathBuf> {
+    let path = edited_path(paths, level, variant, recipe);
+    if path.is_file() {
+        return Ok(path);
+    }
+    let settings = Settings::from_recipe(recipe);
+    let (edge, source) = match level {
+        "thumbs" => (THUMB_EDGE, src(Some(EDIT_EDGE))?),
+        "previews" => (PREVIEW_EDGE, src(Some(EDIT_EDGE))?),
+        _ => (u32::MAX, src(None)?),
+    };
+    // Nunca ampliar: no máximo a resolução da fonte.
+    let edge = edge.min(source.width().max(source.height()) as u32);
+    let img: RgbImage = develop::render_rgb(&source, &settings, edge, Quality::Final);
+    let jpg = encode_jpeg(&img, if level == "thumbs" { 85 } else { 92 }, None)?;
+    write_atomic(&path, &jpg)?;
+    if let Some(dir) = path.parent() {
+        prune_old(dir, variant, &path);
+    }
+    Ok(path)
+}
+
+/// Sidecar JSON da receita na pasta do projeto (cópia legível, recuperável sem o catálogo).
+pub fn write_sidecar(
+    paths: &ProjectPaths,
+    catalog: &Catalog,
+    asset: AssetId,
+    variant: VariantId,
+    recipe: &EditRecipe,
+) -> CoreResult<()> {
+    let src = catalog.asset_source(asset)?;
+    let path = paths.root.join("edits").join(format!("{}-{}.json", asset.0, variant.0));
+    let body = serde_json::json!({
+        "generator": "Momento Studio",
+        "asset": asset.0,
+        "variant": variant.0,
+        "original": src.map(|s| s.path),
+        "recipe": recipe,
+    });
+    write_atomic(&path, serde_json::to_string_pretty(&body).unwrap_or_default().as_bytes())
+}

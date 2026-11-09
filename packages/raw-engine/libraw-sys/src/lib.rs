@@ -82,6 +82,7 @@ extern "C" {
     ) -> c_int;
     pub fn mlr_thumb(h: *mut mlr_handle, index: c_int, out: *mut mlr_image) -> c_int;
     pub fn mlr_develop(h: *mut mlr_handle, half_size: c_int, out: *mut mlr_image) -> c_int;
+    pub fn mlr_develop_linear(h: *mut mlr_handle, half_size: c_int, out: *mut mlr_image) -> c_int;
     pub fn mlr_image_free(img: *mut mlr_image);
     pub fn mlr_close(h: *mut mlr_handle);
     pub fn mlr_strerror(code: c_int) -> *const c_char;

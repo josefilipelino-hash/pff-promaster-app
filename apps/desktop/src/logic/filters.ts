@@ -43,13 +43,13 @@ export type RecMap = Map<number, RecommendationBrief>;
 
 export function matches(p: PhotoRow, f: Filter, recs?: RecMap, org?: OrgMaps): boolean {
   if (!inCollection(p, f.collection) || p.stars < f.minStars || (f.color !== null && p.color !== f.color)) return false;
-  if (f.label && recs?.get(p.id)?.label !== f.label) return false;
+  if (f.label && recs?.get(p.asset ?? p.id)?.label !== f.label) return false;
   if (f.persons && f.persons.length > 0) {
-    const here = org?.photoPersons?.get(p.id) ?? [];
+    const here = org?.photoPersons?.get(p.asset ?? p.id) ?? [];
     if (!f.persons.every((x) => here.includes(x))) return false;
   }
   if (f.moment != null) {
-    const m = org?.photoMoment?.get(p.id) ?? null;
+    const m = org?.photoMoment?.get(p.asset ?? p.id) ?? null;
     if (f.moment === "unclassified" ? m !== null : m !== f.moment) return false;
   }
   return true;
@@ -64,7 +64,7 @@ export function applyFilter(photos: PhotoRow[], f: Filter, recs?: RecMap, org?: 
 export function momentCounts(photos: PhotoRow[], photoMoment: Map<number, number | null>): Map<number | "unclassified", number> {
   const c = new Map<number | "unclassified", number>();
   for (const p of photos) {
-    const m = photoMoment.get(p.id) ?? null;
+    const m = photoMoment.get(p.asset ?? p.id) ?? null;
     const k = m === null ? "unclassified" : m;
     c.set(k, (c.get(k) ?? 0) + 1);
   }
@@ -74,7 +74,7 @@ export function momentCounts(photos: PhotoRow[], photoMoment: Map<number, number
 export function labelCounts(photos: PhotoRow[], recs: RecMap): Record<Label, number> {
   const c: Record<Label, number> = { best: 0, alternative: 0, review: 0, reject: 0, duplicate: 0 };
   for (const p of photos) {
-    const r = recs.get(p.id);
+    const r = recs.get(p.asset ?? p.id);
     if (r) c[r.label]++;
   }
   return c;

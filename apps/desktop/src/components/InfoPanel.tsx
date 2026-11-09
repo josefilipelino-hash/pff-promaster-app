@@ -37,11 +37,11 @@ export function InfoPanel({
   onPerson?: (id: number) => void;
 }) {
   const { t, i18n } = useTranslation();
-  const details = useStore((s) => (photo ? s.details.get(photo.id) : undefined));
+  const details = useStore((s) => (photo ? s.details.get(photo.asset ?? photo.id) : undefined));
   const loadDetails = useStore((s) => s.loadDetails);
 
   useEffect(() => {
-    if (photo) void loadDetails(photo.id);
+    if (photo) void loadDetails(photo.asset ?? photo.id);
   }, [photo, loadDetails]);
 
   if (!photo) {
