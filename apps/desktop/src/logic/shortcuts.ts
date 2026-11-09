@@ -14,6 +14,7 @@ export type Action =
   | { type: "info" }
   | { type: "selectAll" }
   | { type: "import" }
+  | { type: "export" }
   | { type: "help" }
     | { type: "compare" }
   | { type: "develop" };
@@ -33,6 +34,7 @@ export function keyToAction(e: KeyLike, mac: boolean): Action | null {
   if (mod && !e.altKey) {
     if (e.key.toLowerCase() === "a" && !e.shiftKey) return { type: "selectAll" };
     if (e.key.toLowerCase() === "i" && e.shiftKey) return { type: "import" };
+    if (e.key.toLowerCase() === "e" && e.shiftKey) return { type: "export" };
     return null;
   }
   if (e.metaKey || e.ctrlKey || e.altKey) return null;
@@ -108,5 +110,6 @@ export const SHORTCUT_HELP: [string, string][] = [
   ["Mod + U", "shortcuts.autoEdit"],
   ["O", "shortcuts.maskOverlay"],
   ["Mod + Shift + I", "shortcuts.import"],
+  ["Mod + Shift + E", "shortcuts.export"],
   ["?", "shortcuts.help"],
 ];

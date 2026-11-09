@@ -9,6 +9,8 @@ publish.workspace = true
 authors.workspace = true
 
 [dependencies]
+momento-export-engine.workspace = true
+fs4.workspace = true
 momento-core-types.workspace = true
 momento-database.workspace = true
 momento-image-codecs.workspace = true
@@ -30,3 +32,5 @@ blake3.workspace = true
 [dev-dependencies]
 momento-test-fixtures.workspace = true
 tempfile.workspace = true
+kamadak-exif.workspace = true
+walkdir.workspace = true

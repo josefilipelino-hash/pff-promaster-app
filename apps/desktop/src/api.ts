@@ -1,6 +1,12 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  ExportCaps,
+  ExportEstimate,
+  ExportPlan,
+  ExportProgress,
+  ExportRecipe,
+  ExportRequest,
   FaceRegions,
   Criterion,
   LookGroup,
@@ -144,6 +150,21 @@ export const api = {
   mapPoints: (key: number, settings: DevelopSettings, points: [number, number][], toSource: boolean, uncropped: boolean) =>
     invoke<([number, number] | null)[]>("map_points", { key, settings, points, toSource, uncropped }),
   suggestHealSource: (key: number, x: number, y: number, r: number) => invoke<[number, number]>("suggest_heal_source", { key, x, y, r }),
+  // Exportação.
+  exportCapabilities: () => invoke<ExportCaps[]>("export_capabilities"),
+  exportRecipes: () => invoke<ExportRecipe[]>("export_recipes"),
+  saveExportRecipe: (recipe: ExportRecipe) => invoke<ExportRecipe>("save_export_recipe", { recipe }),
+  deleteExportPreset: (id: string) => invoke<boolean>("delete_export_preset", { id }),
+  exportPlans: () => invoke<ExportPlan[]>("export_plans"),
+  saveExportPlan: (plan: ExportPlan) => invoke<ExportPlan>("save_export_plan", { plan }),
+  inspectIccProfile: (path: string) => invoke<string>("inspect_icc_profile", { path }),
+  estimateExport: (request: ExportRequest) => invoke<ExportEstimate>("estimate_export", { request }),
+  startExport: (request: ExportRequest) => invoke<number>("start_export", { request }),
+  exportJobs: () => invoke<ExportProgress[]>("export_jobs"),
+  pauseExport: (id: number, paused: boolean) => invoke<boolean>("pause_export", { id, paused }),
+  cancelExport: (id: number) => invoke<boolean>("cancel_export", { id }),
+  clearFinishedExports: () => invoke<void>("clear_finished_exports"),
+  revealFolder: (path: string) => invoke<void>("reveal_folder", { path }),
 };
 
 export const events = {
@@ -158,6 +179,7 @@ export const events = {
   editsChanged: (cb: (keys: number[]) => void): Promise<UnlistenFn> => listen<number[]>("edits-changed", (e) => cb(e.payload)),
   autoEdit: (cb: (p: AutoEditProgress) => void): Promise<UnlistenFn> => listen<AutoEditProgress>("auto-edit-progress", (e) => cb(e.payload)),
   aiDenoise: (cb: (p: AiDenoiseProgress) => void): Promise<UnlistenFn> => listen<AiDenoiseProgress>("ai-denoise", (e) => cb(e.payload)),
+  exportProgress: (cb: (p: ExportProgress) => void): Promise<UnlistenFn> => listen<ExportProgress>("export-progress", (e) => cb(e.payload)),
 };
 
 export type ImageLevel = "thumb" | "preview" | "full";

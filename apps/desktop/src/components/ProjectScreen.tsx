@@ -10,6 +10,7 @@ import { keyToAction, type Action } from "../logic/shortcuts";
 import { errorText, useStore } from "../store";
 import type { Color, GroupRow, ImportMode, Label } from "../types";
 import { AutoEditDialog, AutoEditQueue } from "./AutoEdit";
+import { ExportDialog, ExportQueue } from "./Export";
 import { ConsistencyView } from "./ConsistencyView";
 import { ApplyPresetDialog } from "./Presets";
 import { ClockDialog } from "./ClockDialog";
@@ -96,6 +97,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
         useStore.getState().reloadPhotos().catch(() => {});
       }, wait);
     };
+    api.exportJobs().then((j) => useStore.getState().setExportJobs(j)).catch(() => {});
     const un = [
       events.importProgress((p) => {
         const st = useStore.getState();
@@ -116,6 +118,12 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
         useStore.getState().bumpEdited(keys);
         // Numa fila de centenas de fotografias chegam muitos avisos: recarregar com limite.
         scheduleReload();
+      }),
+      events.exportProgress((p) => {
+        const st = useStore.getState();
+        st.upsertExportJob(p);
+        if (p.state === "done") st.toast("info", t("export.toastDone", { count: p.filesDone, failed: p.filesFailed }));
+        else if (p.state === "failed") st.toast("error", t("export.toastFailed", { name: p.name }));
       }),
       events.autoEdit((p) => {
         const st = useStore.getState();
@@ -422,6 +430,8 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
           return void chooseImport(false);
         case "help":
           return st.setHelpOpen(true);
+        case "export":
+          return st.setExportDialog(true);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -431,7 +441,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const st = useStore.getState();
-            if (isTyping(e.target) || st.pendingImport || st.importSummary || st.helpOpen || st.clockOpen || st.autoDialog || st.presetDialog) return;
+            if (isTyping(e.target) || st.pendingImport || st.importSummary || st.helpOpen || st.clockOpen || st.autoDialog || st.presetDialog || st.exportDialog) return;
       const a = keyToAction(e, mac);
       if (!a) return;
       e.preventDefault();
@@ -487,6 +497,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
             onCompare={compareFromSelection}
             onAutoEdit={() => s.setAutoDialog(true)}
             onPresets={() => s.setPresetDialog(true)}
+            onExport={() => s.setExportDialog(true)}
             selectedCount={s.selection.ids.size}
             view={s.view}
             onView={(v) => s.setView(v)}
@@ -588,6 +599,8 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
       {s.autoDialog && <AutoEditDialog keys={order.filter((k) => s.selection.ids.has(k))} onClose={() => s.setAutoDialog(false)} />}
       {s.presetDialog && <ApplyPresetDialog onClose={() => s.setPresetDialog(false)} />}
       <AutoEditQueue />
+      {s.exportDialog && <ExportDialog selected={order.filter((k) => s.selection.ids.has(k))} visible={order} onClose={() => s.setExportDialog(false)} />}
+      <ExportQueue />
       {s.dragIds && <div className="drag-badge">{t("moments.dropHint", { count: s.dragIds.length })}</div>}
     </div>
   );

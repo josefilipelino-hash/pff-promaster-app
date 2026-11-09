@@ -14,6 +14,7 @@ export function Toolbar({
   onCompare,
   onAutoEdit,
   onPresets,
+  onExport,
   selectedCount = 0,
   view,
   onView,
@@ -29,6 +30,8 @@ export function Toolbar({
   onAutoEdit?: () => void;
   /** Aplicar preset (seleção, momento, casamento). */
   onPresets?: () => void;
+  /** Abrir o diálogo de exportação. */
+  onExport?: () => void;
   selectedCount?: number;
   view: View;
   onView: (v: View) => void;
@@ -71,6 +74,11 @@ export function Toolbar({
       {onAutoEdit && (
         <button type="button" className="btn" disabled={selectedCount === 0} onClick={onAutoEdit} title={t("auto.batchHint")}>
           ✦ {t("auto.batchButton", { count: selectedCount })}
+        </button>
+      )}
+      {onExport && (
+        <button type="button" className="btn" onClick={onExport} title={t("export.buttonHint")}>
+          ⇪ {t("export.button")}
         </button>
       )}
       <span className="sep" />

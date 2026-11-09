@@ -51,6 +51,18 @@ ainda **não** implementada (adiada para a Fase 2; as licenças diretas foram ve
 | **tract-onnx** (+ tract-core, tract-hir, tract-linalg…) | 0.23.9 | MIT OR Apache-2.0 | inferência dos modelos de IA (Fase 3) |
 | anyhow | 1 | MIT OR Apache-2.0 | erros internos da inferência |
 
+| **lcms2** + lcms2-sys (LittleCMS 2.17, compilada do código-fonte) | 6.2.0 / 4.0.7 | MIT | gestão de cor da exportação (Fase 9) |
+| jpeg-encoder | 0.7.1 | (MIT OR Apache-2.0) AND IJG | JPEG (exportação) |
+| png / tiff / exr (diretas) | 0.18.1 / 0.11.3 / 1.74.2 | MIT OR Apache-2.0 / MIT / BSD-3-Clause | PNG, TIFF/BigTIFF, OpenEXR (exportação) |
+| webp + libwebp-sys (libwebp compilada do código-fonte) | 0.3.1 / 0.9.6 | MIT OR Apache-2.0 / MIT (libwebp: BSD-3-Clause) | WebP (exportação) |
+| rav1e | 0.8.1 | BSD-2-Clause | codificador AV1 (AVIF) |
+| avif-serialize | 0.8.9 | BSD-3-Clause | contentor AVIF |
+| zune-jpegxl + zune-core | 0.5.2 / 0.5.3 | MIT OR Apache-2.0 OR Zlib | JPEG XL sem perdas |
+| openjp2 (codificação) | 0.6.1 | BSD-2-Clause | JPEG 2000 |
+| fs4 | 1.1.0 | MIT OR Apache-2.0 | espaço livre no destino |
+| ab_glyph | 0.2 | Apache-2.0 | texto da marca de água |
+| **Fonte Inter** (`packages/export-engine/assets/fonts`) | 4.0 | **OFL-1.1** (licença ao lado da fonte) | marca de água de texto |
+
 **LibRaw sob CDDL-1.0:** o copyleft da CDDL aplica-se apenas aos ficheiros da própria
 LibRaw (que não modificamos e cujo código-fonte está disponível no submódulo). Permite a
 ligação estática ao resto da aplicação. Os ficheiros `LICENSE.CDDL` e `COPYRIGHT` da LibRaw

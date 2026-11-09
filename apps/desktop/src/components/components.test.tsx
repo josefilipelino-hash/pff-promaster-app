@@ -1,9 +1,50 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "../i18n";
+import { examplePath, fitToFormat, formatDuration, newRecipe, sanitize } from "../logic/exportRecipe";
 import type { DevelopSettings, PhotoRow, ProjectInfo } from "../types";
 
 // --- Simulação do núcleo e das APIs Tauri ---------------------------------------------
+const capsOf = (format: string, extra: Record<string, unknown> = {}) => ({
+  format,
+  available: true,
+  reason: null,
+  extension: format,
+  depths: ["8"],
+  compressions: [],
+  quality: false,
+  spaces: "icc",
+  metadata: true,
+  resolution: true,
+  linear: false,
+  ...extra,
+});
+const EXPORT_CAPS = [
+  capsOf("jpeg", { quality: true, extension: "jpg" }),
+  capsOf("png", { depths: ["8", "16"], compressions: ["fast", "best"] }),
+  capsOf("tiff", { depths: ["8", "16", "32f"], compressions: ["none", "lzw", "zip"], extension: "tif" }),
+  capsOf("avif", { depths: ["8", "10", "12"], quality: true, spaces: "cicp" }),
+  capsOf("heic", { available: false, reason: "export.unavailable.hevc", depths: [] }),
+];
+const EXPORT_BASE = {
+  id: "builtin:galeria",
+  name: "Galeria",
+  format: "jpeg",
+  depth: "8",
+  quality: 85,
+  compression: "lossy",
+  color: "srgb",
+  iccPath: "",
+  intent: "perceptual",
+  size: { mode: "longEdge", unit: "px", a: 2560, b: 2560, noEnlarge: true, ppi: 300, matchOrientation: false },
+  sharpen: { target: "screen", amount: "standard" },
+  metadata: { mode: "all", removeGps: true, copyright: "", creator: "", contact: "" },
+  watermark: { enabled: false, kind: "text", text: "© ", imagePath: "", fontPath: "", color: "#ffffff", size: 4, opacity: 60, anchor: "bottomRight", margin: 3 },
+  naming: { template: "{nome}", prefix: "", suffix: "", seqStart: 1, seqDigits: 4, subfolder: "Galeria", conflict: "rename" },
+};
+const EXPORT_JPEG = EXPORT_BASE;
+const EXPORT_TIFF = { ...EXPORT_BASE, id: "builtin:arquivo-tiff", name: "Arquivo TIFF", format: "tiff", depth: "16", compression: "zip", color: "adobeRgb", size: { ...EXPORT_BASE.size, mode: "original" }, naming: { ...EXPORT_BASE.naming, subfolder: "Arquivo" } };
+
 const apiMock = {
   available: vi.fn(() => true),
   appInfo: vi.fn(async () => ({ appVersion: "0.1.0", coreVersion: "0.1.0", catalogSchemaVersion: 2, os: "macos", arch: "aarch64" })),
@@ -69,6 +110,20 @@ const apiMock = {
   pickWhiteBalance: vi.fn(async () => [23.4, -7.6] as [number, number]),
   autoStraighten: vi.fn(async () => 2.34),
   aiDenoiseAvailable: vi.fn(async () => true),
+  exportCapabilities: vi.fn(async () => EXPORT_CAPS),
+  exportRecipes: vi.fn(async () => [EXPORT_JPEG, EXPORT_TIFF]),
+  exportPlans: vi.fn(async () => [{ id: "builtin:casamento", name: "Exportar casamento", recipes: [EXPORT_JPEG, EXPORT_TIFF] }]),
+  saveExportRecipe: vi.fn(async (r: unknown) => ({ ...(r as object), id: "x1" })),
+  saveExportPlan: vi.fn(async (p: unknown) => ({ ...(p as object), id: "x2" })),
+  deleteExportPreset: vi.fn(async () => true),
+  inspectIccProfile: vi.fn(async () => "Lab Glossy"),
+  estimateExport: vi.fn(async () => ({ photos: 3, files: 6, bytes: 120e6, freeBytes: 10e9, enoughSpace: true, perRecipe: [], notes: [], errors: [] })),
+  startExport: vi.fn(async () => 1),
+  exportJobs: vi.fn(async () => [] as unknown[]),
+  pauseExport: vi.fn(async () => true),
+  cancelExport: vi.fn(async () => true),
+  clearFinishedExports: vi.fn(async () => {}),
+  revealFolder: vi.fn(async () => {}),
   autoEditPhoto: vi.fn(),
   startAutoEdit: vi.fn(async (keys: number[]) => keys.length),
   autoEditStatus: vi.fn(),
@@ -135,7 +190,7 @@ function analysisStatus(analyzed: number, total: number) {
 vi.mock("../api", async (orig) => {
   const real = await orig<typeof import("../api")>();
   const noop = async () => () => {};
-  return { ...real, api: apiMock, events: { importProgress: noop, importFinished: noop, thumbnails: noop, analysis: noop, editsChanged: noop, autoEdit: noop, aiDenoise: noop } };
+  return { ...real, api: apiMock, events: { importProgress: noop, importFinished: noop, thumbnails: noop, analysis: noop, editsChanged: noop, autoEdit: noop, aiDenoise: noop, exportProgress: noop } };
 });
 vi.mock("@tauri-apps/api/webview", () => ({ getCurrentWebview: () => ({ onDragDropEvent: async () => () => {} }) }));
 vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ isFullscreen: async () => false, setFullscreen: vi.fn(async () => {}) }) }));
@@ -261,7 +316,7 @@ describe("ecrã de projeto", () => {
 
   it("secções futuras estão desativadas e identificadas", async () => {
     await openProject(5);
-        for (const name of [/Exportação/]) {
+        for (const name of [/Galerias/, /Álbuns/]) {
       const b = screen.getByRole("button", { name }) as HTMLButtonElement;
       expect(b.disabled).toBe(true);
     }
@@ -1076,6 +1131,112 @@ describe("edição automática em lote (Fase 6)", () => {
     expect(within(queue).getByText("cancelada")).toBeTruthy();
     fireEvent.click(within(queue).getByRole("button", { name: "Fechar" }));
     expect(screen.queryByRole("region", { name: "Edição automática" })).toBeNull();
+  });
+});
+
+describe("exportação (Fase 9)", () => {
+  async function openWith(n: number) {
+    apiMock.listPhotos.mockResolvedValue(rows(n));
+    act(() => useStore.getState().setProject(project));
+    render(<App />);
+    await screen.findByText("Casamento Ana & Pedro");
+    await act(async () => {});
+  }
+
+  it("diálogo: plano com várias receitas, formatos indisponíveis explicados, editor e início", async () => {
+    const dialog = await import("@tauri-apps/plugin-dialog");
+    (dialog.open as unknown as ReturnType<typeof vi.fn>).mockResolvedValueOnce("/tmp/entrega");
+    await openWith(4);
+    act(() => useStore.getState().setSelection({ ids: new Set([1, 2]), focus: 1, anchor: 1 }));
+    fireEvent.click(screen.getByRole("button", { name: /Exportar…/ }));
+    const dlg = await screen.findByRole("dialog", { name: "Exportar" });
+    await act(async () => {});
+    // Plano "Exportar casamento" com as duas receitas e as suas pastas.
+    const list = within(dlg).getByRole("list", { name: "Receitas desta exportação" });
+    expect(within(list).getByText("Galeria")).toBeTruthy();
+    expect(within(list).getByText("/Arquivo")).toBeTruthy();
+    // HEIC visível mas desativado (sem botões falsos).
+    const fmt = within(dlg).getByRole("combobox", { name: "Formato" }) as HTMLSelectElement;
+    const heic = Array.from(fmt.options).find((o) => o.value === "heic")!;
+    expect(heic.disabled).toBe(true);
+    // Mudar para AVIF: profundidades 8/10/12 e só espaços com CICP.
+    fireEvent.change(fmt, { target: { value: "avif" } });
+    const depth = within(dlg).getByRole("combobox", { name: "Profundidade" }) as HTMLSelectElement;
+    expect(Array.from(depth.options).map((o) => o.value)).toEqual(["8", "10", "12"]);
+    const space = within(dlg).getByRole("combobox", { name: "Espaço de cor" }) as HTMLSelectElement;
+    expect(Array.from(space.options).map((o) => o.value)).toEqual(["srgb", "displayP3", "rec709", "rec2020"]);
+    // Nome de exemplo segue o modelo.
+    fireEvent.change(within(dlg).getByRole("textbox", { name: "Prefixo" }), { target: { value: "AP_" } });
+    expect(within(dlg).getByTestId("export-example").textContent).toBe("Galeria/AP_IMG_0001.avif");
+    // Marca de água: grelha de posições.
+    fireEvent.click(within(dlg).getByRole("checkbox", { name: /Aplicar marca de água/ }));
+    fireEvent.click(within(dlg).getByRole("radio", { name: "Canto superior esquerdo" }));
+    // Destino e estimativa; exportar a seleção.
+    fireEvent.click(within(dlg).getAllByRole("button", { name: "Escolher…" }).at(-1)!);
+    await act(async () => {});
+    await waitFor(() => expect(within(dlg).getByRole("status").textContent).toMatch(/6 ficheiros/));
+    fireEvent.click(within(dlg).getByRole("button", { name: /Exportar 6 ficheiros/ }));
+    await act(async () => {});
+    const req = (apiMock.startExport.mock.calls as unknown as unknown[][])[0]![0] as { keys: number[]; recipes: { format: string; watermark: { anchor: string; enabled: boolean }; naming: { prefix: string } }[]; destination: string };
+    expect(req.keys).toEqual([1, 2]);
+    expect(req.destination).toBe("/tmp/entrega");
+    expect(req.recipes).toHaveLength(2);
+    expect(req.recipes[0]).toMatchObject({ format: "avif", naming: { prefix: "AP_" }, watermark: { enabled: true, anchor: "topLeft" } });
+    expect(req.recipes[1]!.format).toBe("tiff");
+  });
+
+  it("fila: progresso, restantes, tamanho, espaço, tempo, erros, pausa e pasta", async () => {
+    await openWith(2);
+    const job = {
+      id: 7,
+      name: "Exportar casamento",
+      destination: "/tmp/entrega",
+      state: "running",
+      pausedReason: null,
+      photosTotal: 10,
+      photosDone: 4,
+      filesTotal: 50,
+      filesDone: 19,
+      filesFailed: 1,
+      filesSkipped: 0,
+      bytesWritten: 200 * 1024 * 1024,
+      bytesEstimated: 500 * 1024 * 1024,
+      freeBytes: 20 * 1024 * 1024 * 1024,
+      elapsedSeconds: 40,
+      etaSeconds: 60,
+      current: "IMG_0005.CR3",
+      errors: [{ file: "IMG_0003.jpg", message: "original não encontrado" }],
+      notes: [],
+      folders: [],
+    };
+    act(() => useStore.getState().upsertExportJob(job as never));
+    const q = screen.getByRole("region", { name: "Exportação" });
+    expect(within(q).getByText("20 de 50 ficheiros · faltam 6 fotografias")).toBeTruthy();
+    expect(within(q).getByText(/200 MB de ≈ 500 MB · livre 20 GB · faltam 1 min 00 s/)).toBeTruthy();
+    fireEvent.click(within(q).getByRole("button", { name: "1 erro" }));
+    expect(within(q).getByText(/original não encontrado/)).toBeTruthy();
+    fireEvent.click(within(q).getByRole("button", { name: /Pausa/ }));
+    expect(apiMock.pauseExport).toHaveBeenCalledWith(7, true);
+    act(() => useStore.getState().upsertExportJob({ ...job, state: "paused", pausedReason: "noSpace" } as never));
+    expect(within(q).getByText(/espaço insuficiente/)).toBeTruthy();
+    fireEvent.click(within(q).getByRole("button", { name: /Retomar/ }));
+    expect(apiMock.pauseExport).toHaveBeenCalledWith(7, false);
+    act(() => useStore.getState().upsertExportJob({ ...job, state: "done", photosDone: 10, filesDone: 49 } as never));
+    fireEvent.click(within(q).getByRole("button", { name: "Mostrar pasta" }));
+    expect(apiMock.revealFolder).toHaveBeenCalledWith("/tmp/entrega");
+  });
+
+  it("lógica: nomes como o núcleo, ajuste ao formato e duração", () => {
+    const r = newRecipe("x");
+    expect(sanitize("CON")).toBe("_CON");
+    expect(sanitize("  ponto. ")).toBe("ponto");
+    const v = { stem: "IMG_1", seq: 7, date: "2026-06-15", time: "1742", project: "P", client: "Ana: Pedro", recipe: "R", moment: "Cerimónia", width: 1, height: 1 };
+    expect(examplePath({ ...r, naming: { ...r.naming, template: "{data}_{seq}_{nome}", prefix: "AP_", suffix: "_web" } }, "jpg", v)).toBe("AP_2026-06-15_0007_IMG_1_web.jpg");
+    expect(examplePath({ ...r, naming: { ...r.naming, subfolder: "Entrega/../{momento}//Alta" } }, "tif", v)).toBe("Entrega/Cerimónia/Alta/IMG_1.tif");
+    const avif = EXPORT_CAPS[3] as never;
+    expect(fitToFormat({ ...r, color: "adobeRgb", depth: "16" }, avif, ["srgb", "displayP3", "adobeRgb", "proPhoto", "rec709", "rec2020", "icc"])).toMatchObject({ format: "avif", color: "srgb", depth: "8" });
+    expect(formatDuration(3725)).toBe("1 h 02 min");
+    expect(formatDuration(65)).toBe("1 min 05 s");
   });
 });
 

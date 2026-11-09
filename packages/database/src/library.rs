@@ -208,6 +208,84 @@ impl Library {
     }
 }
 
+/// Receita ou plano de exportação do utilizador (JSON do `momento-export-engine`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportPresetRow {
+    pub id: String,
+    /// `recipe` | `plan`.
+    pub kind: String,
+    pub name: String,
+    pub position: i64,
+    pub body: String,
+}
+
+impl Library {
+    pub fn export_presets(&self, kind: &str) -> CoreResult<Vec<ExportPresetRow>> {
+        let mut st = self
+            .conn
+            .prepare("SELECT id, kind, name, position, body FROM export_preset WHERE kind = ?1 ORDER BY position, name")
+            .map_err(db_err)?;
+        let rows = st
+            .query_map(params![kind], |r| {
+                Ok(ExportPresetRow {
+                    id: r.get(0)?,
+                    kind: r.get(1)?,
+                    name: r.get(2)?,
+                    position: r.get(3)?,
+                    body: r.get(4)?,
+                })
+            })
+            .map_err(db_err)?;
+        rows.collect::<Result<_, _>>().map_err(db_err)
+    }
+
+    pub fn save_export_preset(&self, p: &ExportPresetRow) -> CoreResult<()> {
+        self.conn
+            .execute(
+                "INSERT INTO export_preset(id, kind, name, position, body, updated_at) VALUES(?1, ?2, ?3, ?4, ?5, ?6)
+                 ON CONFLICT(id) DO UPDATE SET name = ?3, position = ?4, body = ?5, updated_at = ?6",
+                params![p.id, p.kind, p.name, p.position, p.body, now_millis()],
+            )
+            .map_err(db_err)?;
+        Ok(())
+    }
+
+    pub fn delete_export_preset(&self, id: &str) -> CoreResult<bool> {
+        Ok(self
+            .conn
+            .execute("DELETE FROM export_preset WHERE id = ?1", params![id])
+            .map_err(db_err)?
+            > 0)
+    }
+}
+
+#[cfg(test)]
+mod export_preset_tests {
+    use super::*;
+
+    #[test]
+    fn export_presets_roundtrip() {
+        let lib = Library::open_in_memory().unwrap();
+        let row = ExportPresetRow {
+            id: "u1".into(),
+            kind: "recipe".into(),
+            name: "Cliente".into(),
+            position: 0,
+            body: "{}".into(),
+        };
+        lib.save_export_preset(&row).unwrap();
+        lib.save_export_preset(&ExportPresetRow { name: "Cliente 2".into(), ..row.clone() })
+            .unwrap();
+        let all = lib.export_presets("recipe").unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].name, "Cliente 2");
+        assert!(lib.export_presets("plan").unwrap().is_empty());
+        assert!(lib.delete_export_preset("u1").unwrap());
+        assert!(lib.export_presets("recipe").unwrap().is_empty());
+    }
+}
+
 #[cfg(test)]
 mod preset_tests {
     use super::*;

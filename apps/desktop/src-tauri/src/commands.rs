@@ -713,3 +713,121 @@ mod tests {
         assert!(json.get("catalogSchemaVersion").is_some(), "camelCase para a interface");
     }
 }
+
+// ---------------------------------------------------------------- exportação (Fase 9)
+
+use momento_export_engine::presets::Plan as ExportPlan;
+use momento_export_engine::{Caps as ExportCaps, Format as ExportFormat, Recipe as ExportRecipe};
+use momento_project_management::export::{ExportEstimate, ExportProgress, ExportRequest};
+use momento_project_management::export_store::ExportStore;
+
+fn with_export_store<T>(
+    state: &AppState,
+    f: impl FnOnce(&ExportStore) -> momento_core_types::CoreResult<T>,
+) -> CmdResult<T> {
+    let lib = state.library();
+    f(&ExportStore { lib: &lib }).map_err(err)
+}
+
+/// O que cada formato permite (a interface só mostra opções que funcionam).
+#[tauri::command]
+pub async fn export_capabilities() -> CmdResult<Vec<ExportCaps>> {
+    Ok(ExportFormat::ALL.iter().map(|f| f.caps()).collect())
+}
+
+#[tauri::command]
+pub async fn export_recipes(state: State<'_, AppState>) -> CmdResult<Vec<ExportRecipe>> {
+    with_export_store(&state, |s| s.recipes())
+}
+
+#[tauri::command]
+pub async fn save_export_recipe(
+    state: State<'_, AppState>,
+    recipe: ExportRecipe,
+) -> CmdResult<ExportRecipe> {
+    with_export_store(&state, |s| s.save_recipe(&recipe))
+}
+
+#[tauri::command]
+pub async fn delete_export_preset(state: State<'_, AppState>, id: String) -> CmdResult<bool> {
+    with_export_store(&state, |s| s.delete(&id))
+}
+
+#[tauri::command]
+pub async fn export_plans(state: State<'_, AppState>) -> CmdResult<Vec<ExportPlan>> {
+    with_export_store(&state, |s| s.plans())
+}
+
+#[tauri::command]
+pub async fn save_export_plan(
+    state: State<'_, AppState>,
+    plan: ExportPlan,
+) -> CmdResult<ExportPlan> {
+    with_export_store(&state, |s| s.save_plan(&plan))
+}
+
+/// Valida um perfil ICC (personalizado/laboratório) e devolve a sua descrição.
+#[tauri::command]
+pub async fn inspect_icc_profile(path: String) -> CmdResult<String> {
+    let data = std::fs::read(&path).map_err(|e| err(momento_core_types::CoreError::Io(e)))?;
+    momento_color_management::inspect_icc(&data).map_err(err)
+}
+
+#[tauri::command]
+pub async fn estimate_export(
+    state: State<'_, AppState>,
+    request: ExportRequest,
+) -> CmdResult<ExportEstimate> {
+    let s = state.session().map_err(err)?;
+    tauri::async_runtime::spawn_blocking(move || s.estimate_export(&request))
+        .await
+        .map_err(|e| err(momento_core_types::CoreError::Other(e.to_string())))?
+        .map_err(err)
+}
+
+#[tauri::command]
+pub async fn start_export(state: State<'_, AppState>, request: ExportRequest) -> CmdResult<u64> {
+    state.session().and_then(|s| s.start_export(request)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn export_jobs(state: State<'_, AppState>) -> CmdResult<Vec<ExportProgress>> {
+    state.session().map(|s| s.export_jobs()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn pause_export(state: State<'_, AppState>, id: u64, paused: bool) -> CmdResult<bool> {
+    state.session().map(|s| s.pause_export(id, paused)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn cancel_export(state: State<'_, AppState>, id: u64) -> CmdResult<bool> {
+    state.session().map(|s| s.cancel_export(id)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn clear_finished_exports(state: State<'_, AppState>) -> CmdResult<()> {
+    state.session().map(|s| s.clear_finished_exports()).map_err(err)
+}
+
+/// Abre uma pasta de exportação no gestor de ficheiros do sistema.
+#[tauri::command]
+pub async fn reveal_folder(path: String) -> CmdResult<()> {
+    let p = std::path::PathBuf::from(&path);
+    if !p.is_dir() {
+        return Err(err(momento_core_types::CoreError::Other(format!(
+            "pasta inexistente: {path}"
+        ))));
+    }
+    #[cfg(target_os = "macos")]
+    let cmd = "open";
+    #[cfg(target_os = "windows")]
+    let cmd = "explorer";
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    let cmd = "xdg-open";
+    std::process::Command::new(cmd)
+        .arg(&p)
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| err(momento_core_types::CoreError::Io(e)))
+}

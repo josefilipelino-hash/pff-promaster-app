@@ -18,7 +18,8 @@ pub mod sky;
 pub mod source;
 
 pub use render::{
-    render, render_with_overlay, sample_for_white_balance, Quality, RenderOptions, Rendered,
+    render, render_linear, render_with_overlay, sample_for_white_balance, LinearImage, Quality,
+    RenderOptions, Rendered,
 };
 pub use settings::*;
 pub use source::Source;

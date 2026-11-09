@@ -47,6 +47,16 @@ pub fn output_size(
     (((w * s).round() as u32).max(1), ((h * s).round() as u32).max(1))
 }
 
+/// Tamanho nativo do resultado (recorte incluído, sem ampliar nem reduzir): a
+/// resolução em que a exportação revela a fotografia.
+pub fn native_size(src_w: usize, src_h: usize, g: &Geometry) -> (u32, u32) {
+    let (cw, ch) = if g.quarter_turns % 2 == 1 { (src_h, src_w) } else { (src_w, src_h) };
+    (
+        ((cw as f32 * g.crop.w.clamp(0.01, 1.0)).round() as u32).max(1),
+        ((ch as f32 * g.crop.h.clamp(0.01, 1.0)).round() as u32).max(1),
+    )
+}
+
 impl GeoMap {
     pub fn new(src_w: usize, src_h: usize, g: &Geometry, lens: &Lens, uncropped: bool) -> Self {
         let src_aspect = src_w as f32 / src_h as f32;

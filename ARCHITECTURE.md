@@ -576,25 +576,27 @@ D-024 a D-028.
 
 ---
 
-## 14. Motor de exportação **[definido]**
+## 14. Motor de exportação **[implementado na Fase 9 — D-057 a D-063]**
 
-- **Receita de exportação** = formato + profundidade + espaço de cor/perfil + intent +
-  dimensionamento + nitidez de saída + nome (modelo com tokens) + pasta + metadados (manter,
-  remover GPS, remover privados, copyright) + marca de água + política de conflitos.
-- **Lote de receitas** (“Exportar casamento”): cada fotografia é renderizada **uma vez** na
-  resolução máxima necessária em `f32`; cada receita deriva daí (redimensionar, converter,
-  codificar). Reduz o tempo total em lotes múltiplos.
-- **Pré-verificação:** estimativa de espaço necessário vs. disponível, conflitos de nomes,
-  originais em falta — antes de começar.
-- **Escrita atómica** (ficheiro temporário + `rename`), retoma por item (`export_item`),
-  relatório final com erros, avisos e ficheiros ignorados.
-- **Paralelismo** controlado pela fila (limite de memória: cada render de 45 MP em f32
-  RGBA ocupa ~720 MB; o executor limita renders simultâneos por memória disponível).
-- Codificadores: `jpeg-encoder`/mozjpeg (JPEG), `png`, `tiff` (8/16 bits, float),
-  `webp`/libwebp, `ravif` (AVIF, BSD), libjxl (JPEG XL, BSD), `exr`, DNG linear (escrita
-  própria sobre `tiff`, segundo a especificação DNG pública), ImageIO no macOS (HEIC),
-  `pdf-writer`/`krilla` (PDF), `gif`, `zip`. MP4 de slideshows via AVFoundation (macOS) ou
-  FFmpeg externo.
+- **Receita de exportação** (`momento-export-engine::Recipe`) = formato + profundidade +
+  qualidade/compressão + espaço de cor (ou ICC personalizado + intento) + dimensões + PPI +
+  nitidez de saída + metadados + marca de água + nome/subpasta/conflitos. `normalized()`
+  corrige combinações impossíveis e devolve as notas (mostradas na interface).
+- **Plano** = várias receitas numa só operação ("Exportar casamento"). Cada fotografia é
+  revelada **uma vez** a partir do original em resolução nativa (`render_linear`, Rec. 2020
+  linear f32, o mesmo pipeline do ecrã) e cada receita deriva daí: reamostragem Lanczos 3 em
+  luz linear → nitidez (luminância percetual) → marca de água → cor (`momento-color-management`)
+  → quantização → codificação → metadados.
+- **Pré-verificação:** estimativa por receita (bytes/píxel por formato e qualidade), espaço
+  livre no destino, receitas inválidas (ex.: ICC em falta) — antes de começar.
+- **Fila** própria (um trabalhador; cada render usa todos os núcleos): progresso, restantes,
+  bytes escritos, estimativa corrigida pelos ficheiros reais, espaço livre, tempo restante,
+  erros; pausa/retoma/cancelamento entre ficheiros; pausa automática sem espaço; escrita
+  atómica; os originais nunca são alvo (lista protegida, mesmo com "substituir").
+- Codificadores: `jpeg-encoder` (JPEG), `png`, `tiff` (TIFF/BigTIFF), libwebp (`webp`),
+  `rav1e` + `avif-serialize` (AVIF), `zune-jpegxl` (JPEG XL sem perdas), `openjp2` (JP2),
+  `exr`; PSD e PDF por escrita própria. HEIF/HEIC e DNG **não disponíveis** (ver
+  `EXPORT_FORMATS.md`).
 - **Nunca** se exporta para formatos RAW proprietários (CR3, NEF, ARW…).
 
 Ver `EXPORT_FORMATS.md`.
@@ -761,4 +763,10 @@ ficheiros a partir do frontend (caminhos sempre resolvidos e verificados no núc
 | D-054 | 2026-11-09 | Máscaras de IA com modelos MediaPipe **Selfie Multiclass** (fundo/cabelo/pele/rosto/roupa) e **Magic Touch** (objeto por clique), Apache-2.0, convertidos como os outros; bordas refinadas por *guided filter* guiado pela fotografia; guardadas como PNG em `<projeto>/masks/<id>.png` (calculadas uma vez); céu por heurística clássica | DeepLab (testado: grosseiro); modelos de matting com licenças pouco claras | Funciona offline e em CPU; "Sujeito" = pessoas (ou objeto ao centro sem pessoas) |
 | D-055 | 2026-11-09 | Retoque: manchas com **heal** (cópia corrigida pela razão de luz/cor das coroas à volta do destino e da origem) ou **clone**; remoção de objetos = traço de pincel preenchido por uma zona vizinha (origem automática pela textura/nível mais parecidos); nada de "inventar" conteúdo | Inpainting por difusão/PatchMatch; IA generativa | Simples e honesto: bom para objetos pequenos em fundos simples |
 | D-056 | 2026-11-09 | Retrato **subtil e local**: regiões da malha facial (oval, olhos, sobrancelhas, lábios, íris, faixa das olheiras) guardadas na receita; suavização por separação de frequências (atenua a banda média, mantém os poros), máscara de pele contraída para dentro (o contorno nunca muda); sem deformações | Liquify/remodelação automática; suavização por desfocagem total | Pedido do utilizador: não transformar pessoas nem alterar características |
-
+| D-057 | 2026-11-09 | Exportação a partir do **original em resolução nativa** com `render_linear` (o mesmo pipeline do ecrã, saída Rec. 2020 linear f32 sem quantização), uma revelação por fotografia para todas as receitas | Exportar a partir das previews; revelar uma vez por receita | Qualidade máxima e cor idêntica ao ecrã (testado: ±1 nível); várias receitas custam pouco mais do que uma |
+| D-058 | 2026-11-09 | Gestão de cor com **LittleCMS** (`lcms2`): perfis ICC v2 gerados para sRGB, Display P3, Adobe RGB, ProPhoto, Rec. 709 e Rec. 2020; conversão por matriz (+ Bradford para D50) nos espaços normalizados e LittleCMS para ICC personalizado/laboratório (percetual ou relativo + ponto negro); corte por componente fora da gama | Mapeamento de gama perceptual próprio; perfis v4 | v2 é lido por todos os laboratórios; a matriz foi verificada contra a LittleCMS com o próprio perfil embutido |
+| D-059 | 2026-11-09 | Reamostragem **Lanczos 3 em luz linear**, separável e paralela, com recorte por região (Preencher) | `image::imageops` | Médias corretas na redução (sem escurecer detalhes finos); 45 MP → 2048 px em 0,13 s (4 núcleos, medido) |
+| D-060 | 2026-11-09 | 8 bits com **ruído triangular de ±1 LSB** determinístico; 10/12/16 bits sem ruído | Arredondamento simples | Evita bandas em céus e fundos lisos; repetível (ficheiros idênticos em exportações iguais) |
+| D-061 | 2026-11-09 | **Metadados escritos por nós** (EXIF TIFF e XMP a partir do catálogo), nunca copiados do original: modos tudo / copyright / nada e "remover GPS" (por omissão) | Copiar o bloco EXIF do original | Garante que o GPS removido não fica escondido noutro bloco; lido por leitores independentes nos testes |
+| D-062 | 2026-11-09 | **JPEG XL só sem perdas** (zune-jpegxl, Rust) com o cabeçalho de cor reescrito por nós (primárias/branco/curva enumerados ou personalizados); AVIF com rav1e diretamente para sinalizar P3/Rec. 2020 por CICP | libjxl/libavif (C++/C, cmake no Windows e macOS) | Sem dependências C++ pesadas; ficheiros validados com libjxl, libavif e jxl-oxide; JPEG XL com perdas fica por fazer |
+| D-063 | 2026-11-09 | HEIF/HEIC e DNG **indisponíveis** e assinalados na interface com a razão | x265 (GPL); DNG "linear" a partir da imagem revelada | HEVC: licença e patentes; ImageIO no macOS fica para quando houver testes num Mac. DNG útil exige os dados do sensor e matrizes da câmara |

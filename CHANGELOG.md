@@ -5,6 +5,32 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [0.9.0] — 2026-11-09 — Fase 9: exportação
+
+### Adicionado
+- **Motor de exportação** a partir do original (RAW em resolução total) + receita, nunca de
+  previews: JPEG, JPEG XL (sem perdas), JPEG 2000, PNG, TIFF, BigTIFF, WebP, AVIF, OpenEXR,
+  PSD (achatado) e PDF; 8, 10, 12, 16 bits e 16/32 bits de vírgula flutuante conforme o
+  formato.
+- **Cor**: sRGB, Display P3, Adobe RGB, ProPhoto RGB, Rec. 709, Rec. 2020 e perfil ICC
+  personalizado / do laboratório (LittleCMS, intento percetual ou relativo), sempre com o
+  perfil embutido (ou sinalização nativa em JPEG XL, AVIF e EXR).
+- **Receitas**: qualidade, compressão, dimensões (lado longo/curto, largura, altura, caber,
+  preencher com recorte, megapíxeis; px/cm/in), PPI, nitidez de saída (ecrã, mate,
+  brilhante), metadados (tudo/copyright/nada, remover GPS), copyright, autor, contacto,
+  marca de água (texto ou imagem, 9 posições), nome (campos, prefixo, sufixo, sequência),
+  subpastas e conflitos (nunca sobrescreve originais).
+- 10 receitas incluídas (Alta Resolução, Galeria, Website, Email, Instagram 4:5, Instagram
+  Square, Impressão, Album, Arquivo TIFF; Arquivo DNG indisponível) e o plano **"Exportar
+  casamento"** (várias receitas numa só operação, cada uma na sua pasta); receitas e planos
+  do utilizador guardados na biblioteca.
+- **Fila de exportação**: progresso, fotografias restantes, tamanho estimado (corrigido
+  com os ficheiros reais), espaço livre, tempo restante, erros, pausa/retoma/cancelar,
+  pausa automática sem espaço, "Mostrar pasta". Atalho Mod + Shift + E.
+
+### Não incluído
+- HEIF/HEIC (sem codificador HEVC livre; ImageIO no macOS por testar) e DNG de arquivo.
+
 ## [0.8.0] — 2026-11-09 — Fase 8: edição localizada, retoque e retrato
 
 ### Adicionado

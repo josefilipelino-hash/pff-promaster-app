@@ -461,3 +461,41 @@ progress::-moz-progress-bar { background: var(--accent); }
 .component-params { width: 100%; }
 .color-swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border); }
 .brush-sliders { border-left: 2px solid var(--accent); padding-left: 6px; }
+
+/* ---------------------------------------------------------------- Exportação (Fase 9) */
+.modal.wide:has(.export-layout) { width: min(1080px, calc(100vw - 32px)); }
+.modal-body:has(.export-layout) { max-height: calc(100vh - 180px); overflow: hidden; display: flex; }
+.export-layout { display: grid; grid-template-columns: 290px 1fr; gap: 18px; min-height: 0; flex: 1; }
+.export-side { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; padding-right: 4px; }
+.export-side .field.compact, .export-editor .field.compact { padding: 0; }
+.export-scope { border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; display: flex; flex-direction: column; gap: 4px; }
+.export-scope legend { font-size: 12px; color: var(--text-muted); padding: 0 4px; }
+.export-recipes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.export-recipes li { display: flex; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: 8px; }
+.export-recipes li.active { border-color: var(--accent); }
+.export-recipe { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; background: none; border: 0; color: inherit; text-align: left; padding: 6px 8px; cursor: pointer; min-width: 0; }
+.export-recipe span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.export-notes { margin: 0; padding-left: 16px; }
+.export-editor { overflow-y: auto; padding-right: 6px; display: flex; flex-direction: column; gap: 6px; }
+.export-editor h4 { margin: 10px 0 2px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); }
+.export-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px 12px; align-items: end; }
+.export-grid .span2 { grid-column: span 2; }
+.export-grid .check, .export-editor > .check { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.export-editor input[type="color"] { height: 30px; padding: 2px; }
+.anchor-grid { display: grid; grid-template-columns: repeat(3, 22px); gap: 3px; }
+.anchor-grid button { width: 22px; height: 22px; border-radius: 4px; border: 1px solid var(--border); background: var(--bg); cursor: pointer; }
+.anchor-grid button.active { background: var(--accent); border-color: var(--accent); }
+.anchor-grid button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.export-summary { margin-right: auto; }
+.export-queue { right: 332px; max-height: 60vh; overflow-y: auto; }
+.export-job { display: flex; flex-direction: column; gap: 4px; padding: 6px 0; border-top: 1px solid var(--border); }
+.export-job:first-of-type { border-top: 0; }
+.export-job p { margin: 0; }
+.export-errors { margin: 0; padding-left: 16px; max-height: 120px; overflow-y: auto; }
+@media (max-width: 760px) {
+  .export-layout { grid-template-columns: 1fr; }
+  .export-queue { right: 16px; bottom: 120px; }
+}
+.export-layout .warn, .export-summary .warn, .export-queue .warn { color: var(--yellow); }
+.export-layout .grow, .export-job .grow { flex: 1; min-width: 0; }
+.export-side input.grow { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px; }

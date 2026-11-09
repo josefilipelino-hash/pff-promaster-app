@@ -94,11 +94,15 @@ céu, fundo, objeto) com somar/subtrair/intersetar, suavidade, fluxo, densidade 
 ajustes locais; corrigir, clonar, manchas, pó do sensor, remoção simples de objetos; retrato
 subtil (pele, olheiras, brilho, dentes, olhos).
 
-## Fase 9 — Exportação
+## Fase 9 — Exportação ✅ *(concluída 2026-11-09, ver PROJECT_STATUS.md)*
 
-Receitas e lotes múltiplos, presets de exportação, gestão de cor completa (soft proofing,
-gamut), marca de água, metadados e privacidade, impressão, redes sociais, arquivo
-TIFF/DNG.
+JPEG, JPEG XL (sem perdas), JPEG 2000, PNG, TIFF/BigTIFF, WebP, AVIF, OpenEXR, PSD e PDF;
+8–16 bits e vírgula flutuante; sRGB, Display P3, Adobe RGB, ProPhoto, Rec. 709/2020 e ICC
+personalizado/laboratório; dimensões, PPI, nitidez de saída, metadados (remover GPS),
+copyright, marca de água, nomes e subpastas; 10 receitas incluídas e planos
+multi-exportação; fila com progresso, tamanho, espaço e tempo restante.
+**Por fazer:** HEIF/HEIC (ImageIO no macOS, por testar num Mac), DNG de arquivo, JPEG XL
+com perdas, soft proofing, GPU.
 
 ## Fase 10 — Galerias
 

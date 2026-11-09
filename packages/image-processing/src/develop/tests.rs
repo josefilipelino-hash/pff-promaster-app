@@ -1,7 +1,7 @@
 //! Testes de renderização: cada ajuste tem o efeito esperado, medido em números, e a
 //! receita neutra reproduz o original.
 
-use super::color::{eotf, mul3, wb_matrix, REC2020_TO_SRGB};
+use super::color::{eotf, mul3, oetf, wb_matrix, REC2020_TO_SRGB};
 use super::*;
 use image::{Rgb, RgbImage};
 
@@ -706,4 +706,29 @@ fn black_white_mix_grading_and_lut() {
         ..Default::default()
     };
     assert_eq!(render_with(&unk).rgba, base.rgba);
+}
+
+/// A exportação usa o mesmo pipeline que o ecrã: o render linear, convertido para sRGB
+/// 8 bits, dá os mesmos bytes (±1) — com efeitos, LUT desligada, grão e vinheta.
+#[test]
+fn linear_render_matches_screen_render() {
+    let mut s = Settings::default();
+    s.light.exposure = 0.4;
+    s.light.contrast = 30.0;
+    s.color.saturation = 20.0;
+    s.effects.vignette = -30.0;
+    s.effects.grain = 20.0;
+    let o = opts(Quality::Final);
+    let r = render(&src(), &s, &o);
+    let l = super::render_linear(&src(), &s, &o);
+    assert_eq!((l.width, l.height), (r.width, r.height));
+    let mut worst = 0i32;
+    for (i, q) in l.px.iter().enumerate() {
+        let srgb = mul3(&REC2020_TO_SRGB, *q);
+        for (c, v) in srgb.iter().enumerate() {
+            let b = (oetf(v.clamp(0.0, 1.0)) * 255.0).round() as i32;
+            worst = worst.max((b - r.rgba[i * 4 + c] as i32).abs());
+        }
+    }
+    assert!(worst <= 1, "diferença máxima {worst}");
 }

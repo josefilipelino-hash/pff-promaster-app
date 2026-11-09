@@ -55,8 +55,13 @@ abaixo são requisitos de arquitetura, não opções.
 5a. **Fase 1:** a aplicação não faz nenhuma ligação de rede. As fotografias são lidas
    apenas para gerar miniaturas na pasta do projeto; os originais são abertos só para
    leitura.
-6. **Exportação:** opção para remover GPS e metadados privados; preset “Entrega sem
-   metadados privados”.
+6. **Exportação (Fase 9):** os metadados dos ficheiros exportados são **escritos de novo**
+   a partir do catálogo (nunca copiados do original), por isso o que se escolhe é o que
+   fica: "tudo" (câmara, data, autor, copyright), "só copyright e contacto" ou "nada".
+   **Remover localização (GPS)** está ligado por omissão em todas as receitas, exceto
+   "Arquivo TIFF" (cópia pessoal). Os dados faciais, pessoas, momentos e classificações
+   da IA **nunca** são escritos nos ficheiros (só a classificação por estrelas, no modo
+   "tudo"). A exportação é local: grava apenas na pasta escolhida, sem ligações de rede.
 7. **Credenciais** de publicação ficam no porta-chaves do sistema (Keychain no macOS),
    nunca no catálogo, em ficheiros de texto ou no código.
 8. **Repositório:** fotografias, modelos e credenciais nunca são versionados (garantido

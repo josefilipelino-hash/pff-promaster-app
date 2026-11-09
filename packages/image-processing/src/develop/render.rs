@@ -10,7 +10,7 @@
 //! 3. **Filtros espaciais** à resolução do render: textura, redução de ruído, nitidez.
 //! 4. **Saída**: vinheta, grão → sRGB 8 bits (RGBA) + histograma.
 
-use super::color::{eotf, luma, matmul, mul3, oetf, wb_matrix, Transfer, REC2020_TO_SRGB};
+use super::color::{eotf, luma, mul3, oetf, wb_matrix, Transfer, REC2020_TO_SRGB, SRGB_TO_REC2020};
 use super::curves::CurveLuts;
 use super::filters::{gaussian, min_filter, sample_plane};
 use super::geometry::{output_size, GeoMap};
@@ -534,6 +534,40 @@ pub fn render_with_overlay(
     o: &RenderOptions,
     overlay: Option<usize>,
 ) -> Rendered {
+    match render_impl(src, s, o, overlay, false) {
+        Output::Srgb(r) => *r,
+        Output::Linear(_) => unreachable!(),
+    }
+}
+
+/// Imagem final em **Rec. 2020 linear** (0–1, referida ao ecrã), sem quantização — para a
+/// exportação (alta profundidade e outros espaços de cor). Mesmo pipeline que o preview.
+pub struct LinearImage {
+    pub width: u32,
+    pub height: u32,
+    pub px: Vec<[f32; 3]>,
+}
+
+/// Render para exportação: mesma receita, sem quantização nem conversão para sRGB.
+pub fn render_linear(src: &Source, s: &Settings, o: &RenderOptions) -> LinearImage {
+    match render_impl(src, s, o, None, true) {
+        Output::Linear(l) => l,
+        Output::Srgb(_) => unreachable!(),
+    }
+}
+
+enum Output {
+    Srgb(Box<Rendered>),
+    Linear(LinearImage),
+}
+
+fn render_impl(
+    src: &Source,
+    s: &Settings,
+    o: &RenderOptions,
+    overlay: Option<usize>,
+    linear_out: bool,
+) -> Output {
     let (w, h) =
         output_size(src.width(), src.height(), &s.geometry, o.uncropped, o.max_width, o.max_height);
     let (w, h) = (w as usize, h as usize);
@@ -661,61 +695,73 @@ pub fn render_with_overlay(
             .map(|(i, d)| uv[i].map(|[u, v]| om.value(u, v, *d, ru, rv) * 0.6).unwrap_or(0.0))
             .collect()
     });
-    // Saída: vinheta, grão, sRGB 8 bits, histograma.
-    let to_srgb = matmul(&REC2020_TO_SRGB, &[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]);
+    // Saída: vinheta, grão (+ LUT) → Rec. 2020 linear; depois sRGB 8 bits e histograma.
     let e = &s.effects;
     let grain_px = (src.full_width.max(src.full_height) as f32 / w.max(h) as f32).max(1.0);
     let gsize = 1.0 + e.grain_size / 100.0 * 4.0;
+    let finish = |x: usize, y: usize| -> [f32; 3] {
+        let i = y * w + x;
+        let mut d = disp[i];
+        let (u, v) = ((x as f32 + 0.5) / w as f32, (y as f32 + 0.5) / h as f32);
+        if e.vignette != 0.0 {
+            let round = e.vignette_roundness / 100.0;
+            let ax = 1.0 + round.min(0.0) * -0.5;
+            let ay = 1.0 + round.max(0.0) * 0.5;
+            let (dx, dy) = ((u - 0.5) * 2.0 * ax, (v - 0.5) * 2.0 * ay);
+            let r = (dx * dx + dy * dy).sqrt() / std::f32::consts::SQRT_2;
+            let m0 = 0.15 + e.vignette_midpoint / 100.0 * 0.7;
+            let f = 0.05 + e.vignette_feather / 100.0 * 0.8;
+            let mask = smoothstep(m0 - f * 0.5, m0 + f * 0.5, r);
+            let k = e.vignette / 100.0 * mask;
+            d = if k < 0.0 { d.map(|c| c * (1.0 + k)) } else { d.map(|c| c + (1.0 - c) * k) };
+        }
+        if e.grain != 0.0 {
+            // Coordenadas na grelha da resolução total → grão com o mesmo tamanho a qualquer zoom.
+            let (gx, gy) = (x as f32 * grain_px / gsize, y as f32 * grain_px / gsize);
+            let mut n = value_noise(gx, gy, 7);
+            let rough = e.grain_roughness / 100.0;
+            n = n * (1.0 - rough * 0.5) + value_noise(gx * 2.3, gy * 2.3, 11) * rough * 0.5;
+            let l = luma(d);
+            let amp = e.grain / 100.0 * 0.22 * (0.3 + 0.7 * 4.0 * l * (1.0 - l));
+            d = d.map(|c| c + n * amp);
+        }
+        // Exato (sem tabela) na exportação: precisão para 16/32 bits.
+        let lin: [f32; 3] = if linear_out {
+            d.map(|c| eotf(c.clamp(0.0, 1.0)))
+        } else {
+            [tr.to_linear.get(d[0]), tr.to_linear.get(d[1]), tr.to_linear.get(d[2])]
+        };
+        match &p.lut {
+            Some((lut, amt)) => {
+                // LUT em sRGB codificado (0–1), como nos editores de vídeo.
+                let e = mul3(&REC2020_TO_SRGB, lin).map(|c| oetf(c.clamp(0.0, 1.0)));
+                let l = lut.apply(e);
+                let out: [f32; 3] =
+                    std::array::from_fn(|i| eotf((e[i] + (l[i] - e[i]) * amt).clamp(0.0, 1.0)));
+                mul3(&SRGB_TO_REC2020, out)
+            }
+            None => lin,
+        }
+    };
+    if linear_out {
+        let px: Vec<[f32; 3]> = (0..w * h)
+            .into_par_iter()
+            .map(|i| if valid[i] { finish(i % w, i / w) } else { [0.0; 3] })
+            .collect();
+        return Output::Linear(LinearImage { width: w as u32, height: h as u32, px });
+    }
     let mut rgba = vec![0u8; w * h * 4];
     let hist = rgba
         .par_chunks_mut(w * 4)
         .enumerate()
         .map(|(y, row)| {
             let mut hist = [[0u32; 256]; 3];
-            let v = (y as f32 + 0.5) / h as f32;
             for x in 0..w {
-                let i = y * w + x;
-                if !valid[i] {
+                if !valid[y * w + x] {
                     row[x * 4..x * 4 + 4].copy_from_slice(&[0, 0, 0, 255]);
                     continue;
                 }
-                let mut d = disp[i];
-                let u = (x as f32 + 0.5) / w as f32;
-                if e.vignette != 0.0 {
-                    let round = e.vignette_roundness / 100.0;
-                    let ax = 1.0 + round.min(0.0) * -0.5;
-                    let ay = 1.0 + round.max(0.0) * 0.5;
-                    let (dx, dy) = ((u - 0.5) * 2.0 * ax, (v - 0.5) * 2.0 * ay);
-                    let r = (dx * dx + dy * dy).sqrt() / std::f32::consts::SQRT_2;
-                    let m0 = 0.15 + e.vignette_midpoint / 100.0 * 0.7;
-                    let f = 0.05 + e.vignette_feather / 100.0 * 0.8;
-                    let mask = smoothstep(m0 - f * 0.5, m0 + f * 0.5, r);
-                    let k = e.vignette / 100.0 * mask;
-                    d = if k < 0.0 {
-                        d.map(|c| c * (1.0 + k))
-                    } else {
-                        d.map(|c| c + (1.0 - c) * k)
-                    };
-                }
-                if e.grain != 0.0 {
-                    // Coordenadas na grelha da resolução total → grão com o mesmo tamanho a qualquer zoom.
-                    let (gx, gy) = (x as f32 * grain_px / gsize, y as f32 * grain_px / gsize);
-                    let mut n = value_noise(gx, gy, 7);
-                    let rough = e.grain_roughness / 100.0;
-                    n = n * (1.0 - rough * 0.5) + value_noise(gx * 2.3, gy * 2.3, 11) * rough * 0.5;
-                    let l = luma(d);
-                    let amp = e.grain / 100.0 * 0.22 * (0.3 + 0.7 * 4.0 * l * (1.0 - l));
-                    d = d.map(|c| c + n * amp);
-                }
-                let lin = [tr.to_linear.get(d[0]), tr.to_linear.get(d[1]), tr.to_linear.get(d[2])];
-                let mut out = mul3(&to_srgb, lin);
-                if let Some((lut, amt)) = &p.lut {
-                    // LUT em sRGB codificado (0–1), como nos editores de vídeo.
-                    let e = out.map(|c| oetf(c.clamp(0.0, 1.0)));
-                    let l = lut.apply(e);
-                    out =
-                        std::array::from_fn(|i| eotf((e[i] + (l[i] - e[i]) * amt).clamp(0.0, 1.0)));
-                }
+                let out = mul3(&REC2020_TO_SRGB, finish(x, y));
                 for c in 0..3 {
                     let b = tr.encode_u8(out[c]);
                     row[x * 4 + c] = b;
@@ -745,7 +791,7 @@ pub fn render_with_overlay(
             }
         });
     }
-    Rendered { width: w as u32, height: h as u32, rgba, histogram: hist }
+    Output::Srgb(Box::new(Rendered { width: w as u32, height: h as u32, rgba, histogram: hist }))
 }
 
 /// Textura, redução de ruído (luminância e cor) e nitidez, à resolução do render.

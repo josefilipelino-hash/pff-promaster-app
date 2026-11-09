@@ -7,6 +7,7 @@ import { defaultAutoOptions } from "./logic/develop";
 import type {
   Preset,
   AutoEditProgress,
+  ExportProgress,
   AutoOptions,
   DevelopSettings,
   AssetMoment,
@@ -100,6 +101,10 @@ interface State {
   presets: Preset[];
   /** Diálogo "Aplicar preset" (seleção, momento, casamento). */
   presetDialog: boolean;
+  // Exportação (Fase 9)
+  exportDialog: boolean;
+  /** Trabalhos da fila de exportação (atualizados pelos eventos). */
+  exportJobs: ExportProgress[];
 }
 
 interface Actions {
@@ -136,6 +141,10 @@ interface Actions {
   setAutoDialog(o: boolean): void;
   reloadPresets(): Promise<void>;
   setPresetDialog(o: boolean): void;
+  setExportDialog(o: boolean): void;
+  /** Atualiza (ou junta) um trabalho da fila de exportação. */
+  upsertExportJob(p: ExportProgress): void;
+  setExportJobs(j: ExportProgress[]): void;
   /** Miniaturas/previews editadas mudaram: novas URLs e recarregar a lista. */
   bumpEdited(keys: number[]): void;
 }
@@ -217,6 +226,8 @@ export const useStore = create<State & Actions>((set, get) => ({
   autoDialog: false,
   presets: [],
   presetDialog: false,
+  exportDialog: false,
+  exportJobs: [],
 
 
 
@@ -252,6 +263,8 @@ export const useStore = create<State & Actions>((set, get) => ({
         clockOpen: false,
         autoProgress: null,
         autoDialog: false,
+        exportDialog: false,
+        exportJobs: [],
       });
       return;
     }
@@ -467,6 +480,20 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   setPresetDialog(o) {
     set({ presetDialog: o });
+  },
+
+  setExportDialog(o) {
+    set({ exportDialog: o });
+  },
+
+  upsertExportJob(p) {
+    const jobs = get().exportJobs;
+    const i = jobs.findIndex((j) => j.id === p.id);
+    set({ exportJobs: i < 0 ? [...jobs, p] : jobs.map((j) => (j.id === p.id ? p : j)) });
+  },
+
+  setExportJobs(j) {
+    set({ exportJobs: j });
   },
 
   bumpEdited(keys) {

@@ -9,3 +9,7 @@ publish.workspace = true
 authors.workspace = true
 
 [dependencies]
+momento-core-types.workspace = true
+lcms2.workspace = true
+rayon.workspace = true
+serde.workspace = true

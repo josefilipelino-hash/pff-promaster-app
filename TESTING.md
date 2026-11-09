@@ -69,6 +69,19 @@ plataforma, ecrã inicial, validação do formulário, grelha virtualizada com 3
 secções futuras desativadas, classificação por teclado e em seleção múltipla, filtro
 Favoritas + visualizador, reversão quando o núcleo recusa, paridade de traduções.
 
+## Fase 9 — exportação
+
+| Teste | O que verifica |
+|---|---|
+| `color-management` (4) | conversão por matriz = LittleCMS com o **perfil embutido** nos 6 espaços (gama e linear); branco e preto preservados; curvas ida e volta; ICC "do laboratório" pela LittleCMS igual ao interno; perfis não RGB recusados |
+| `develop::tests` (+1) | `render_linear` (exportação) dá os mesmos bytes que o ecrã (±1) com exposição, contraste, saturação, vinheta e grão |
+| `export-engine::quality_tests` (13) | cada formato lido por um **descodificador independente**: JPEG (PSNR > 38 dB a q92, ICC, EXIF lido pelo kamadak-exif, GPS removido, XMP), PNG 8/16 exatos (+ICC P3, PPI), TIFF e BigTIFF 8/16/32f × sem/LZW/ZIP exatos com ICC, WebP sem perdas exato e com perdas, JPEG XL sem perdas em 5 espaços (codificação de cor lida pelo jxl-oxide), JPEG 2000 (8 bits sem perdas exato; 12/16 bits com perdas), OpenEXR half/float com cromaticidades, PSD 8/16 sem/RLE, PDF (tabela xref válida, página pelo PPI), AVIF (caixas `colr` nclx e `pixi`); **gama larga**: P3 → ler com o perfil embutido → cores originais (fora de sRGB); dimensões/nitidez/marca de água; estimativa; HEIF/HEIC/DNG recusados com razão |
+| `export-engine` (8) | dimensões (lado longo/curto, caber, preencher 4:5, não ampliar, cm a 300 PPI, megapíxeis); Lanczos mantém cores lisas e a média; nitidez só nos contornos; marca de água no canto pedido; EXIF lido por leitor independente (GPS conforme a opção, modos); XMP escapado; nomes (campos, carateres proibidos, nomes reservados do Windows, subpastas sem `..`); conflitos (renomear, ignorar, substituir — **nunca um original**); 10 receitas e plano "Exportar casamento" |
+| `export_store` + `database` (+1) | receitas e planos do utilizador na biblioteca; incluídas protegidas |
+| `export_flow` | caminho real: plano "Exportar casamento" → 15 ficheiros em 5 pastas numa operação; estimativa vs. real; resolução total; Instagram 1080×1350; TIFF 16 bits; edição (+1 EV) exportada; GPS removido; segunda exportação renomeia; pausa (não avança) e retoma; cancelar; receita inválida → erro claro; **originais intactos**. RAW Canon 7D real: TIFF 16 bits **5184×3456 a partir do sensor** (não da preview), > 2000 níveis distintos, estimativa a 14 % do real |
+| `scripts/validate-exports.py` | 25 amostras de uma fotografia real lidas por **libjxl, libavif, OpenJPEG (C), libwebp, Pillow, tifffile, psd-tools, pypdf e OpenEXR**: dimensões, profundidade, perfil ICC certo, copyright presente, GPS ausente, PSNR contra a referência (sem perdas ≥ 107 dB; JPEG q92 45,6 dB; AVIF 43,7–46,5 dB; EXR 32 bits 121,8 dB) — 25/25 válidos. Encontrou e levou a corrigir: texto do EXR em Latin-1 e JPEG 2000 sem perdas a 12/16 bits (agora limitado a 8 bits) |
+| Interface (+3) | diálogo com plano de várias receitas, HEIC desativado, AVIF limita profundidades e espaços, exemplo de nome, marca de água por posição, destino e estimativa, pedido enviado; fila (restantes, tamanho, espaço, tempo, erros, pausa por falta de espaço, retomar, mostrar pasta); lógica de nomes igual ao núcleo |
+
 ## Fase 8 — edição localizada, retoque e retrato
 
 | Teste | O que verifica |

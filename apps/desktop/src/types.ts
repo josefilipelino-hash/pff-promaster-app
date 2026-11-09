@@ -682,3 +682,113 @@ export interface MatchOptions {
   color: boolean;
   look: boolean;
 }
+
+// ---------------------------------------------------------------- exportação (Fase 9)
+
+export type ExportFormat = "jpeg" | "jpegXl" | "jpeg2000" | "png" | "tiff" | "bigTiff" | "webp" | "avif" | "heif" | "heic" | "exr" | "dng" | "pdf" | "psd";
+export type ExportDepth = "8" | "10" | "12" | "16" | "16f" | "32f";
+export type ExportCompression = "none" | "fast" | "best" | "lzw" | "zip" | "piz" | "rle" | "lossless" | "lossy";
+export type ExportColorSpace = "srgb" | "displayP3" | "adobeRgb" | "proPhoto" | "rec709" | "rec2020" | "icc";
+export const EXPORT_SPACES: ExportColorSpace[] = ["srgb", "displayP3", "adobeRgb", "proPhoto", "rec709", "rec2020", "icc"];
+export type SizeMode = "original" | "longEdge" | "shortEdge" | "width" | "height" | "fit" | "fill" | "megapixels";
+export const SIZE_MODES: SizeMode[] = ["original", "longEdge", "shortEdge", "width", "height", "fit", "fill", "megapixels"];
+export type Anchor = "topLeft" | "top" | "topRight" | "left" | "center" | "right" | "bottomLeft" | "bottom" | "bottomRight";
+export const ANCHORS: Anchor[] = ["topLeft", "top", "topRight", "left", "center", "right", "bottomLeft", "bottom", "bottomRight"];
+
+export interface ExportCaps {
+  format: ExportFormat;
+  available: boolean;
+  /** Chave i18n da razão quando indisponível. */
+  reason: string | null;
+  extension: string;
+  depths: ExportDepth[];
+  compressions: ExportCompression[];
+  quality: boolean;
+  spaces: "icc" | "builtin" | "cicp";
+  metadata: boolean;
+  resolution: boolean;
+  linear: boolean;
+}
+
+export interface ExportRecipe {
+  id: string;
+  name: string;
+  format: ExportFormat;
+  depth: ExportDepth;
+  quality: number;
+  compression: ExportCompression;
+  color: ExportColorSpace;
+  iccPath: string;
+  intent: "perceptual" | "relativeColorimetric";
+  size: { mode: SizeMode; unit: "px" | "cm" | "in"; a: number; b: number; noEnlarge: boolean; ppi: number; matchOrientation: boolean };
+  sharpen: { target: "none" | "screen" | "matte" | "glossy"; amount: "low" | "standard" | "high" };
+  metadata: { mode: "all" | "copyright" | "none"; removeGps: boolean; copyright: string; creator: string; contact: string };
+  watermark: {
+    enabled: boolean;
+    kind: "text" | "image";
+    text: string;
+    imagePath: string;
+    fontPath: string;
+    color: string;
+    size: number;
+    opacity: number;
+    anchor: Anchor;
+    margin: number;
+  };
+  naming: { template: string; prefix: string; suffix: string; seqStart: number; seqDigits: number; subfolder: string; conflict: "rename" | "overwrite" | "skip" };
+}
+
+export interface ExportPlan {
+  id: string;
+  name: string;
+  recipes: ExportRecipe[];
+}
+
+export interface ExportRequest {
+  keys: number[];
+  recipes: ExportRecipe[];
+  destination: string;
+  name: string;
+  momentNames: Record<number, string>;
+}
+
+export interface ExportNote {
+  recipe: string;
+  code: string;
+}
+
+export interface ExportEstimate {
+  photos: number;
+  files: number;
+  bytes: number;
+  freeBytes: number | null;
+  enoughSpace: boolean;
+  perRecipe: { name: string; files: number; bytes: number }[];
+  notes: ExportNote[];
+  errors: ExportNote[];
+}
+
+export type ExportJobState = "queued" | "running" | "paused" | "done" | "cancelled" | "failed";
+
+export interface ExportProgress {
+  id: number;
+  name: string;
+  destination: string;
+  state: ExportJobState;
+  pausedReason: string | null;
+  photosTotal: number;
+  photosDone: number;
+  filesTotal: number;
+  filesDone: number;
+  filesFailed: number;
+  filesSkipped: number;
+  bytesWritten: number;
+  bytesEstimated: number;
+  freeBytes: number | null;
+  elapsedSeconds: number;
+  etaSeconds: number | null;
+  current: string | null;
+  errors: { file: string; message: string }[];
+  notes: ExportNote[];
+  folders: string[];
+}

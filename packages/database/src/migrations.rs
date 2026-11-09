@@ -333,6 +333,17 @@ pub const LIBRARY: &[&str] = &[
         updated_at INTEGER NOT NULL
     ) STRICT;
     "#,
+    // v3 — Fase 9: receitas e planos de exportação do utilizador.
+    r#"
+    CREATE TABLE export_preset (
+        id         TEXT PRIMARY KEY NOT NULL,
+        kind       TEXT NOT NULL CHECK (kind IN ('recipe', 'plan')),
+        name       TEXT NOT NULL,
+        position   INTEGER NOT NULL DEFAULT 0,
+        body       TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+    ) STRICT;
+    "#,
 ];
 
 pub fn user_version(conn: &Connection) -> CoreResult<u32> {

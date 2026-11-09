@@ -1,6 +1,6 @@
 [package]
 name = "momento-export-engine"
-description = "Receitas e lotes de exportação."
+description = "Motor de exportação: formatos, cor, dimensões, nitidez, metadados, marca de água e nomes."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,3 +9,29 @@ publish.workspace = true
 authors.workspace = true
 
 [dependencies]
+momento-core-types.workspace = true
+momento-color-management.workspace = true
+momento-image-processing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rayon.workspace = true
+tempfile.workspace = true
+image.workspace = true
+jpeg-encoder.workspace = true
+png.workspace = true
+tiff.workspace = true
+exr.workspace = true
+webp.workspace = true
+rav1e.workspace = true
+avif-serialize.workspace = true
+zune-jpegxl.workspace = true
+zune-core.workspace = true
+openjp2.workspace = true
+ab_glyph.workspace = true
+
+[dev-dependencies]
+kamadak-exif.workspace = true
+jxl-oxide.workspace = true
+jpeg2k.workspace = true
+lcms2.workspace = true
+momento-image-codecs.workspace = true

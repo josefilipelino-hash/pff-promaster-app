@@ -18,6 +18,7 @@ pub const EV_ANALYSIS: &str = "analysis-progress";
 pub const EV_EDITS: &str = "edits-changed";
 pub const EV_AUTO_EDIT: &str = "auto-edit-progress";
 pub const EV_AI_DENOISE: &str = "ai-denoise";
+pub const EV_EXPORT: &str = "export-progress";
 
 struct Emitter2 {
     app: AppHandle,
@@ -56,6 +57,9 @@ impl SessionEvents for Emitter2 {
     }
     fn ai_denoise(&self, p: &momento_project_management::auto_edit::AiDenoiseProgress) {
         let _ = self.app.emit(EV_AI_DENOISE, p);
+    }
+    fn export_progress(&self, p: &momento_project_management::export::ExportProgress) {
+        let _ = self.app.emit(EV_EXPORT, p);
     }
 }
 

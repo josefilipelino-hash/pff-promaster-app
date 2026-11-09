@@ -90,6 +90,8 @@ pub trait SessionEvents: Send + Sync {
     fn auto_edit(&self, _p: &crate::auto_edit::AutoEditProgress) {}
     /// AI Denoise de uma fotografia no editor.
     fn ai_denoise(&self, _p: &crate::auto_edit::AiDenoiseProgress) {}
+    /// Fila de exportação.
+    fn export_progress(&self, _p: &crate::export::ExportProgress) {}
 }
 
 /// Estado de edição + ajustes já interpretados (a interface trabalha com `settings`).
@@ -249,6 +251,8 @@ pub struct ProjectSession {
     /// Cálculos de AI Denoise em curso (para não repetir o mesmo em paralelo).
     pub(crate) ai_inflight: Mutex<std::collections::HashSet<crate::edit::AiKey>>,
     pub(crate) auto_job: Mutex<Option<crate::auto_edit::AutoEditJob>>,
+    /// Fila de exportação.
+    pub(crate) exports: crate::export::ExportQueue,
 }
 
 impl ProjectSession {
@@ -300,6 +304,7 @@ impl ProjectSession {
             ai_busy: std::sync::atomic::AtomicBool::new(false),
             ai_inflight: Mutex::new(std::collections::HashSet::new()),
             auto_job: Mutex::new(None),
+            exports: Default::default(),
         });
         if let Some(s) = unfinished {
             tracing::info!(sessao = s.id.0, "a retomar importação interrompida");
@@ -1001,6 +1006,8 @@ impl ProjectSession {
     /// Fecha o projeto: suspende a importação (retomada na próxima abertura) e para as
     /// miniaturas (as pendentes ficam registadas no catálogo).
     pub fn close(&self) {
+        // Exportação: para entre ficheiros (os ficheiros completos ficam; nunca meio escritos).
+        self.exports.cancel_all();
         // Edição automática: para (o que já foi editado fica; o resto não é tocado).
         self.cancel_auto_edit();
         self.wait_auto_edit();
