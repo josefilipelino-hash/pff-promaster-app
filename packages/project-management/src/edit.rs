@@ -250,7 +250,22 @@ impl EditService {
         quality: Quality,
         uncropped: bool,
     ) -> Vec<u8> {
-        let r = develop::render(
+        self.render_frame_overlay(src, s, max_w, max_h, quality, uncropped, None)
+    }
+
+    /// Render com a máscara `overlay` (índice em `s.masks`) a vermelho.
+    #[allow(clippy::too_many_arguments)]
+    pub fn render_frame_overlay(
+        &self,
+        src: &Source,
+        s: &Settings,
+        max_w: u32,
+        max_h: u32,
+        quality: Quality,
+        uncropped: bool,
+        overlay: Option<usize>,
+    ) -> Vec<u8> {
+        let r = develop::render_with_overlay(
             src,
             s,
             &RenderOptions {
@@ -259,6 +274,7 @@ impl EditService {
                 quality,
                 uncropped,
             },
+            overlay,
         );
         encode_frame(&r)
     }

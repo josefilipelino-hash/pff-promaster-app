@@ -122,6 +122,8 @@ por `scripts/prepare-models.py` (URLs e SHA-256 fixados) e incluídos no instala
 | MobileNetV3-small image embedder (`image_embedder`) | Google MediaPipe | Apache-2.0 | 4,2 MB | semelhança visual |
 | EfficientNet-Lite2 image classifier (`scene_classifier`) | Google MediaPipe | Apache-2.0 | 23,8 MB | cena/objetos (momentos) |
 | SFace (`face_identity`) | OpenCV Zoo (`face_recognition_sface_2021dec`) | Apache-2.0 | 37,8 MB | identidade facial (pessoas) |
+| Selfie multiclass 256 (`segment_multiclass`) | Google MediaPipe Image Segmenter | Apache-2.0 | 16,5 MB | máscaras de pessoa, cabelo, pele, rosto, roupa, fundo (Fase 8) |
+| Magic Touch (`segment_object`) | Google MediaPipe Interactive Segmenter | Apache-2.0 | 12,4 MB | máscara de objeto por clique (Fase 8) |
 | FFDNet a cores (`denoise_ffdnet`) | KAIR, Kai Zhang (`ffdnet_color_clip.pth`, release v1.0) | MIT | 3,3 MB | AI Denoise (Fase 6), opcional |
 
 O SFace é descarregado do objeto Git LFS oficial; se o LFS não estiver acessível, usa-se a

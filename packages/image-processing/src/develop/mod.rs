@@ -9,12 +9,17 @@ pub mod consistency;
 pub mod curves;
 pub mod filters;
 pub mod geometry;
+pub mod local;
 pub mod lut;
+pub mod portrait;
 pub mod render;
 pub mod settings;
+pub mod sky;
 pub mod source;
 
-pub use render::{render, sample_for_white_balance, Quality, RenderOptions, Rendered};
+pub use render::{
+    render, render_with_overlay, sample_for_white_balance, Quality, RenderOptions, Rendered,
+};
 pub use settings::*;
 pub use source::Source;
 
@@ -50,3 +55,6 @@ pub fn auto_straighten(src: &Source, s: &Settings) -> Option<f32> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod local_tests;

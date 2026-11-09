@@ -706,6 +706,8 @@ pub fn detect_dust(src: &Source) -> Vec<Spot> {
                 r: rr / long,
                 sx: best.0 / w as f32,
                 sy: best.1 / h as f32,
+                heal: true,
+                ..Default::default()
             }
         })
         .collect()

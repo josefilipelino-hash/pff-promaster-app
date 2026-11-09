@@ -441,3 +441,23 @@ progress::-moz-progress-bar { background: var(--accent); }
 
 /* Barra superior: em janelas estreitas passa a duas linhas em vez de cortar botões. */
 .toolbar { flex-wrap: wrap; row-gap: 6px; }
+
+/* Fase 8 — edição localizada */
+.tool-layer { position: absolute; inset: 0; touch-action: none; }
+.tool-layer.tool-brush, .tool-layer.tool-patch { cursor: crosshair; }
+.tool-layer.tool-point, .tool-layer.tool-spot { cursor: cell; }
+.tool-layer.tool-linear, .tool-layer.tool-radial { cursor: crosshair; }
+.kind-menu { position: relative; display: inline-block; }
+.kind-menu-list { position: absolute; z-index: 40; top: 100%; left: 0; margin-top: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 4px; display: flex; flex-direction: column; min-width: 180px; max-height: 320px; overflow-y: auto; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); }
+.kind-menu-item { background: none; border: 0; text-align: left; padding: 5px 10px; border-radius: 5px; cursor: pointer; color: var(--text); }
+.kind-menu-item:hover, .kind-menu-item:focus-visible { background: var(--surface-2); outline: none; }
+.mask-list, .component-list, .spot-list { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.mask-item { display: flex; align-items: center; gap: 6px; }
+.mask-item .side-item { flex: 1; text-align: left; }
+.mask-item.active .side-item { color: var(--accent); background: var(--surface-2); }
+.mask-detail { border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin-top: 6px; display: flex; flex-direction: column; gap: 4px; }
+.mask-name { flex: 1; min-width: 0; }
+.component-item { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.component-params { width: 100%; }
+.color-swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--border); }
+.brush-sliders { border-left: 2px solid var(--accent); padding-left: 6px; }

@@ -23,6 +23,7 @@ pub mod identity;
 mod mesh;
 mod models;
 pub mod scene;
+pub mod segment;
 mod tensor;
 
 /// Modelo otimizado e pronto a executar.

@@ -420,12 +420,117 @@ export interface DevelopSettings {
   lens: { distortion: number; caRed: number; caBlue: number; vignetting: number; vignettingMidpoint: number };
   retouch: {
     redEyes: { x: number; y: number; r: number }[];
-    spots: { x: number; y: number; r: number; sx: number; sy: number }[];
+    spots: Spot[];
+    patches: Patch[];
   };
   grading: { shadowsHue: number; shadowsSat: number; highlightsHue: number; highlightsSat: number; balance: number };
   bw: { enabled: boolean; mix: number[] };
   lut: { id: string; name: string; amount: number };
+  masks: LocalMask[];
+  portrait: Portrait;
 }
+
+// --- Edição localizada (Fase 8) — coordenadas normalizadas da fotografia orientada ----------
+
+export interface Spot {
+  x: number;
+  y: number;
+  /** Raio em unidades do lado maior. */
+  r: number;
+  sx: number;
+  sy: number;
+  heal: boolean;
+  feather: number;
+  opacity: number;
+}
+
+export interface BrushStroke {
+  points: [number, number][];
+  size: number;
+  feather: number;
+  flow: number;
+  erase: boolean;
+}
+
+export interface Patch {
+  stroke: BrushStroke;
+  dx: number;
+  dy: number;
+  heal: boolean;
+  opacity: number;
+}
+
+export type MaskOp = "add" | "subtract" | "intersect";
+
+export type MaskShape =
+  | { type: "brush"; strokes: BrushStroke[] }
+  | { type: "linear"; x0: number; y0: number; x1: number; y1: number }
+  | { type: "radial"; cx: number; cy: number; rx: number; ry: number; angle: number; feather: number }
+  | { type: "luminance"; min: number; max: number; smooth: number }
+  | { type: "color"; hue: number; range: number; minSat: number; smooth: number }
+  | { type: "raster"; kind: string; raster: string; feather: number };
+
+export interface MaskComponent {
+  op: MaskOp;
+  invert: boolean;
+  shape: MaskShape;
+}
+
+export interface LocalAdjust {
+  exposure: number;
+  contrast: number;
+  highlights: number;
+  shadows: number;
+  whites: number;
+  blacks: number;
+  temperature: number;
+  tint: number;
+  saturation: number;
+  texture: number;
+  clarity: number;
+  sharpness: number;
+  noise: number;
+}
+
+export interface LocalMask {
+  id: string;
+  name: string;
+  enabled: boolean;
+  invert: boolean;
+  density: number;
+  components: MaskComponent[];
+  adjust: LocalAdjust;
+}
+
+export interface FaceRegions {
+  oval: [number, number][];
+  leftEye: [number, number][];
+  rightEye: [number, number][];
+  leftBrow: [number, number][];
+  rightBrow: [number, number][];
+  lipsOuter: [number, number][];
+  lipsInner: [number, number][];
+  underLeft: [number, number][];
+  underRight: [number, number][];
+  leftIris: [number, number, number];
+  rightIris: [number, number, number];
+}
+
+export interface Portrait {
+  skin: number;
+  darkCircles: number;
+  shine: number;
+  teeth: number;
+  eyes: number;
+  faces: FaceRegions[];
+}
+
+/** Tipos de máscara que se podem criar. */
+export const MASK_KINDS = ["brush", "linear", "radial", "luminance", "color", "subject", "person", "face", "skin", "hair", "clothes", "sky", "background", "object"] as const;
+export type MaskKind = (typeof MASK_KINDS)[number];
+/** Máscaras calculadas (IA local ou céu). */
+export const RASTER_KINDS: MaskKind[] = ["subject", "person", "face", "skin", "hair", "clothes", "sky", "background", "object"];
+export const LOCAL_FIELDS: (keyof LocalAdjust)[] = ["exposure", "contrast", "highlights", "shadows", "whites", "blacks", "temperature", "tint", "saturation", "texture", "clarity", "sharpness", "noise"];
 
 export interface HistoryEntry {
   seq: number;
@@ -451,7 +556,7 @@ export interface EditView {
   settings: DevelopSettings;
 }
 
-export const SETTINGS_BLOCKS = ["light", "wb", "color", "hsl", "curve", "detail", "effects", "geometry", "lens", "retouch", "grading", "bw", "lut"] as const;
+export const SETTINGS_BLOCKS = ["light", "wb", "color", "hsl", "curve", "detail", "effects", "geometry", "lens", "retouch", "grading", "bw", "lut", "masks", "portrait"] as const;
 export type SettingsBlock = (typeof SETTINGS_BLOCKS)[number];
 
 // --- Edição automática (Fase 6) -------------------------------------------------------------

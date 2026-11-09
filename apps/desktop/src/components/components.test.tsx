@@ -1,7 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "../i18n";
-import type { PhotoRow, ProjectInfo } from "../types";
+import type { DevelopSettings, PhotoRow, ProjectInfo } from "../types";
 
 // --- Simulação do núcleo e das APIs Tauri ---------------------------------------------
 const apiMock = {
@@ -89,7 +89,15 @@ const apiMock = {
   measureConsistency: vi.fn(async () => 4),
   consistencyGroups: vi.fn(async () => ({ groups: lookGroups(), missing: 0 })),
   startSync: vi.fn(async (_r: number, keys: number[]) => keys.length),
+  createMaskRaster: vi.fn(async (_k: number, kind: string) => ({ raster: `r-${kind}`, kind, coverage: 0.4 })),
+  detectPortrait: vi.fn(async () => [faceRegions()]),
+  mapPoints: vi.fn(async (_k: number, _s: unknown, pts: [number, number][]) => pts),
+  suggestHealSource: vi.fn(async (_k: number, x: number, y: number) => [x + 0.1, y] as [number, number]),
 };
+function faceRegions() {
+  const sq = (x: number, y: number, d: number): [number, number][] => [[x, y], [x + d, y], [x + d, y + d], [x, y + d]];
+  return { oval: sq(0.4, 0.2, 0.2), leftEye: sq(0.45, 0.25, 0.02), rightEye: sq(0.52, 0.25, 0.02), leftBrow: [], rightBrow: [], lipsOuter: sq(0.47, 0.33, 0.06), lipsInner: sq(0.48, 0.34, 0.04), underLeft: sq(0.45, 0.28, 0.02), underRight: sq(0.52, 0.28, 0.02), leftIris: [0.46, 0.26, 0.005], rightIris: [0.53, 0.26, 0.005] };
+}
 function presetList() {
   return [
     { id: "builtin:natural-wedding", name: "Natural Wedding", group: "Cor", components: ["tone", "presence"], settings: defaultSettings(), builtin: true, description: "Natural" },
@@ -772,7 +780,7 @@ describe("edição (Fase 5)", () => {
     expect(screen.getByText("Olhos vermelhos: 1")).toBeTruthy();
     fireEvent.click(within(panel).getAllByRole("button", { name: "Remover" })[0]!);
     await act(async () => {});
-    expect(apiMock.commitEdit).toHaveBeenCalledWith(2, "retouch.redEye", expect.objectContaining({ retouch: { redEyes: [], spots: [] } }));
+    expect(apiMock.commitEdit).toHaveBeenCalledWith(2, "retouch.redEye", expect.objectContaining({ retouch: { redEyes: [], spots: [], patches: [] } }));
     // Vista dividida (Y): o "antes" tem o mesmo enquadramento, sem os ajustes.
     apiMock.renderEdit.mockClear();
     fireEvent.keyDown(window, { key: "y" });
@@ -901,6 +909,137 @@ describe("presets e consistência (Fase 7)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Medir agora" }));
     await act(async () => {});
     expect(apiMock.measureConsistency).toHaveBeenCalled();
+  });
+});
+
+describe("edição localizada (Fase 8)", () => {
+  async function openDevelop() {
+    vi.useRealTimers();
+    apiMock.listPhotos.mockResolvedValue(rows(3).map((r) => ({ ...r, flag: 0 })));
+    act(() => useStore.getState().setProject(project));
+    render(<App />);
+    await screen.findByText("Casamento Ana & Pedro");
+    await act(async () => {});
+    fireEvent.mouseDown(document.querySelector('[data-id="2"]')!);
+    fireEvent.keyDown(window, { key: "d" });
+    await act(async () => {});
+    await waitFor(() => expect(apiMock.renderEdit).toHaveBeenCalled());
+    const panel = screen.getByRole("complementary", { name: "Ajustes" });
+    fireEvent.click(within(panel).getByRole("button", { name: /Máscaras/ }));
+    return panel;
+  }
+  const lastCommit = () => apiMock.commitEdit.mock.calls.at(-1)! as [number, string, DevelopSettings];
+
+  it("máscara de IA (pessoa), sobreposição, ajuste local, gradiente a subtrair, eliminar", async () => {
+    const panel = await openDevelop();
+    fireEvent.click(within(panel).getByRole("button", { name: "+ Nova máscara…" }));
+    fireEvent.click(within(panel).getByRole("menuitem", { name: "Pessoa" }));
+    await act(async () => {});
+    expect(apiMock.createMaskRaster).toHaveBeenCalledWith(2, "person", null);
+    let [, label, st] = lastCommit();
+    expect(label).toBe("masks.add.person");
+    expect(st.masks[0]!.components[0]).toEqual({ op: "add", invert: false, shape: { type: "raster", kind: "person", raster: "r-person", feather: 0 } });
+    // A máscara selecionada aparece a vermelho no render (sobreposição).
+    await waitFor(() => expect(apiMock.renderEdit.mock.calls.some((c) => c[6] === 0)).toBe(true));
+    const detail = within(panel).getByRole("group", { name: "Máscara Pessoa" });
+    fireEvent.change(within(detail).getByRole("slider", { name: "Exposição" }), { target: { value: "0.7" } });
+    fireEvent.pointerUp(within(detail).getByRole("slider", { name: "Exposição" }), { target: { value: "0.7" } });
+    await act(async () => {});
+    [, label, st] = lastCommit();
+    expect(label).toBe("masks.exposure");
+    expect(st.masks[0]!.adjust.exposure).toBe(0.7);
+    // Subtrair um gradiente linear desenhado na imagem.
+    fireEvent.click(within(detail).getByRole("button", { name: "− Subtrair…" }));
+    fireEvent.click(within(detail).getByRole("menuitem", { name: "Gradiente linear" }));
+    await act(async () => {});
+    const layer = screen.getByRole("application", { name: "Gradiente linear: arraste" });
+    fireEvent.pointerDown(layer, { clientX: 0, clientY: 0, pointerId: 1 });
+    fireEvent.pointerMove(layer, { clientX: 0, clientY: 0, pointerId: 1 });
+    fireEvent.pointerUp(layer, { pointerId: 1 });
+    await act(async () => {});
+    expect(apiMock.mapPoints).toHaveBeenCalledWith(2, expect.anything(), expect.any(Array), true, false);
+    [, label, st] = lastCommit();
+    expect(label).toBe("masks.linear");
+    expect(st.masks[0]!.components[1]).toMatchObject({ op: "subtract", shape: { type: "linear" } });
+    expect(screen.queryByRole("application")).toBeNull();
+    // Inverter e densidade, e eliminar.
+    fireEvent.click(within(detail).getByRole("checkbox", { name: "Inverter a máscara" }));
+    await act(async () => {});
+    expect(lastCommit()[2].masks[0]!.invert).toBe(true);
+    fireEvent.click(within(panel).getByRole("button", { name: "Eliminar a máscara Pessoa" }));
+    await act(async () => {});
+    expect(lastCommit()[2].masks).toEqual([]);
+  });
+
+  it("pincel: pintar e apagar com tamanho, suavidade e fluxo", async () => {
+    const panel = await openDevelop();
+    fireEvent.click(within(panel).getByRole("button", { name: "+ Nova máscara…" }));
+    fireEvent.click(within(panel).getByRole("menuitem", { name: "Pincel" }));
+    await act(async () => {});
+    fireEvent.change(within(panel).getByRole("slider", { name: "Fluxo" }), { target: { value: "40" } });
+    const layer = screen.getByRole("application", { name: "Pincel: arraste para pintar" });
+    fireEvent.pointerDown(layer, { clientX: 1, clientY: 1, pointerId: 1 });
+    fireEvent.pointerMove(layer, { clientX: 2, clientY: 1, pointerId: 1 });
+    fireEvent.pointerMove(layer, { clientX: 3, clientY: 1, pointerId: 1 });
+    fireEvent.pointerUp(layer, { pointerId: 1 });
+    await act(async () => {});
+    const [, label, st] = lastCommit();
+    expect(label).toBe("masks.stroke");
+    const brush = st.masks[0]!.components[0]!.shape as { strokes: { points: unknown[]; flow: number; erase: boolean }[] };
+    expect(brush.strokes).toHaveLength(1);
+    expect(brush.strokes[0]!.points).toHaveLength(3);
+    expect(brush.strokes[0]!).toMatchObject({ flow: 40, erase: false });
+    fireEvent.click(within(panel).getByRole("button", { name: "Apagar" }));
+    const layer2 = screen.getByRole("application", { name: "Pincel: arraste para pintar" });
+    fireEvent.pointerDown(layer2, { clientX: 1, clientY: 1, pointerId: 1 });
+    fireEvent.pointerUp(layer2, { pointerId: 1 });
+    await act(async () => {});
+    const strokes = (lastCommit()[2].masks[0]!.components[0]!.shape as { strokes: { erase: boolean }[] }).strokes;
+    expect(strokes.map((x) => x.erase)).toEqual([false, true]);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("application")).toBeNull();
+  });
+
+  it("retoque (corrigir/clonar/remover) e retrato (detetar, ajustar, remover)", async () => {
+    const panel = await openDevelop();
+    fireEvent.click(within(panel).getByRole("button", { name: /Retoque/ }));
+    fireEvent.click(within(panel).getByRole("button", { name: "Corrigir" }));
+    fireEvent.click(screen.getByRole("application", { name: "Clique na mancha a remover" }), { clientX: 0, clientY: 0 });
+    await act(async () => {});
+    expect(apiMock.suggestHealSource).toHaveBeenCalled();
+    let [, label, st] = lastCommit();
+    expect(label).toBe("retouch.heal");
+    expect(st.retouch.spots[0]).toMatchObject({ heal: true, sx: 0.1, r: 0.03 });
+    fireEvent.change(within(panel).getByRole("combobox", { name: "Modo da mancha 1" }), { target: { value: "clone" } });
+    await act(async () => {});
+    expect(lastCommit()[2].retouch.spots[0]!.heal).toBe(false);
+    fireEvent.click(within(panel).getByRole("button", { name: "Remover a mancha 1" }));
+    await act(async () => {});
+    expect(lastCommit()[2].retouch.spots).toEqual([]);
+    // Remover objeto: traço → origem sugerida → patch.
+    fireEvent.click(within(panel).getByRole("button", { name: "Remover objeto" }));
+    const layer = screen.getByRole("application", { name: "Pinte sobre o objeto a remover" });
+    fireEvent.pointerDown(layer, { clientX: 0, clientY: 0, pointerId: 1 });
+    fireEvent.pointerUp(layer, { pointerId: 1 });
+    await act(async () => {});
+    [, label, st] = lastCommit();
+    expect(label).toBe("retouch.object");
+    expect(st.retouch.patches[0]).toMatchObject({ heal: true, dx: 0.1, dy: 0 });
+    // Retrato.
+    fireEvent.click(within(panel).getByRole("button", { name: /Retrato/ }));
+    fireEvent.click(within(panel).getByRole("button", { name: "Detetar rostos" }));
+    await act(async () => {});
+    expect(apiMock.detectPortrait).toHaveBeenCalledWith(2);
+    expect(lastCommit()[2].portrait.faces).toHaveLength(1);
+    expect(within(panel).getByText("1 rosto")).toBeTruthy();
+    const skin = within(panel).getByRole("slider", { name: "Suavizar pele" });
+    fireEvent.change(skin, { target: { value: "30" } });
+    fireEvent.pointerUp(skin, { target: { value: "30" } });
+    await act(async () => {});
+    expect(lastCommit()[2].portrait.skin).toBe(30);
+    fireEvent.click(within(panel).getByRole("button", { name: "Remover retrato" }));
+    await act(async () => {});
+    expect(lastCommit()[2].portrait).toEqual({ skin: 0, darkCircles: 0, shine: 0, teeth: 0, eyes: 0, faces: [] });
   });
 });
 

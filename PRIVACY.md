@@ -24,6 +24,11 @@ abaixo são requisitos de arquitetura, não opções.
    Caminhos de ficheiros podem aparecer em registos de erro locais. Ficam apenas no
    computador (macOS: `~/Library/Logs/pt.momentostudio.desktop/`; Windows:
    `%LOCALAPPDATA%\pt.momentostudio.desktop\logs\`).
+5f. **Fase 8 — máscaras de IA e retrato:** a segmentação (pessoa, cabelo, pele, rosto,
+   roupa, objeto) e a deteção dos pontos faciais correm neste computador. As máscaras ficam
+   como imagens em `<projeto>/masks/` e os contornos faciais do retrato na receita da
+   fotografia (catálogo e sidecar do projeto); nada é enviado para fora, e removê-los da
+   receita é sempre possível. Não são guardados na base de dados de pessoas.
 5e. **Fase 7 — presets e consistência:** os presets do utilizador ficam na biblioteca local
    da aplicação e as LUT importadas na pasta de dados da aplicação (copiadas para o projeto
    quando usadas). As características de luz (EV, dominante, flash) ficam no catálogo do

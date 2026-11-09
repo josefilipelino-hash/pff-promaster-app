@@ -288,7 +288,7 @@ pub struct RedEye {
 
 /// Remoção de mancha (pó do sensor): o círculo (x, y, r) é substituído pela zona (sx, sy),
 /// com transição suave. Mesmas coordenadas que [`RedEye`].
-#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Spot {
     pub x: f32,
@@ -296,6 +296,221 @@ pub struct Spot {
     pub r: f32,
     pub sx: f32,
     pub sy: f32,
+    /// Corrigir (heal): a zona copiada recebe a luz e a cor à volta do destino.
+    /// `false` = clonar tal e qual.
+    pub heal: bool,
+    /// Transição da borda, 0–100 % do raio.
+    pub feather: f32,
+    /// Opacidade, 0–100.
+    pub opacity: f32,
+}
+
+impl Default for Spot {
+    fn default() -> Self {
+        Spot {
+            x: 0.0,
+            y: 0.0,
+            r: 0.0,
+            sx: 0.0,
+            sy: 0.0,
+            heal: false,
+            feather: 45.0,
+            opacity: 100.0,
+        }
+    }
+}
+
+/// Remoção de objeto / clonagem com pincel: a zona pintada (traço) é substituída pela mesma
+/// forma deslocada (`dx`, `dy`, coordenadas normalizadas).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Patch {
+    pub stroke: BrushStroke,
+    pub dx: f32,
+    pub dy: f32,
+    pub heal: bool,
+    pub opacity: f32,
+}
+
+impl Default for Patch {
+    fn default() -> Self {
+        Patch { stroke: BrushStroke::default(), dx: 0.05, dy: 0.0, heal: true, opacity: 100.0 }
+    }
+}
+
+/// Traço de pincel (coordenadas normalizadas da fotografia orientada; `size` = raio em
+/// unidades do lado maior).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct BrushStroke {
+    pub points: Vec<[f32; 2]>,
+    pub size: f32,
+    /// 0–100 % do raio.
+    pub feather: f32,
+    /// 0–100: quanto cada passagem acrescenta.
+    pub flow: f32,
+    /// Apagar (pincel "menos").
+    pub erase: bool,
+}
+
+impl Default for BrushStroke {
+    fn default() -> Self {
+        BrushStroke { points: vec![], size: 0.02, feather: 50.0, flow: 100.0, erase: false }
+    }
+}
+
+/// Como uma parte da máscara se combina com as anteriores.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum MaskOp {
+    #[default]
+    Add,
+    Subtract,
+    Intersect,
+}
+
+/// Forma de uma parte da máscara.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum MaskShape {
+    Brush {
+        strokes: Vec<BrushStroke>,
+    },
+    /// 100 % do lado de (x0, y0), 0 % a partir de (x1, y1).
+    Linear {
+        x0: f32,
+        y0: f32,
+        x1: f32,
+        y1: f32,
+    },
+    /// Elipse (raios normalizados pelo lado maior), 100 % no interior.
+    Radial {
+        cx: f32,
+        cy: f32,
+        rx: f32,
+        ry: f32,
+        /// Graus.
+        angle: f32,
+        /// 0–100 %.
+        feather: f32,
+    },
+    /// Luminância (0–1, visualização) entre `min` e `max`.
+    Luminance {
+        min: f32,
+        max: f32,
+        /// Transição (0–1).
+        smooth: f32,
+    },
+    /// Cor: matiz (graus) ± intervalo, com saturação mínima.
+    Color {
+        hue: f32,
+        range: f32,
+        min_sat: f32,
+        smooth: f32,
+    },
+    /// Máscara calculada (IA local ou céu): imagem guardada no projeto (`masks/<raster>.png`).
+    Raster {
+        kind: String,
+        raster: String,
+        /// Desfocagem da borda, 0–100.
+        feather: f32,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct MaskComponent {
+    pub op: MaskOp,
+    pub invert: bool,
+    pub shape: MaskShape,
+}
+
+impl Default for MaskComponent {
+    fn default() -> Self {
+        MaskComponent {
+            op: MaskOp::Add,
+            invert: false,
+            shape: MaskShape::Brush { strokes: vec![] },
+        }
+    }
+}
+
+/// Ajustes dentro de uma máscara (−100…+100; exposição em EV).
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct LocalAdjust {
+    pub exposure: f32,
+    pub contrast: f32,
+    pub highlights: f32,
+    pub shadows: f32,
+    pub whites: f32,
+    pub blacks: f32,
+    pub temperature: f32,
+    pub tint: f32,
+    pub saturation: f32,
+    pub texture: f32,
+    pub clarity: f32,
+    pub sharpness: f32,
+    /// Redução de ruído local (0…100; negativo não tem efeito).
+    pub noise: f32,
+}
+
+/// Ajuste local: máscara (componentes) + ajustes.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct LocalMask {
+    pub id: String,
+    pub name: String,
+    pub enabled: bool,
+    pub invert: bool,
+    /// Densidade (opacidade da máscara), 0–100.
+    pub density: f32,
+    pub components: Vec<MaskComponent>,
+    pub adjust: LocalAdjust,
+}
+
+impl Default for LocalMask {
+    fn default() -> Self {
+        LocalMask {
+            id: String::new(),
+            name: String::new(),
+            enabled: true,
+            invert: false,
+            density: 100.0,
+            components: vec![],
+            adjust: LocalAdjust::default(),
+        }
+    }
+}
+
+/// Regiões de um rosto (pontos da malha facial, coordenadas normalizadas).
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct FaceRegions {
+    pub oval: Vec<[f32; 2]>,
+    pub left_eye: Vec<[f32; 2]>,
+    pub right_eye: Vec<[f32; 2]>,
+    pub left_brow: Vec<[f32; 2]>,
+    pub right_brow: Vec<[f32; 2]>,
+    pub lips_outer: Vec<[f32; 2]>,
+    pub lips_inner: Vec<[f32; 2]>,
+    pub under_left: Vec<[f32; 2]>,
+    pub under_right: Vec<[f32; 2]>,
+    /// Íris: x, y, raio (lado maior).
+    pub left_iris: [f32; 3],
+    pub right_iris: [f32; 3],
+}
+
+/// Retrato (subtil): quantidades 0–100, aplicadas só nas regiões de cada rosto.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Portrait {
+    pub skin: f32,
+    pub dark_circles: f32,
+    pub shine: f32,
+    pub teeth: f32,
+    pub eyes: f32,
+    pub faces: Vec<FaceRegions>,
 }
 
 /// Retoque básico (não destrutivo): olhos vermelhos e manchas do sensor.
@@ -304,6 +519,8 @@ pub struct Spot {
 pub struct Retouch {
     pub red_eyes: Vec<RedEye>,
     pub spots: Vec<Spot>,
+    /// Remoção de objetos / clonagem com pincel.
+    pub patches: Vec<Patch>,
 }
 
 /// Todos os ajustes de uma variante.
@@ -323,12 +540,15 @@ pub struct Settings {
     pub grading: Grading,
     pub bw: BlackWhite,
     pub lut: LutRef,
+    /// Ajustes locais (máscaras).
+    pub masks: Vec<LocalMask>,
+    pub portrait: Portrait,
 }
 
 /// Nomes dos blocos (copiar/colar escolhe blocos).
-pub const BLOCKS: [&str; 13] = [
+pub const BLOCKS: [&str; 15] = [
     "light", "wb", "color", "hsl", "curve", "detail", "effects", "geometry", "lens", "retouch",
-    "grading", "bw", "lut",
+    "grading", "bw", "lut", "masks", "portrait",
 ];
 
 fn put<T: Serialize + Default + PartialEq>(r: &mut EditRecipe, name: &str, v: &T) {
@@ -359,6 +579,8 @@ impl Settings {
             grading: get(r, "grading"),
             bw: get(r, "bw"),
             lut: get(r, "lut"),
+            masks: get(r, "masks"),
+            portrait: get(r, "portrait"),
         }
     }
 
@@ -378,6 +600,8 @@ impl Settings {
         put(&mut r, "grading", &self.grading);
         put(&mut r, "bw", &self.bw);
         put(&mut r, "lut", &self.lut);
+        put(&mut r, "masks", &self.masks);
+        put(&mut r, "portrait", &self.portrait);
         r
     }
 

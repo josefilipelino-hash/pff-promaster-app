@@ -312,7 +312,10 @@ fn red_eyes_are_detected_and_corrected() {
     let (dark, eyes2) = face_with_pupils([25, 20, 18]);
     assert!(detect_red_eyes(&dark, &eyes2).is_empty(), "pupilas escuras: nada");
     // Correção no render: a pupila deixa de ser vermelha; a pele à volta não muda.
-    let s = Settings { retouch: Retouch { red_eyes: found, spots: vec![] }, ..Default::default() };
+    let s = Settings {
+        retouch: Retouch { red_eyes: found, ..Default::default() },
+        ..Default::default()
+    };
     let before = render_rgb(&red, &Settings::default(), 800, Quality::Final);
     let after = render_rgb(&red, &s, 800, Quality::Final);
     let p = after.get_pixel(340, 260);
@@ -357,7 +360,7 @@ fn sensor_dust_is_found_on_smooth_areas_and_removed() {
     assert!(spots.len() <= 4, "falsos positivos: {spots:?}");
     // Remoção: o centro da mancha fica perto do fundo.
     let st = Settings {
-        retouch: Retouch { red_eyes: vec![], spots: spots.clone() },
+        retouch: Retouch { spots: spots.clone(), ..Default::default() },
         ..Default::default()
     };
     let out = render_rgb(&src, &st, w, Quality::Final);
@@ -424,7 +427,8 @@ fn retouch_block_roundtrip() {
     let s = Settings {
         retouch: Retouch {
             red_eyes: vec![RedEye { x: 0.4, y: 0.3, r: 0.01 }],
-            spots: vec![Spot { x: 0.1, y: 0.2, r: 0.005, sx: 0.12, sy: 0.2 }],
+            spots: vec![Spot { x: 0.1, y: 0.2, r: 0.005, sx: 0.12, sy: 0.2, ..Default::default() }],
+            ..Default::default()
         },
         ..Default::default()
     };

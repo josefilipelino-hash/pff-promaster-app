@@ -6,6 +6,9 @@ import { errorText, useStore } from "../../store";
 import { SETTINGS_BLOCKS, type AutoOptions, type AutoReport, type DevelopSettings, type EditView } from "../../types";
 import { AutoOptionsForm, AutoReportView } from "./AutoPanel";
 import { CreatePresetDialog, ImportReportDialog, importPresets, PresetList, PresetManager } from "../Presets";
+import { MasksPanel, PortraitPanel, RetouchTools, type BrushSettings, type Tool } from "./LocalPanels";
+import { longDist, newMask, unitScale } from "../../logic/develop";
+import { RASTER_KINDS, type MaskComponent, type MaskKind, type MaskOp } from "../../types";
 import { defaultMatchOptions } from "../../logic/develop";
 import type { MatchOptions, Preset, PresetImportResult } from "../../types";
 import { Modal } from "../Modal";
@@ -52,6 +55,7 @@ export function historyLabel(label: string, t: (k: string, o?: Record<string, un
     if (v !== k) return v;
   }
   if (label.startsWith("hsl.")) return t("develop.section.hsl");
+  for (const prefix of ["masks", "portrait", "retouch"]) if (label.startsWith(`${prefix}.`)) return t(`develop.history.${prefix}`);
   return label;
 }
 
@@ -59,10 +63,10 @@ export function historyLabel(label: string, t: (k: string, o?: Record<string, un
  * Renderização com qualidade dinâmica: um pedido de cada vez; durante a interação, render
  * rápido (resolução menor, sem nitidez/ruído); ao parar, render final à resolução do ecrã.
  */
-function useRenderer(key: number, settings: DevelopSettings, before: boolean, uncropped: boolean, box: { w: number; h: number }, onFrame: (f: Frame) => void, fail: (e: unknown) => void) {
+function useRenderer(key: number, settings: DevelopSettings, before: boolean, uncropped: boolean, box: { w: number; h: number }, onFrame: (f: Frame) => void, fail: (e: unknown) => void, overlay: number | null = null) {
   const st = useRef({ inFlight: false, dirty: false, lastChange: 0, timer: 0 as unknown as ReturnType<typeof setTimeout> | 0 });
-  const latest = useRef({ key, settings, before, uncropped, box });
-  latest.current = { key, settings, before, uncropped, box };
+  const latest = useRef({ key, settings, before, uncropped, box, overlay });
+  latest.current = { key, settings, before, uncropped, box, overlay };
   const run = useCallback(async () => {
     const r = st.current;
     if (r.inFlight) {
@@ -81,7 +85,7 @@ function useRenderer(key: number, settings: DevelopSettings, before: boolean, un
     const w = Math.max(64, Math.min(cap, Math.round(L.box.w * dpr * scale)));
     const h = Math.max(64, Math.min(cap, Math.round(L.box.h * dpr * scale)));
     try {
-      const buf = await api.renderEdit(L.key, L.before ? defaultSettings() : L.settings, w, h, quality, L.uncropped && !L.before);
+      const buf = await api.renderEdit(L.key, L.before ? defaultSettings() : L.settings, w, h, quality, L.uncropped && !L.before, L.before ? null : L.overlay);
       onFrame(parseFrame(buf));
     } catch (e) {
       fail(e);
@@ -209,6 +213,15 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
   const [presetDialog, setPresetDialog] = useState<"create" | "manage" | null>(null);
   const [importReport, setImportReport] = useState<PresetImportResult | null>(null);
   const hoverSeq = useRef(0);
+  // Edição localizada: máscara selecionada, ferramenta sobre a imagem, pincel.
+  const [selMask, setSelMask] = useState<number | null>(null);
+  const [tool, setTool] = useState<Tool>(null);
+  const [brush, setBrush] = useState<BrushSettings>({ size: 3, feather: 50, flow: 100 });
+  const [maskOverlay, setMaskOverlay] = useState(true);
+  const [localBusy, setLocalBusy] = useState(false);
+  /** Parte em criação: operação e máscara de destino (para pincel/gradientes/cliques). */
+  const pendingOp = useRef<{ op: MaskOp; mask: number }>({ op: "add", mask: 0 });
+  const [drag, setDrag] = useState<{ pts: [number, number][] } | null>(null);
   useEffect(() => {
     if (presets.length === 0) reloadPresets().catch(() => {});
   }, [presets.length, reloadPresets]);
@@ -247,6 +260,8 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
     setBefore(false);
     setReport(null);
     setAiProgress(null);
+    setSelMask(null);
+    setTool(null);
     api.editView(photoKey).then(applyView).catch(fail);
   }, [photoKey, applyView, fail]);
 
@@ -263,7 +278,11 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
       /* ImageData indisponível (testes) */
     }
   }, []);
-  const renderer = useRenderer(photoKey, preview ?? settings, before, cropMode, box, onFrame, fail);
+  const renderer = useRenderer(photoKey, preview ?? settings, before, cropMode, box, onFrame, fail, maskOverlay && selMask !== null && selMask < settings.masks.length ? selMask : null);
+  useEffect(() => {
+    if (view) renderer.request(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selMask, maskOverlay]);
   // A pré-visualização de um preset pede um render quando muda.
   useEffect(() => {
     if (view) renderer.request(false);
@@ -388,6 +407,157 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
       fail(e);
     }
   };
+  // ---- edição localizada
+  const [ru, rv] = unitScale(photo?.width ?? 3, photo?.height ?? 2);
+  /** Acrescenta uma parte à máscara (ou cria uma máscara nova). */
+  const addKind = async (kind: MaskKind, op: MaskOp, mask: number | null) => {
+    let idx = mask;
+    const pushComp = (c: MaskComponent) =>
+      set(`masks.add.${kind}`, (s) => {
+        if (idx === null || idx >= s.masks.length) {
+          s.masks.push({ ...newMask(t(`masks.kind.${kind}`)), components: [c] });
+          idx = s.masks.length - 1;
+        } else s.masks[idx]!.components.push(c);
+      }, true);
+    const target = () => (idx === null ? settings.masks.length : idx);
+    if (RASTER_KINDS.includes(kind) && kind !== "object") {
+      setLocalBusy(true);
+      try {
+        const r = await api.createMaskRaster(photoKey, kind, null);
+        if (r.coverage < 0.002) toast("info", t("masks.emptyResult", { kind: t(`masks.kind.${kind}`) }));
+        const i = target();
+        pushComp({ op, invert: false, shape: { type: "raster", kind, raster: r.raster, feather: 0 } });
+        setSelMask(i);
+      } catch (e) {
+        fail(e);
+      } finally {
+        setLocalBusy(false);
+      }
+      return;
+    }
+    if (kind === "luminance") {
+      const i = target();
+      pushComp({ op, invert: false, shape: { type: "luminance", min: 0.5, max: 1, smooth: 0.1 } });
+      return setSelMask(i);
+    }
+    // Pincel, gradientes, cor e objeto: a parte é criada na imagem.
+    if (idx === null) {
+      const m = newMask(t(`masks.kind.${kind}`));
+      set("masks.new", (s) => void s.masks.push(m), true);
+      idx = settings.masks.length;
+    }
+    setSelMask(idx);
+    pendingOp.current = { op, mask: idx };
+    if (kind === "brush") {
+      set("masks.brush", (s) => void s.masks[idx!]?.components.push({ op, invert: false, shape: { type: "brush", strokes: [] } }), true);
+      setTool({ kind: "brush", erase: false });
+    } else if (kind === "linear") setTool({ kind: "linear" });
+    else if (kind === "radial") setTool({ kind: "radial" });
+    else setTool({ kind: "point", purpose: kind === "color" ? "color" : "object" });
+    toast("info", t(`masks.hint.${kind === "object" || kind === "color" ? "point" : kind}`));
+  };
+
+  const viewUv = (e: { clientX: number; clientY: number }): [number, number] => {
+    const r = canvas.current!.getBoundingClientRect();
+    return [Math.min(1, Math.max(0, (e.clientX - r.left) / (r.width || 1))), Math.min(1, Math.max(0, (e.clientY - r.top) / (r.height || 1)))];
+  };
+  const toSource = async (pts: [number, number][]) => (await api.mapPoints(photoKey, settings, pts, true, false)).map((p, i) => p ?? pts[i]!);
+
+  const finishDrag = async (pts: [number, number][]) => {
+    setDrag(null);
+    if (!tool || pts.length === 0) return;
+    try {
+      const src = await toSource(pts);
+      const size = brush.size / 100;
+      const stroke = { points: src, size, feather: brush.feather, flow: brush.flow, erase: tool.kind === "brush" && tool.erase };
+      const { op, mask } = pendingOp.current;
+      if (tool.kind === "brush" && selMask !== null) {
+        set("masks.stroke", (s) => {
+          const m = s.masks[selMask];
+          if (!m) return;
+          let c = [...m.components].reverse().find((x) => x.shape.type === "brush");
+          if (!c) {
+            c = { op, invert: false, shape: { type: "brush", strokes: [] } };
+            m.components.push(c);
+          }
+          (c.shape as { strokes: typeof stroke[] }).strokes.push(stroke);
+        }, true);
+      } else if (tool.kind === "linear" && src.length >= 2) {
+        const [a, b] = [src[0]!, src[src.length - 1]!];
+        set("masks.linear", (s) => void s.masks[mask]?.components.push({ op, invert: false, shape: { type: "linear", x0: a[0], y0: a[1], x1: b[0], y1: b[1] } }), true);
+        setTool(null);
+      } else if (tool.kind === "radial" && pts.length >= 2) {
+        const c = pts[0]!;
+        const e = pts[pts.length - 1]!;
+        const [cs, xs, ys] = await toSource([c, [e[0], c[1]], [c[0], e[1]]]);
+        const rx = Math.max(0.005, longDist(cs!, xs!, ru, rv));
+        const ry = Math.max(0.005, longDist(cs!, ys!, ru, rv));
+        const angle = (Math.atan2((xs![1] - cs![1]) * rv, (xs![0] - cs![0]) * ru) * 180) / Math.PI;
+        set("masks.radial", (s) => void s.masks[mask]?.components.push({ op, invert: false, shape: { type: "radial", cx: cs![0], cy: cs![1], rx, ry, angle, feather: 50 } }), true);
+        setTool(null);
+      } else if (tool.kind === "patch") {
+        const cx = src.reduce((a, p) => a + p[0], 0) / src.length;
+        const cy = src.reduce((a, p) => a + p[1], 0) / src.length;
+        const rad = Math.max(...src.map((p) => longDist(p, [cx, cy], ru, rv))) + size;
+        const [sx, sy] = await api.suggestHealSource(photoKey, cx, cy, rad);
+        set("retouch.object", (s) => void s.retouch.patches.push({ stroke: { ...stroke, erase: false, flow: 100 }, dx: sx - cx, dy: sy - cy, heal: true, opacity: 100 }), true);
+      }
+    } catch (err) {
+      fail(err);
+    }
+  };
+
+  const clickTool = async (e: React.MouseEvent) => {
+    if (!tool || (tool.kind !== "point" && tool.kind !== "spot")) return;
+    const uv = viewUv(e);
+    try {
+      const [p] = await toSource([uv]);
+      if (tool.kind === "spot") {
+        const r = brush.size / 100;
+        const [sx, sy] = await api.suggestHealSource(photoKey, p![0], p![1], r);
+        set(tool.heal ? "retouch.heal" : "retouch.clone", (s) => void s.retouch.spots.push({ x: p![0], y: p![1], r, sx, sy, heal: tool.heal, feather: 45, opacity: 100 }), true);
+        return;
+      }
+      const { op, mask } = pendingOp.current;
+      if (tool.purpose === "color") {
+        // Cor amostrada no canvas (o que se vê).
+        const c = canvas.current!;
+        const ctx = c.getContext?.("2d");
+        const d = ctx?.getImageData(Math.floor(uv[0] * c.width), Math.floor(uv[1] * c.height), 1, 1).data ?? new Uint8ClampedArray([128, 128, 128, 255]);
+        const [r, g, b] = [d[0]! / 255, d[1]! / 255, d[2]! / 255];
+        const mx = Math.max(r, g, b);
+        const mn = Math.min(r, g, b);
+        const dd = mx - mn;
+        let hue = 0;
+        if (dd > 1e-6) hue = mx === r ? 60 * (((g - b) / dd + 6) % 6) : mx === g ? 60 * ((b - r) / dd + 2) : 60 * ((r - g) / dd + 4);
+        const sat = mx > 0 ? dd / mx : 0;
+        set("masks.color", (s) => void s.masks[mask]?.components.push({ op, invert: false, shape: { type: "color", hue, range: 20, minSat: Math.max(0.08, sat * 0.5), smooth: 0.3 } }), true);
+      } else {
+        setLocalBusy(true);
+        const r = await api.createMaskRaster(photoKey, "object", p!);
+        set("masks.object", (s) => void s.masks[mask]?.components.push({ op, invert: false, shape: { type: "raster", kind: "object", raster: r.raster, feather: 0 } }), true);
+      }
+      setTool(null);
+    } catch (err) {
+      fail(err);
+    } finally {
+      setLocalBusy(false);
+    }
+  };
+
+  const detectPortrait = async () => {
+    setLocalBusy(true);
+    try {
+      const faces = await api.detectPortrait(photoKey);
+      if (faces.length === 0) toast("info", t("portrait.noFaces"));
+      set("portrait.detect", (s) => void (s.portrait.faces = faces), true);
+    } catch (e) {
+      fail(e);
+    } finally {
+      setLocalBusy(false);
+    }
+  };
+
   const undo = () => api.undoEdit(photoKey).then(replace).catch(fail);
   const redo = () => api.redoEdit(photoKey).then(replace).catch(fail);
   const reset = () => api.resetEdit(photoKey).then(replace).catch(fail);
@@ -412,6 +582,8 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
       if (!m && !e.altKey && k === "r") return e.preventDefault(), setCropMode((c) => !c);
       if (!m && !e.altKey && k === "w") return e.preventDefault(), setWbPicking((w) => !w);
       if (!m && !e.altKey && k === "y") return e.preventDefault(), setSplit((v) => !v);
+      if (e.key === "Escape" && tool) return e.preventDefault(), e.stopPropagation(), setTool(null);
+      if (!m && !e.altKey && k === "o" && selMask !== null) return e.preventDefault(), setMaskOverlay((v) => !v);
       if (m && !e.shiftKey && k === "u") return e.preventDefault(), void runAuto(autoOptions);
     };
     window.addEventListener("keydown", onKey);
@@ -735,6 +907,52 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
         <div ref={stage} className={`develop-stage${wbPicking ? " picking" : ""}`}>
           <div className="develop-image" style={shown ? { width: shown.w, height: shown.h } : undefined} onClick={pickWb}>
             <canvas ref={canvas} aria-label={t("develop.image")} role="img" style={shown ? { width: shown.w, height: shown.h } : undefined} />
+            {tool && !before && !cropMode && shown && (
+              <svg
+                className={`tool-layer tool-${tool.kind}`}
+                role="application"
+                aria-label={t(`masks.toolLabel.${tool.kind}`)}
+                width={shown.w}
+                height={shown.h}
+                onClick={(e) => void clickTool(e)}
+                onPointerDown={(e) => {
+                  if (tool.kind === "point" || tool.kind === "spot") return;
+                  (e.target as Element).setPointerCapture?.(e.pointerId);
+                  setDrag({ pts: [viewUv(e)] });
+                }}
+                onPointerMove={(e) => {
+                  if (!drag) return;
+                  const p = viewUv(e);
+                  setDrag((d) => (d ? { pts: tool.kind === "brush" || tool.kind === "patch" ? [...d.pts, p] : [d.pts[0]!, p] } : d));
+                }}
+                onPointerUp={() => drag && void finishDrag(drag.pts)}
+              >
+                {drag && (tool.kind === "brush" || tool.kind === "patch") && (
+                  <polyline
+                    points={drag.pts.map((p) => `${p[0] * shown.w},${p[1] * shown.h}`).join(" ")}
+                    fill="none"
+                    stroke={tool.kind === "brush" && tool.erase ? "rgba(80,160,255,0.6)" : "rgba(255,90,90,0.6)"}
+                    strokeWidth={Math.max(2, (brush.size / 100) * Math.max(shown.w, shown.h) * 2)}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                )}
+                {drag && tool.kind === "linear" && drag.pts.length > 1 && (
+                  <line x1={drag.pts[0]![0] * shown.w} y1={drag.pts[0]![1] * shown.h} x2={drag.pts[1]![0] * shown.w} y2={drag.pts[1]![1] * shown.h} stroke="#fff" strokeWidth={2} />
+                )}
+                {drag && tool.kind === "radial" && drag.pts.length > 1 && (
+                  <ellipse
+                    cx={drag.pts[0]![0] * shown.w}
+                    cy={drag.pts[0]![1] * shown.h}
+                    rx={Math.abs(drag.pts[1]![0] - drag.pts[0]![0]) * shown.w}
+                    ry={Math.abs(drag.pts[1]![1] - drag.pts[0]![1]) * shown.h}
+                    fill="none"
+                    stroke="#fff"
+                    strokeWidth={2}
+                  />
+                )}
+              </svg>
+            )}
             {split && !before && !cropMode && (
               <div
                 className="split-layer"
@@ -808,6 +1026,26 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
         wbPicking={wbPicking}
         onPickWb={() => setWbPicking(!wbPicking)}
         geometry={geometry}
+        masks={
+          <MasksPanel
+            settings={settings}
+            set={set}
+            selected={selMask}
+            setSelected={(i) => {
+              setSelMask(i);
+              if (tool?.kind !== "spot" && tool?.kind !== "patch") setTool(null);
+            }}
+            tool={tool}
+            setTool={setTool}
+            brush={brush}
+            setBrush={setBrush}
+            onAdd={(k, op, m) => void addKind(k, op, m)}
+            overlay={maskOverlay}
+            setOverlay={setMaskOverlay}
+            busy={localBusy}
+          />
+        }
+        portrait={<PortraitPanel settings={settings} set={set} onDetect={() => void detectPortrait()} busy={localBusy} />}
         presets={
           <div className="dev-presets">
             <Slider label={t("presets.amount")} value={presetAmount} min={0} max={150} def={100} onChange={(v) => setPresetAmount(v)} />
@@ -841,34 +1079,7 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
           </div>
         }
         retouch={
-          <div className="dev-retouch">
-            {(["redEye", "dust"] as const).map((kind) => {
-              const n = kind === "redEye" ? settings.retouch.redEyes.length : settings.retouch.spots.length;
-              return (
-                <div key={kind} className="dev-row">
-                  <span className="small">{t(`develop.retouch.${kind}`, { count: n })}</span>
-                  <span className="spacer" />
-                  <button type="button" className="btn small" disabled={autoBusy} onClick={() => void retouchOnly(kind)}>
-                    {t("develop.retouch.detect")}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn small ghost"
-                    disabled={n === 0}
-                    onClick={() =>
-                      set(`retouch.${kind}`, (s) => {
-                        if (kind === "redEye") s.retouch.redEyes = [];
-                        else s.retouch.spots = [];
-                      }, true)
-                    }
-                  >
-                    {t("develop.retouch.remove")}
-                  </button>
-                </div>
-              );
-            })}
-            <p className="small muted dev-note">{t("develop.retouch.note")}</p>
-          </div>
+          <RetouchTools settings={settings} set={set} tool={tool} setTool={setTool} brush={brush} setBrush={setBrush} busy={autoBusy || localBusy} onDetect={(k) => void retouchOnly(k)} />
         }
       />
       {dialog === "copy" && (

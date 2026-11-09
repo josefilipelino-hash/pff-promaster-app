@@ -23,6 +23,7 @@ pub use momento_image_processing::develop::auto::{
     AiDenoise, AutoOptions, AutoReport, Intensity as AutoIntensity,
 };
 pub use momento_image_processing::develop::consistency::{MatchOptions, MatchReport};
+pub use momento_image_processing::develop::FaceRegions;
 pub use momento_image_processing::develop::{
     Quality as RenderQuality, Settings as DevelopSettings,
 };
@@ -284,6 +285,7 @@ impl ProjectSession {
         let unfinished = catalog.unfinished_import_session()?;
 
         momento_image_processing::develop::lut::add_search_path(paths.root.join("luts"));
+        momento_image_processing::develop::local::add_raster_path(paths.root.join("masks"));
         let session = Arc::new(ProjectSession {
             paths,
             catalog: Mutex::new(catalog),
@@ -379,6 +381,26 @@ impl ProjectSession {
         let (src, _) =
             self.source_for(&self.open_catalog()?, asset, settings, false, false, key)?;
         Ok(self.edits.render_frame(&src, settings, max_w, max_h, quality, uncropped))
+    }
+
+    /// Render com a máscara `overlay` (índice em `settings.masks`) mostrada a vermelho.
+    #[allow(clippy::too_many_arguments)]
+    pub fn render_edit_overlay(
+        self: &Arc<Self>,
+        key: i64,
+        settings: &DevelopSettings,
+        max_w: u32,
+        max_h: u32,
+        quality: RenderQuality,
+        uncropped: bool,
+        overlay: Option<usize>,
+    ) -> CoreResult<Vec<u8>> {
+        let (_, asset) = self.catalog().resolve_key(key)?;
+        let (src, _) =
+            self.source_for(&self.open_catalog()?, asset, settings, false, false, key)?;
+        Ok(self
+            .edits
+            .render_frame_overlay(&src, settings, max_w, max_h, quality, uncropped, overlay))
     }
 
     /// Ligação própria para operações longas (não bloqueia a do resto da interface).

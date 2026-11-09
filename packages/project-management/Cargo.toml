@@ -25,6 +25,7 @@ tracing.workspace = true
 momento-metadata.workspace = true
 momento-presets.workspace = true
 rayon.workspace = true
+blake3.workspace = true
 
 [dev-dependencies]
 momento-test-fixtures.workspace = true

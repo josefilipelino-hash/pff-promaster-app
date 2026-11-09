@@ -5,6 +5,21 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [0.8.0] — 2026-11-09 — Fase 8: edição localizada, retoque e retrato
+
+### Adicionado
+- **Máscaras** (não destrutivas): pincel (tamanho, suavidade, fluxo, apagar), gradiente
+  linear e radial, intervalo de luminância e de cor, e máscaras de IA local: sujeito,
+  pessoa, rosto, pele, cabelo, roupa, fundo, objeto (por clique); céu por heurística.
+  Somar, subtrair, intersetar, inverter (parte e máscara), densidade; ver a máscara a
+  vermelho (tecla O).
+- **Ajustes locais**: exposição, contraste, realces, sombras, brancos, pretos, temperatura,
+  matiz, saturação, textura, clareza, nitidez e ruído.
+- **Retoque**: corrigir (heal) e clonar por clique com origem automática, remoção simples
+  de objetos com pincel; pó do sensor e olhos vermelhos (Fase 6) no mesmo painel.
+- **Retrato** (subtil, por rosto): suavizar pele, olheiras, brilho, dentes, olhos.
+- Modelos `segment_multiclass` e `segment_object` (MediaPipe, Apache-2.0).
+
 ## [0.7.0] — 2026-11-09 — Fase 7: presets e consistência visual
 
 ### Adicionado

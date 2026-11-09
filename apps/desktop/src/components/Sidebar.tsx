@@ -9,7 +9,7 @@ import { SelectionPanel } from "./SelectionPanel";
 const COLLECTIONS: Collection[] = ["all", "picks", "rejects", "unrated"];
 
 /** Secções futuras: visíveis mas desativadas e identificadas com a fase em que chegam. */
-const UPCOMING: [string, number][] = [["export", 8]];
+const UPCOMING: [string, number][] = [["export", 9]];
 
 export function Sidebar({
   active,

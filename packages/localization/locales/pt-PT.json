@@ -242,7 +242,8 @@
     "crop": "Ferramenta de recorte (editor)",
     "copyPaste": "Copiar / colar definições (editor)",
     "split": "Antes/depois dividido (editor)",
-    "autoEdit": "Edição automática da fotografia (editor)"
+    "autoEdit": "Edição automática da fotografia (editor)",
+    "maskOverlay": "Mostrar/ocultar a máscara selecionada (editor)"
   },
   "error": {
     "io": "Erro ao ler ou escrever um ficheiro.",
@@ -581,7 +582,9 @@
       "presets": "Presets",
       "grading": "Tonalização e LUT",
       "bw": "Preto e branco",
-      "lut": "LUT"
+      "lut": "LUT",
+      "masks": "Máscaras (ajustes locais)",
+      "portrait": "Retrato"
     },
     "resetSection": "Repor esta secção",
     "panel": "Ajustes",
@@ -701,7 +704,10 @@
       "resetSection": "Repor {{section}}",
       "auto": "Edição automática",
       "preset": "Preset: {{name}}",
-      "sync": "Sincronizado com referência"
+      "sync": "Sincronizado com referência",
+      "masks": "Máscaras",
+      "portrait": "Retrato",
+      "retouch": "Retoque"
     },
     "copyNote": "A geometria (recorte, rotação) não é copiada por omissão.",
     "loading": "A carregar a fotografia…",
@@ -1027,5 +1033,116 @@
     "queueTitle": "Sincronizar com referência",
     "toastFinished_one": "Sincronização concluída: {{count}} fotografia.",
     "toastFinished_other": "Sincronização concluída: {{count}} fotografias."
+  },
+  "masks": {
+    "new": "+ Nova máscara…",
+    "computing": "A calcular a máscara…",
+    "enable": "Ativar {{name}}",
+    "delete": "Eliminar a máscara {{name}}",
+    "none": "Sem máscaras. Crie uma para ajustar só uma zona.",
+    "detail": "Máscara {{name}}",
+    "name": "Nome da máscara",
+    "showOverlay": "Mostrar (O)",
+    "opOf": "Operação de {{name}}",
+    "op": {
+      "add": "Somar",
+      "subtract": "Subtrair",
+      "intersect": "Intersetar"
+    },
+    "invert": "Inverter",
+    "deletePart": "Remover a parte {{name}}",
+    "add": "+ Somar…",
+    "subtract": "− Subtrair…",
+    "intersect": "∩ Intersetar…",
+    "paint": "Pintar",
+    "erase": "Apagar",
+    "invertMask": "Inverter a máscara",
+    "density": "Densidade",
+    "adjustments": "Ajustes na máscara",
+    "resetAdjust": "Repor os ajustes",
+    "brushSize": "Tamanho (%)",
+    "feather": "Suavidade",
+    "flow": "Fluxo",
+    "lumMin": "Luminância mínima",
+    "lumMax": "Luminância máxima",
+    "smooth": "Transição",
+    "colorRange": "Intervalo de cor (°)",
+    "kind": {
+      "brush": "Pincel",
+      "linear": "Gradiente linear",
+      "radial": "Gradiente radial",
+      "luminance": "Intervalo de luminância",
+      "color": "Intervalo de cor",
+      "subject": "Sujeito",
+      "person": "Pessoa",
+      "face": "Rosto",
+      "skin": "Pele",
+      "hair": "Cabelo",
+      "clothes": "Roupa",
+      "sky": "Céu",
+      "background": "Fundo",
+      "object": "Objeto"
+    },
+    "field": {
+      "exposure": "Exposição",
+      "contrast": "Contraste",
+      "highlights": "Realces",
+      "shadows": "Sombras",
+      "whites": "Brancos",
+      "blacks": "Pretos",
+      "temperature": "Temperatura",
+      "tint": "Matiz",
+      "saturation": "Saturação",
+      "texture": "Textura",
+      "clarity": "Clareza",
+      "sharpness": "Nitidez",
+      "noise": "Ruído"
+    },
+    "emptyResult": "Não foi encontrado(a) {{kind}} nesta fotografia (a máscara está vazia; pode pintar com o pincel).",
+    "hint": {
+      "brush": "Pinte na imagem. Esc termina.",
+      "linear": "Arraste na imagem: do lado com efeito para o lado sem efeito.",
+      "radial": "Arraste do centro para fora.",
+      "point": "Clique na imagem."
+    },
+    "toolLabel": {
+      "brush": "Pincel: arraste para pintar",
+      "linear": "Gradiente linear: arraste",
+      "radial": "Gradiente radial: arraste do centro",
+      "point": "Clique para escolher",
+      "spot": "Clique na mancha a remover",
+      "patch": "Pinte sobre o objeto a remover"
+    }
+  },
+  "retouch": {
+    "tools": "Ferramentas de retoque",
+    "heal": "Corrigir",
+    "clone": "Clonar",
+    "object": "Remover objeto",
+    "healHint": "Clique numa mancha: é substituída por uma zona vizinha com a luz e a cor ajustadas à volta",
+    "cloneHint": "Clique: copia uma zona vizinha tal e qual",
+    "objectHint": "Pinte sobre um objeto pequeno: é preenchido com uma zona vizinha",
+    "spotN": "Mancha {{n}}",
+    "modeOf": "Modo da mancha {{n}}",
+    "removeSpot": "Remover a mancha {{n}}",
+    "objectN": "Objeto {{n}}",
+    "removeObject": "Remover a correção do objeto {{n}}",
+    "note": "Tudo é guardado como receita e pode ser alterado ou removido. A remoção de objetos copia uma zona vizinha (não inventa conteúdo): funciona para objetos pequenos em fundos simples."
+  },
+  "portrait": {
+    "detect": "Detetar rostos",
+    "detecting": "A detetar…",
+    "faces_one": "{{count}} rosto",
+    "faces_other": "{{count}} rostos",
+    "remove": "Remover retrato",
+    "noFaces": "Não foram encontrados rostos.",
+    "field": {
+      "skin": "Suavizar pele",
+      "darkCircles": "Olheiras",
+      "shine": "Brilho da pele",
+      "teeth": "Branquear dentes",
+      "eyes": "Realçar olhos"
+    },
+    "note": "Subtil e só nas regiões de cada rosto: suaviza manchas mantendo os poros, não deforma nem altera características. Detete os rostos primeiro; cada controlo a 0 não muda nada."
   }
 }

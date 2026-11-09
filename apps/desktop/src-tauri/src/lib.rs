@@ -132,6 +132,10 @@ pub fn run() {
             commands::measure_consistency,
             commands::consistency_groups,
             commands::start_sync,
+            commands::create_mask_raster,
+            commands::detect_portrait,
+            commands::map_points,
+            commands::suggest_heal_source,
         ])
         .build(tauri::generate_context!())
         .expect("falha ao iniciar a aplicação");

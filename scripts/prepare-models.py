@@ -53,6 +53,20 @@ SOURCES = [
         "sha256": "94b6c84a5d6de20f932558de213b50e0338dcc06ab83d8d64b12128a476b4b83",
         "file": "scene_classifier.onnx",
     },
+    {
+        # Fase 8: máscaras de IA — fundo, cabelo, pele do corpo, pele do rosto, roupa, outros.
+        "id": "segment_multiclass",
+        "url": BASE + "image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite",
+        "sha256": "c6748b1253a99067ef71f7e26ca71096cd449baefa8f101900ea23016507e0e0",
+        "file": "segment_multiclass.onnx",
+    },
+    {
+        # Fase 8: objeto/pessoa sob um ponto clicado ("magic touch").
+        "id": "segment_object",
+        "url": BASE + "interactive_segmenter/magic_touch/float32/latest/magic_touch.tflite",
+        "sha256": "e24338a717c1b7ad8d159666677ef400babb7f33b8ad60c4d96db4ecf694cd25",
+        "file": "segment_object.onnx",
+    },
 ]
 
 # Fase 4: identidade facial SFace (OpenCV Zoo, Apache-2.0), já em ONNX. O SHA-256 é o do

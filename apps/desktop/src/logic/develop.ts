@@ -1,4 +1,4 @@
-import type { AutoOptions, DevelopSettings, MatchOptions, Preset } from "../types";
+import type { AutoOptions, DevelopSettings, LocalAdjust, LocalMask, MatchOptions, Preset } from "../types";
 
 /** Ajustes neutros (iguais aos do núcleo: uma receita vazia reproduz o original). */
 export function defaultSettings(): DevelopSettings {
@@ -12,10 +12,12 @@ export function defaultSettings(): DevelopSettings {
     effects: { texture: 0, clarity: 0, dehaze: 0, vignette: 0, vignetteMidpoint: 50, vignetteFeather: 50, vignetteRoundness: 0, grain: 0, grainSize: 25, grainRoughness: 50 },
     geometry: { crop: { x: 0, y: 0, w: 1, h: 1 }, quarterTurns: 0, flipHorizontal: false, straighten: 0, aspect: "original", vertical: 0, horizontal: 0 },
     lens: { distortion: 0, caRed: 0, caBlue: 0, vignetting: 0, vignettingMidpoint: 50 },
-    retouch: { redEyes: [], spots: [] },
+    retouch: { redEyes: [], spots: [], patches: [] },
     grading: { shadowsHue: 220, shadowsSat: 0, highlightsHue: 45, highlightsSat: 0, balance: 0 },
     bw: { enabled: false, mix: Array(8).fill(0) },
     lut: { id: "", name: "", amount: 100 },
+    masks: [],
+    portrait: { skin: 0, darkCircles: 0, shine: 0, teeth: 0, eyes: 0, faces: [] },
   };
 }
 
@@ -113,4 +115,25 @@ export function groupPresets(list: Preset[], noGroup: string): [string, Preset[]
     m.get(g)!.push(p);
   }
   return [...m.entries()];
+}
+
+export function emptyAdjust(): LocalAdjust {
+  return { exposure: 0, contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0, temperature: 0, tint: 0, saturation: 0, texture: 0, clarity: 0, sharpness: 0, noise: 0 };
+}
+
+let maskSeq = 0;
+export function newMask(name: string): LocalMask {
+  maskSeq += 1;
+  return { id: `m${Date.now().toString(36)}${maskSeq}`, name, enabled: true, invert: false, density: 100, components: [], adjust: emptyAdjust() };
+}
+
+/** Distância entre dois pontos normalizados, em unidades do lado maior (ru, rv = largura/altura ÷ lado maior). */
+export function longDist(a: [number, number], b: [number, number], ru: number, rv: number): number {
+  return Math.hypot((a[0] - b[0]) * ru, (a[1] - b[1]) * rv);
+}
+
+/** Escalas de u e v para unidades do lado maior. */
+export function unitScale(width: number, height: number): [number, number] {
+  const l = Math.max(width, height, 1);
+  return [width / l, height / l];
 }

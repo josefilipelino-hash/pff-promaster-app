@@ -16,6 +16,7 @@ pub mod cache;
 pub mod codecs;
 pub mod consistency;
 pub mod edit;
+pub mod local_edit;
 pub mod organize;
 pub mod paths;
 pub mod preset_store;

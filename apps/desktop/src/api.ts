@@ -1,6 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  FaceRegions,
   Criterion,
   LookGroup,
   MatchOptions,
@@ -96,8 +97,8 @@ export const api = {
     setCameraOffsets: (offsets: CameraOffset[]) => invoke<OrganizeSummary>("set_camera_offsets", { offsets }),
   // Edição não destrutiva (os originais nunca são escritos).
   editView: (key: number) => invoke<EditView>("edit_view", { key }),
-  renderEdit: (key: number, settings: DevelopSettings, maxWidth: number, maxHeight: number, quality: "fast" | "final", uncropped: boolean) =>
-    invoke<ArrayBuffer>("render_edit", { key, settings, maxWidth, maxHeight, quality, uncropped }),
+  renderEdit: (key: number, settings: DevelopSettings, maxWidth: number, maxHeight: number, quality: "fast" | "final", uncropped: boolean, overlay: number | null = null) =>
+    invoke<ArrayBuffer>("render_edit", { key, settings, maxWidth, maxHeight, quality, uncropped, overlay }),
   commitEdit: (key: number, label: string, settings: DevelopSettings) => invoke<EditView>("commit_edit", { key, label, settings }),
   undoEdit: (key: number) => invoke<EditView>("undo_edit", { key }),
   redoEdit: (key: number) => invoke<EditView>("redo_edit", { key }),
@@ -136,6 +137,13 @@ export const api = {
   measureConsistency: () => invoke<number>("measure_consistency"),
   consistencyGroups: (criterion: Criterion) => invoke<{ groups: LookGroup[]; missing: number }>("consistency_groups", { criterion }),
   startSync: (reference: number, keys: number[], options: MatchOptions) => invoke<number>("start_sync", { reference, keys, options }),
+  // Edição localizada.
+  createMaskRaster: (key: number, kind: string, point: [number, number] | null) =>
+    invoke<{ raster: string; kind: string; coverage: number }>("create_mask_raster", { key, kind, point }),
+  detectPortrait: (key: number) => invoke<FaceRegions[]>("detect_portrait", { key }),
+  mapPoints: (key: number, settings: DevelopSettings, points: [number, number][], toSource: boolean, uncropped: boolean) =>
+    invoke<([number, number] | null)[]>("map_points", { key, settings, points, toSource, uncropped }),
+  suggestHealSource: (key: number, x: number, y: number, r: number) => invoke<[number, number]>("suggest_heal_source", { key, x, y, r }),
 };
 
 export const events = {

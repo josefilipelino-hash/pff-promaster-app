@@ -1,75 +1,75 @@
 # Estado do projeto
 
-**Última atualização:** 2026-11-09 · **Fase atual:** 7 — Presets e consistência visual · **Estado:** ✅ concluída
-**Versão:** 0.7.0 · **Branch:** `main` · **Plataformas-alvo:** macOS (Apple Silicon e Intel) e Windows 10/11
+**Última atualização:** 2026-11-09 · **Fase atual:** 8 — Edição localizada, retoque e retrato · **Estado:** ✅ concluída
+**Versão:** 0.8.0 · **Branch:** `main` · **Plataformas-alvo:** macOS (Apple Silicon e Intel) e Windows 10/11
 
 ---
 
 ## Resumo
 
-Sistema de **presets** completo (biblioteca global, componentes, Amount, 13 internos, formato
-próprio com LUT, importação XMP aproximada com relatório, LUT `.cube`) e **consistência
-visual**: grupos por luz semelhante, iluminação, câmara, cenário, horário, balanço de brancos
-e flash/natural, e **sincronização inteligente** com uma fotografia de referência — cada
-fotografia recebe o aspeto da referência e é ajustada **medindo o resultado** (exposição,
-balanço, pele, contraste, cor), em vez de copiar os mesmos valores. Tudo não destrutivo.
+Edição **localizada e não destrutiva**: máscaras (pincel, gradientes, intervalos de
+luminância/cor e máscaras de IA local — sujeito, pessoa, rosto, pele, cabelo, roupa, fundo,
+objeto — e céu) combinadas por somar/subtrair/intersetar, com 13 ajustes locais; retoque
+(corrigir, clonar, remoção simples de objetos, pó do sensor, olhos vermelhos) e retrato
+subtil por rosto (pele, olheiras, brilho, dentes, olhos). Tudo fica na receita e pode ser
+alterado ou removido a qualquer momento; os originais nunca são escritos.
 
 ## Funcional (verificado)
 
 | Funcionalidade | Verificação |
 |---|---|
-| Criar preset (componentes escolhidos), guardar, renomear, organizar (grupos e ordem), duplicar (incl. internos), eliminar (com confirmação; internos protegidos) | Testes do armazenamento + interface + aplicação real |
-| Importar/exportar `.momentopreset` (com as LUT), importar XMP e `.cube` | Testes (ida e volta noutra biblioteca; LUT log e `.lrtemplate` recusados) |
-| Pré-visualizar ao passar o rato; aplicar a uma fotografia, seleção, momento, casamento completo | Interface + teste de integração (6 fotografias) + aplicação real ("Preset: Fine Art" no histórico) |
-| Amount 0–150 % | Testes (0 = nada, 50 = a meio, 150 = exagero; curvas e LUT incluídas) |
-| 13 presets internos com os nomes pedidos | Testes (todos diferentes; mantêm exposição e balanço; P&B só nos P&B) + folha de contactos numa fotografia real |
-| Tonalização, P&B com mistura por cor, LUT `.cube` 1D/3D | Testes de render |
-| XMP: interpretação aproximada com relatório (interpretado/ignorado e porquê) | Teste com um XMP do Lightroom; ver `docs/COMPATIBILIDADE-PRESETS.md` |
-| Agrupamento: luz semelhante, iluminação (EV), câmara, cenário (momento), horário, balanço, flash/natural | Testes (7 critérios) + integração (exterior vs. interior quente separados) + aplicação real |
-| Referência + sincronização (exposição, balanço, pele, contraste, cor, aspeto), em fila com progresso/pausa/cancelar | Teste: fotografia 1,3 EV mais escura com tungsténio fica igual à referência e **copiar os valores não chegava**; aplicação real com retratos em sombra fria e tungsténio |
-| "Sincronizar" do editor: inteligente ou copiar valores | Interface |
-| Originais intactos | Teste de integração (hash) |
+| Pincel (tamanho, suavidade, fluxo, apagar), gradiente linear e radial | Testes (fluxo acumula, apagar, borda suave) + interface |
+| Intervalo de luminância e de cor | Testes (cinzento não entra na cor) + interface (cor amostrada no clique) |
+| Sujeito, pessoa, rosto, pele, cabelo, roupa, fundo, objeto (clique) | Teste com retrato real (coberturas coerentes; sujeito = pessoa; objeto = pessoa clicada) + aplicação real (máscara "Pessoa" com bordas limpas) |
+| Céu (heurística) | Testes; RAW Canon 7D com céu nublado: 38 % (árvore e edifício fora); interior: 0 % |
+| Somar, subtrair, intersetar, inverter (parte e máscara), densidade, suavidade | Testes + interface |
+| 13 ajustes locais (exposição … ruído) | Testes de render (só dentro da máscara) + aplicação real (+1 EV na pessoa, fundo igual) |
+| Máscaras acompanham recorte/endireitar; ver a máscara a vermelho (O) sem mexer no histograma | Testes |
+| Corrigir (heal) e clonar com origem automática, remoção de objetos, pó do sensor, olhos vermelhos | Testes (heal iguala o fundo onde o clone traria o escuro; objeto removido) + interface |
+| Retrato: pele (separação de frequências, mantém poros), olheiras, brilho, dentes, olhos | Testes (contorno e fora do rosto iguais; 0 = original) + retrato real (`examples/portrait_eval`) + aplicação real |
+| Tudo removível/alterável; originais intactos | Testes (remover = render idêntico ao anterior; hash dos originais) |
 
 ## Desempenho medido (Linux x86_64, 4 núcleos, release)
 
 | Operação | Resultado |
 |---|---|
-| Aplicar um preset a 6 fotografias (gravação) | instantâneo (miniaturas editadas em segundo plano) |
-| Medir a luz de uma fotografia (miniatura) | ≈ 10–20 ms |
-| Sincronizar uma fotografia com a referência (JPEG 1–2 MP) | ≈ 1–2 s (inclui carregar a fonte e ~10 renders de 384 px) |
+| Máscara de IA (pessoa/cabelo/…; segmentação + refinamento 1024 px) | ≈ 0,5–1 s, uma vez (fica guardada) |
+| Máscara de objeto por clique | ≈ 1 s |
+| Deteção de rostos para o retrato | ≈ 0,3–0,6 s |
+| Render com várias máscaras | +10–30 % por máscara com ajustes espaciais; as restantes quase sem custo |
 
-Num RAW soma-se a revelação linear (≈ 1 s). Mac/Windows: **não medido**.
+Mac/Windows: **não medido**.
 
 ## Não funcional / limitações
 
-- **XMP:** só importação e **aproximada** (motores diferentes); não exportamos XMP; perfis de
-  câmara, máscaras, Kelvin absolutos, meios-tons do color grading e perfis de objetiva são
-  ignorados (o relatório diz quais). `.lrtemplate` não suportado.
-- **LUT:** só LUT criativas sRGB (domínio 0–1); LUT log/HDR recusadas.
-- **Tons de pele na sincronização:** precisam dos rostos da análise; ajustam o HSL laranja e
-  vermelho (também afetam outros objetos dessas cores, de forma limitada a ±20/±25).
-- **Agrupamento por iluminação:** usa o EV do EXIF; fotografias sem EXIF ficam em "Sem dados
-  de exposição". O flash vem do EXIF no início do ficheiro (CR3/RAF podem ficar "desconhecido").
-  A dominante de cor é medida na miniatura **depois** do balanço da câmara (dominante residual).
-- **Cenário** = momento (Fase 4); sem momentos atribuídos fica "Por classificar".
-- Ainda: saída sRGB; sem máscaras; macOS/Windows não executados.
+- **Máscaras de IA:** o modelo multiclasse trabalha a 256 px (bordas refinadas pela
+  fotografia); em grupos grandes, pessoas pequenas podem ficar de fora (corrigir com pincel).
+  "Sujeito" = pessoas; sem pessoas, o objeto ao centro.
+- **Céu:** heurística (sem modelo): falha em céus noturnos, muito escuros, ou que não tocam
+  no topo; nesses casos fica vazio e pode-se pintar.
+- **Remoção de objetos:** copia uma zona vizinha (não gera conteúdo novo): só objetos
+  pequenos em fundos simples.
+- **Edição das formas já desenhadas:** gradientes e traços não têm pegas para mover depois
+  de criados (apaga-se a parte e desenha-se de novo); a origem de cada mancha é automática.
+- **Retrato:** precisa dos modelos de rostos; perfis e rostos muito pequenos podem não ser
+  detetados. Sem deformações (por desenho).
+- Ainda: saída sRGB; macOS/Windows não executados.
 
 ## Arquitetura
 
-Decisões D-046 a D-051 em `ARCHITECTURE.md`. Novos módulos: `momento-presets` (componentes,
-Amount, internos, ficheiro, XMP), `develop::lut`, `develop::consistency`,
-`project-management::{consistency, preset_store}`; fila de fundo generalizada (auto/sync).
-Catálogo v7 (`look_feature`), biblioteca v2 (`preset`), EXIF `Flash`. Nova permissão
-`dialog:allow-save` (exportar presets).
+Decisões D-052 a D-056. Novos módulos: `develop::{local, portrait, sky}`,
+`face-analysis::segment`, `project-management::local_edit`; blocos de receita `masks` e
+`portrait`, `retouch.patches`, heal nas manchas. Modelos novos: `segment_multiclass` e
+`segment_object` (MediaPipe, Apache-2.0).
 
 ## Dependências novas
 
-Nenhuma biblioteca externa nova (o `blake3` já existia no projeto).
+Nenhuma biblioteca nova (blake3 já existia). Dois modelos novos (ver `LICENSES.md`).
 
 ## Comandos exatos
 
 ```bash
-pnpm install
+.venv-models/bin/python scripts/prepare-models.py --only segment_multiclass segment_object
 ```
 
 ```bash
@@ -80,29 +80,32 @@ pnpm dev
 ./scripts/check.sh
 ```
 
-Ver os presets internos numa fotografia tua:
+Avaliar o retrato numa fotografia tua (nada é escrito no original):
 
 ```bash
-cargo run --release -p momento-presets --example preset_sheet -- foto.jpg folha.jpg
+cargo run --release -p momento-project-management --example portrait_eval -- foto.jpg rosto.jpg 35 40 40 40 30
 ```
 
 ## Testes realizados (2026-11-09)
 
-| Verificação | Resultado |
+| Conjunto | Resultado |
 |---|---|
-| `cargo test --workspace --release` (com RAW reais e referências) | ✅ 189 passados, 1 ignorado (débito de análise 24 MP) |
-| `pnpm -r test` | ✅ 63 (57 da aplicação, 6 de traduções) |
-| `pnpm -r typecheck`, `cargo fmt --check`, `cargo clippy -D warnings` | ✅ |
-| Aplicação real (release, Linux): presets no editor (pré-visualização, aplicar, histórico), vista Consistência (medir, grupos, referência), sincronização em fila de 5 fotografias | ✅ — 4 defeitos encontrados e corrigidos: título do grupo combinado não era o da maioria; barra de ferramentas cortava "Fechar projeto"; aviso de pré-visualização por cima dos botões; "Exportação · Fase 7" na barra lateral |
-| macOS / Windows reais | ⏳ não executado |
+| `cargo test --release --workspace` (com amostras RAW, modelos e rostos) | ✅ 201 passaram, 0 falharam, 1 ignorado (débito 24 MP, manual) |
+| `pnpm -r test` (Vitest) | ✅ 60 (desktop) + 6 (localização) |
+| `tsc --noEmit`, `cargo fmt --check`, `cargo clippy -D warnings` | ✅ limpos |
+| Aplicação real (build release, Linux/Xvfb) | ✅ menu de máscaras, máscara "Pessoa" + 1 EV só na pessoa, céu no RAW 7D, retrato detetado e aplicado, ver máscara (O) |
+| Avaliação visual do retrato (`portrait_eval`) | ✅ subtil; poros e rugas mantidos; contorno intacto |
+
+Novos testes: `develop::local` (formas, combinação, pincel), `develop/local_tests.rs` (5),
+`develop::sky`, `face-analysis::segment`, `tests/local_edit_flow.rs`.
 
 ## Riscos
 
 | Risco | Impacto | Mitigação |
 |---|---|---|
-| Expectativa de que XMP do Lightroom dê o mesmo aspeto | Médio | Relatório na importação, documento de compatibilidade, sem exportação XMP |
-| Sincronização em fotografias muito diferentes (outra cena) | Médio | Agrupamento prévio por luz/cenário; cada sincronização pode ser desfeita |
-| Pele em cenas sem análise | Baixo | Ignorada sem rostos (indicado na interface) |
+| Máscaras de IA imperfeitas em grupos/cenas complexas | Médio | Somar/subtrair com pincel; refinamento pelas arestas |
+| Retoque de pele percebido como artificial | Médio | Limites rígidos, poros mantidos, valores por omissão 0, avaliação visual |
+| Desempenho com muitas máscaras espaciais em portáteis | Baixo | Só no render final; GPU na fase de otimização |
 
 ## Histórico de fases
 
@@ -116,15 +119,16 @@ cargo run --release -p momento-presets --example preset_sheet -- foto.jpg folha.
 | 5 — Motor de edição | ✅ | 2026-11-09 |
 | 6 — Edição automática | ✅ | 2026-11-09 |
 | 7 — Presets e consistência visual | ✅ | 2026-11-09 |
-| 8 — Exportação | ⏸ próxima | — |
+| 8 — Edição localizada, retoque e retrato | ✅ | 2026-11-09 |
+| 9 — Exportação | ⏸ próxima | — |
 
 ## Próximo passo
 
-**Recomendado:** num casamento teu, abrir **Consistência → Luz semelhante**, editar uma
-fotografia de referência por grupo (ou aplicar um preset interno) e sincronizar; depois rever
-a cerimónia e a festa e dizer-me onde a sincronização falha.
+**Recomendado:** num casamento teu, experimentar máscara "Pessoa" + exposição, "Céu" nas
+fotografias de exterior e o retrato com valores baixos (20–40) em retratos; dizer-me onde as
+máscaras falham.
 
-**Fase 8 — Exportação:** receitas e lotes, gestão de cor completa (perfis, soft proofing),
+**Fase 9 — Exportação:** receitas e lotes, gestão de cor completa (perfis, soft proofing),
 marca de água, metadados e privacidade.
 
 **Pendente do utilizador:** repositório GitHub (CI em macOS/Windows); fotografias de teste;

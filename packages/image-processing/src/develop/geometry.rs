@@ -123,9 +123,76 @@ impl GeoMap {
     }
 }
 
+/// Ponto da vista (0–1, depois da geometria) → ponto da fotografia orientada.
+pub fn view_to_source(
+    src_w: usize,
+    src_h: usize,
+    g: &Geometry,
+    lens: &Lens,
+    uncropped: bool,
+    u: f32,
+    v: f32,
+) -> (f32, f32) {
+    GeoMap::new(src_w, src_h, g, lens, uncropped).map(u, v).0[1]
+}
+
+/// Ponto da fotografia orientada → ponto da vista (inversão numérica, Newton).
+pub fn source_to_view(
+    src_w: usize,
+    src_h: usize,
+    g: &Geometry,
+    lens: &Lens,
+    uncropped: bool,
+    x: f32,
+    y: f32,
+) -> Option<(f32, f32)> {
+    let geo = GeoMap::new(src_w, src_h, g, lens, uncropped);
+    let (mut u, mut v) = (x, y);
+    for _ in 0..20 {
+        let p = geo.map(u, v).0[1];
+        let (ex, ey) = (p.0 - x, p.1 - y);
+        if ex.abs() < 1e-6 && ey.abs() < 1e-6 {
+            return Some((u, v));
+        }
+        let e = 1e-3;
+        let pu = geo.map(u + e, v).0[1];
+        let pv = geo.map(u, v + e).0[1];
+        let (a, b, c, d) = ((pu.0 - p.0) / e, (pv.0 - p.0) / e, (pu.1 - p.1) / e, (pv.1 - p.1) / e);
+        let det = a * d - b * c;
+        if det.abs() < 1e-9 {
+            return None;
+        }
+        u -= (d * ex - b * ey) / det;
+        v -= (-c * ex + a * ey) / det;
+    }
+    let p = geo.map(u, v).0[1];
+    ((p.0 - x).abs() < 1e-3 && (p.1 - y).abs() < 1e-3).then_some((u, v))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn view_and_source_are_inverse() {
+        let g = Geometry {
+            crop: super::super::settings::Crop { x: 0.1, y: 0.2, w: 0.6, h: 0.5 },
+            straighten: 7.0,
+            quarter_turns: 1,
+            flip_horizontal: true,
+            vertical: 20.0,
+            ..Default::default()
+        };
+        let l = Lens { distortion: 30.0, ..Default::default() };
+        for (u, v) in [(0.3, 0.4), (0.5, 0.5), (0.8, 0.2)] {
+            let (x, y) = view_to_source(300, 200, &g, &l, false, u, v);
+            let (u2, v2) = source_to_view(300, 200, &g, &l, false, x, y).unwrap();
+            assert!(
+                (u - u2).abs() < 1e-3 && (v - v2).abs() < 1e-3,
+                "{u},{v} → {x},{y} → {u2},{v2}"
+            );
+        }
+    }
 
     #[test]
     fn identity_maps_centers_and_corners() {

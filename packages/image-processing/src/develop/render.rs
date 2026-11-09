@@ -75,6 +75,33 @@ struct Prep<'a> {
     /// Tonalização: vetores de cor (sem luminância) das sombras e dos realces, já escalados.
     grade: Option<([f32; 3], [f32; 3], f32)>,
     lut: Option<(std::sync::Arc<super::lut::Lut>, f32)>,
+    /// Correção do "heal" por mancha (razão destino/origem por canal).
+    heal: Vec<[f32; 3]>,
+    /// Remoção de objetos: zona rasterizada, razão do heal, parâmetros.
+    patches: Vec<(std::sync::Arc<super::local::Raster>, [f32; 3], super::settings::Patch)>,
+}
+
+/// Média de um plano numa coroa (ou zona) definida por `inside(u, v)`, deslocada (ox, oy).
+fn ring_mean(src: &Source, pts: &[(f32, f32)], ox: f32, oy: f32) -> Option<[f32; 3]> {
+    let pl = src.level_for(1024.0);
+    let (mut acc, mut n) = ([0.0f32; 3], 0.0);
+    for &(u, v) in pts {
+        if let Some(q) = pl.sample(u + ox, v + oy) {
+            for c in 0..3 {
+                acc[c] += q[c];
+            }
+            n += 1.0;
+        }
+    }
+    (n > 0.0).then(|| acc.map(|a| a / n))
+}
+
+/// Razão de correção do heal: luz e cor à volta do destino ÷ à volta da origem.
+fn heal_ratio(src: &Source, ring: &[(f32, f32)], ox: f32, oy: f32) -> [f32; 3] {
+    match (ring_mean(src, ring, 0.0, 0.0), ring_mean(src, ring, ox, oy)) {
+        (Some(d), Some(o)) => std::array::from_fn(|c| (d[c] / o[c].max(1e-5)).clamp(0.05, 20.0)),
+        _ => [1.0; 3],
+    }
 }
 
 /// Cor pura de um matiz sem a sua luminância (para tonalizar sem mudar o brilho).
@@ -107,7 +134,67 @@ impl<'a> Prep<'a> {
             .then(|| super::lut::get(&s.lut.id))
             .flatten()
             .map(|l| (l, s.lut.amount.clamp(0.0, 100.0) / 100.0));
+        // Heal: coroa à volta de cada mancha (1,1–1,5 × raio).
+        let heal = s
+            .retouch
+            .spots
+            .iter()
+            .map(|sp| {
+                if !sp.heal {
+                    return [1.0; 3];
+                }
+                let ring: Vec<(f32, f32)> = (0..24)
+                    .flat_map(|k| {
+                        let a = k as f32 / 24.0 * std::f32::consts::TAU;
+                        [1.15f32, 1.45].map(|f| {
+                            (
+                                sp.x + a.cos() * sp.r * f / (src.width() as f32 / long),
+                                sp.y + a.sin() * sp.r * f / (src.height() as f32 / long),
+                            )
+                        })
+                    })
+                    .collect();
+                heal_ratio(src, &ring, sp.sx - sp.x, sp.sy - sp.y)
+            })
+            .collect();
+        let (pru, prv) = (src.width() as f32 / long, src.height() as f32 / long);
+        let patches = s
+            .retouch
+            .patches
+            .iter()
+            .filter(|pt| !pt.stroke.points.is_empty() && pt.opacity > 0.0)
+            .map(|pt| {
+                let key = super::local::hash_of(&pt.stroke, &format!("patch{pru}{prv}"));
+                let r = super::local::cached(key, || {
+                    super::local::rasterize_strokes(
+                        std::slice::from_ref(&pt.stroke),
+                        super::local::Raster::full(pru / prv),
+                        pru,
+                        prv,
+                    )
+                });
+                // Coroa: células na transição da borda.
+                let ring: Vec<(f32, f32)> = if pt.heal {
+                    let mut v = Vec::new();
+                    for j in (0..r.h).step_by(2) {
+                        for i in (0..r.w).step_by(2) {
+                            let m = r.data[j * r.w + i];
+                            if (0.02..0.35).contains(&m) {
+                                v.push(r.cell_uv(i, j));
+                            }
+                        }
+                    }
+                    v
+                } else {
+                    vec![]
+                };
+                let ratio = if pt.heal { heal_ratio(src, &ring, pt.dx, pt.dy) } else { [1.0; 3] };
+                (r, ratio, pt.clone())
+            })
+            .collect();
         Prep {
+            heal,
+            patches,
             grade,
             lut,
             ru: src.width() as f32 / long,
@@ -140,7 +227,10 @@ impl<'a> Prep<'a> {
                 let bb =
                     if pts[2] == pts[1] { g[2] } else { src.sample_channel(pts[2].0, pts[2].1, 2) };
                 let mut p = [rr, g[1], bb];
-                if !self.s.retouch.spots.is_empty() || !self.s.retouch.red_eyes.is_empty() {
+                if !self.s.retouch.spots.is_empty()
+                    || !self.s.retouch.red_eyes.is_empty()
+                    || !self.patches.is_empty()
+                {
                     p = self.retouch(src, &pts, p);
                 }
                 let lv = self.s.lens.vignetting;
@@ -167,17 +257,30 @@ impl<'a> Prep<'a> {
         mut p: [f32; 3],
     ) -> [f32; 3] {
         let (u, v) = pts[1];
-        for sp in &self.s.retouch.spots {
+        for (k, sp) in self.s.retouch.spots.iter().enumerate() {
             let (dx, dy) = ((u - sp.x) * self.ru, (v - sp.y) * self.rv);
             let r = sp.r.max(1e-5);
             let d2 = dx * dx + dy * dy;
             if d2 >= r * r {
                 continue;
             }
-            let w = 1.0 - smoothstep(0.55 * r, r, d2.sqrt());
+            let inner = r * (1.0 - sp.feather.clamp(0.0, 100.0) / 100.0);
+            let w = (1.0 - smoothstep(inner, r, d2.sqrt())) * sp.opacity.clamp(0.0, 100.0) / 100.0;
             let (ox, oy) = (sp.sx - sp.x, sp.sy - sp.y);
-            let q: [f32; 3] =
-                std::array::from_fn(|c| src.sample_channel(pts[c].0 + ox, pts[c].1 + oy, c));
+            let ratio = self.heal.get(k).copied().unwrap_or([1.0; 3]);
+            let q: [f32; 3] = std::array::from_fn(|c| {
+                src.sample_channel(pts[c].0 + ox, pts[c].1 + oy, c) * ratio[c]
+            });
+            p = std::array::from_fn(|c| p[c] + (q[c] - p[c]) * w);
+        }
+        for (r, ratio, pt) in &self.patches {
+            let w = r.sample(u, v) * pt.opacity.clamp(0.0, 100.0) / 100.0;
+            if w <= 0.0 {
+                continue;
+            }
+            let q: [f32; 3] = std::array::from_fn(|c| {
+                src.sample_channel(pts[c].0 + pt.dx, pts[c].1 + pt.dy, c) * ratio[c]
+            });
             p = std::array::from_fn(|c| p[c] + (q[c] - p[c]) * w);
         }
         for e in &self.s.retouch.red_eyes {
@@ -421,6 +524,16 @@ fn value_noise(x: f32, y: f32, seed: u32) -> f32 {
 }
 
 pub fn render(src: &Source, s: &Settings, o: &RenderOptions) -> Rendered {
+    render_with_overlay(src, s, o, None)
+}
+
+/// Render com a máscara `overlay` (índice em `s.masks`) mostrada a vermelho.
+pub fn render_with_overlay(
+    src: &Source,
+    s: &Settings,
+    o: &RenderOptions,
+    overlay: Option<usize>,
+) -> Rendered {
     let (w, h) =
         output_size(src.width(), src.height(), &s.geometry, o.uncropped, o.max_width, o.max_height);
     let (w, h) = (w as usize, h as usize);
@@ -478,7 +591,76 @@ pub fn render(src: &Source, s: &Settings, o: &RenderOptions) -> Rendered {
             row[x] = color_ops(&p, d);
         }
     });
-    spatial(&mut disp, w, h, s, src, o.quality);
+    // Ajustes locais e retrato: posição de cada píxel na fotografia.
+    let long = src.width().max(src.height()) as f32;
+    let (ru, rv) = (src.width() as f32 / long, src.height() as f32 / long);
+    let masks = super::local::prepare(&s.masks, ru, rv);
+    let portrait = super::portrait::prepare(&s.portrait, ru, rv);
+    let overlay_mask = overlay.and_then(|i| s.masks.get(i)).map(|m| {
+        let mut m = m.clone();
+        m.enabled = true;
+        m.adjust = Default::default();
+        super::local::prepare(std::slice::from_ref(&m), ru, rv)
+    });
+    let need_uv = !masks.is_empty() || portrait.is_some() || overlay_mask.is_some();
+    let uv: Vec<Option<[f32; 2]>> = if need_uv {
+        (0..w * h)
+            .into_par_iter()
+            .map(|i| {
+                if !valid[i] {
+                    return None;
+                }
+                let (x, y) = (i % w, i / w);
+                let (pts, _) = p.geo.map((x as f32 + 0.5) / w as f32, (y as f32 + 0.5) / h as f32);
+                Some([pts[1].0, pts[1].1])
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let mut local = super::local::LocalSpatial::default();
+    if !masks.is_empty() {
+        let k = masks.len();
+        let mut vals = vec![0.0f32; w * h * k];
+        vals.par_chunks_mut(k).zip(disp.par_iter_mut()).enumerate().for_each(|(i, (mv, d))| {
+            let Some([u, v]) = uv[i] else { return };
+            for (j, m) in masks.iter().enumerate() {
+                let val = m.value(u, v, *d, ru, rv);
+                mv[j] = val;
+                *d = m.apply(*d, val, tr);
+            }
+        });
+        for (j, m) in masks.iter().enumerate() {
+            if m.spatial {
+                local.planes.push(((0..w * h).map(|i| vals[i * k + j]).collect(), m.adjust));
+            }
+        }
+    }
+    spatial(&mut disp, w, h, s, src, o.quality, &local);
+    if let Some(pp) = &portrait {
+        // Píxeis do render por unidade do lado maior (medido ao centro).
+        let c = (h / 2) * w + w / 2;
+        let ppu = match (uv.get(c).copied().flatten(), uv.get(c + 1).copied().flatten()) {
+            (Some(a), Some(b)) => {
+                let d = (((b[0] - a[0]) * ru).powi(2) + ((b[1] - a[1]) * rv).powi(2)).sqrt();
+                if d > 0.0 {
+                    1.0 / d
+                } else {
+                    w.max(h) as f32
+                }
+            }
+            _ => w.max(h) as f32,
+        };
+        super::portrait::apply(pp, &mut disp, w, h, &uv, ppu);
+    }
+    // Sobreposição da máscara: calculada aqui, aplicada aos bytes **depois** do histograma
+    // (o histograma mostra sempre a fotografia, não o vermelho).
+    let overlay_vals: Option<Vec<f32>> = overlay_mask.as_ref().and_then(|v| v.first()).map(|om| {
+        disp.par_iter()
+            .enumerate()
+            .map(|(i, d)| uv[i].map(|[u, v]| om.value(u, v, *d, ru, rv) * 0.6).unwrap_or(0.0))
+            .collect()
+    });
     // Saída: vinheta, grão, sRGB 8 bits, histograma.
     let to_srgb = matmul(&REC2020_TO_SRGB, &[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]);
     let e = &s.effects;
@@ -554,11 +736,28 @@ pub fn render(src: &Source, s: &Settings, o: &RenderOptions) -> Rendered {
                 a
             },
         );
+    if let Some(ov) = overlay_vals {
+        rgba.par_chunks_mut(4).zip(ov.par_iter()).for_each(|(px, &m)| {
+            if m > 0.0 {
+                px[0] = (px[0] as f32 + (217.0 - px[0] as f32) * m) as u8;
+                px[1] = (px[1] as f32 * (1.0 - m)) as u8;
+                px[2] = (px[2] as f32 * (1.0 - m)) as u8;
+            }
+        });
+    }
     Rendered { width: w as u32, height: h as u32, rgba, histogram: hist }
 }
 
 /// Textura, redução de ruído (luminância e cor) e nitidez, à resolução do render.
-fn spatial(disp: &mut [[f32; 3]], w: usize, h: usize, s: &Settings, src: &Source, q: Quality) {
+fn spatial(
+    disp: &mut [[f32; 3]],
+    w: usize,
+    h: usize,
+    s: &Settings,
+    src: &Source,
+    q: Quality,
+    local: &super::local::LocalSpatial,
+) {
     let d = &s.detail;
     let tex = s.effects.texture / 100.0;
     let nl = if q == Quality::Final { d.noise_luminance / 100.0 } else { 0.0 };
@@ -569,7 +768,20 @@ fn spatial(disp: &mut [[f32; 3]], w: usize, h: usize, s: &Settings, src: &Source
     let scale = w.max(h) as f32 / src.full_width.max(src.full_height) as f32;
     let sharp_sigma = d.sharpen_radius * scale.max(0.0);
     let sharpen = q == Quality::Final && d.sharpen_amount > 0.0 && sharp_sigma >= 0.25;
-    if tex == 0.0 && nl == 0.0 && nc == 0.0 && !sharpen {
+    let final_q = q == Quality::Final;
+    let local_tex = local.any(|a| a.texture);
+    let local_cl = local.any(|a| a.clarity);
+    let local_sh = final_q && local.any(|a| a.sharpness);
+    let local_nr = final_q && local.any(|a| a.noise.max(0.0));
+    if tex == 0.0
+        && nl == 0.0
+        && nc == 0.0
+        && !sharpen
+        && !local_tex
+        && !local_cl
+        && !local_sh
+        && !local_nr
+    {
         return;
     }
     let mut y: Vec<f32> = disp.iter().map(|p| luma(*p)).collect();
@@ -633,6 +845,48 @@ fn spatial(disp: &mut [[f32; 3]], w: usize, h: usize, s: &Settings, src: &Source
             let hp = if a < thr { hp * (a / thr.max(1e-6)) } else { hp };
             let m = if mask_on { smoothstep(m_t * 0.5, m_t, grad[i]) } else { 1.0 };
             y[i] += amt * hp * m;
+        }
+    }
+    // Ajustes locais espaciais (máscaras).
+    if local_nr {
+        let b = gaussian(&y, w, h, 2.0);
+        for i in 0..w * h {
+            let a = local.amount(i, |a| a.noise.max(0.0)).min(1.0);
+            if a > 0.0 {
+                let diff = y[i] - b[i];
+                let wgt = (-(diff * diff) / (0.12 * 0.12)).exp();
+                y[i] += (b[i] - y[i]) * wgt * a;
+            }
+        }
+    }
+    if local_tex {
+        let b = gaussian(&y, w, h, (w.max(h) as f32 * 0.004).max(1.0));
+        for i in 0..w * h {
+            let a = local.amount(i, |a| a.texture);
+            if a != 0.0 {
+                let mid = 1.0 - (2.0 * y[i] - 1.0).clamp(-1.0, 1.0).powi(2);
+                y[i] += a * 0.8 * (y[i] - b[i]) * (0.4 + 0.6 * mid);
+            }
+        }
+    }
+    if local_cl {
+        let b = gaussian(&y, w, h, w.max(h) as f32 / 60.0);
+        for i in 0..w * h {
+            let a = local.amount(i, |a| a.clarity);
+            if a != 0.0 {
+                let mid = 1.0 - (2.0 * y[i] - 1.0).clamp(-1.0, 1.0).powi(2);
+                y[i] = (y[i] + a * 0.9 * (y[i] - b[i]) * mid).max(0.0);
+            }
+        }
+    }
+    if local_sh {
+        let b = gaussian(&y, w, h, (scale * 1.0).max(0.6));
+        for i in 0..w * h {
+            let a = local.amount(i, |a| a.sharpness);
+            if a != 0.0 {
+                // Positivo: nitidez; negativo: suaviza.
+                y[i] += if a > 0.0 { a * 1.2 * (y[i] - b[i]) } else { -a * (b[i] - y[i]) };
+            }
         }
     }
     for (i, p) in disp.iter_mut().enumerate() {

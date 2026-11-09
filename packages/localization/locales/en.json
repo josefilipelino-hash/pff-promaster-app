@@ -242,7 +242,8 @@
     "crop": "Crop tool (editor)",
     "copyPaste": "Copy / paste settings (editor)",
     "split": "Split before/after (editor)",
-    "autoEdit": "Automatic edit of the photo (editor)"
+    "autoEdit": "Automatic edit of the photo (editor)",
+    "maskOverlay": "Show/hide the selected mask (editor)"
   },
   "error": {
     "io": "Error reading or writing a file.",
@@ -581,7 +582,9 @@
       "presets": "Presets",
       "grading": "Toning and LUT",
       "bw": "Black & white",
-      "lut": "LUT"
+      "lut": "LUT",
+      "masks": "Masks (local adjustments)",
+      "portrait": "Portrait"
     },
     "resetSection": "Reset this section",
     "panel": "Adjustments",
@@ -701,7 +704,10 @@
       "resetSection": "Reset {{section}}",
       "auto": "Automatic edit",
       "preset": "Preset: {{name}}",
-      "sync": "Synced with reference"
+      "sync": "Synced with reference",
+      "masks": "Masks",
+      "portrait": "Portrait",
+      "retouch": "Retouch"
     },
     "copyNote": "Geometry (crop, rotation) is not copied by default.",
     "loading": "Loading the photo…",
@@ -1027,5 +1033,116 @@
     "queueTitle": "Sync with reference",
     "toastFinished_one": "Sync finished: {{count}} photo.",
     "toastFinished_other": "Sync finished: {{count}} photos."
+  },
+  "masks": {
+    "new": "+ New mask…",
+    "computing": "Computing the mask…",
+    "enable": "Enable {{name}}",
+    "delete": "Delete the mask {{name}}",
+    "none": "No masks. Create one to adjust only an area.",
+    "detail": "Mask {{name}}",
+    "name": "Mask name",
+    "showOverlay": "Show (O)",
+    "opOf": "Operation of {{name}}",
+    "op": {
+      "add": "Add",
+      "subtract": "Subtract",
+      "intersect": "Intersect"
+    },
+    "invert": "Invert",
+    "deletePart": "Remove the part {{name}}",
+    "add": "+ Add…",
+    "subtract": "− Subtract…",
+    "intersect": "∩ Intersect…",
+    "paint": "Paint",
+    "erase": "Erase",
+    "invertMask": "Invert the mask",
+    "density": "Density",
+    "adjustments": "Adjustments in the mask",
+    "resetAdjust": "Reset adjustments",
+    "brushSize": "Size (%)",
+    "feather": "Feather",
+    "flow": "Flow",
+    "lumMin": "Minimum luminance",
+    "lumMax": "Maximum luminance",
+    "smooth": "Transition",
+    "colorRange": "Color range (°)",
+    "kind": {
+      "brush": "Brush",
+      "linear": "Linear gradient",
+      "radial": "Radial gradient",
+      "luminance": "Luminance range",
+      "color": "Color range",
+      "subject": "Subject",
+      "person": "Person",
+      "face": "Face",
+      "skin": "Skin",
+      "hair": "Hair",
+      "clothes": "Clothes",
+      "sky": "Sky",
+      "background": "Background",
+      "object": "Object"
+    },
+    "field": {
+      "exposure": "Exposure",
+      "contrast": "Contrast",
+      "highlights": "Highlights",
+      "shadows": "Shadows",
+      "whites": "Whites",
+      "blacks": "Blacks",
+      "temperature": "Temperature",
+      "tint": "Tint",
+      "saturation": "Saturation",
+      "texture": "Texture",
+      "clarity": "Clarity",
+      "sharpness": "Sharpness",
+      "noise": "Noise"
+    },
+    "emptyResult": "No {{kind}} found in this photo (the mask is empty; you can paint with the brush).",
+    "hint": {
+      "brush": "Paint on the image. Esc ends.",
+      "linear": "Drag on the image: from the affected side to the unaffected side.",
+      "radial": "Drag from the center outwards.",
+      "point": "Click on the image."
+    },
+    "toolLabel": {
+      "brush": "Brush: drag to paint",
+      "linear": "Linear gradient: drag",
+      "radial": "Radial gradient: drag from the center",
+      "point": "Click to choose",
+      "spot": "Click the spot to remove",
+      "patch": "Paint over the object to remove"
+    }
+  },
+  "retouch": {
+    "tools": "Retouch tools",
+    "heal": "Heal",
+    "clone": "Clone",
+    "object": "Remove object",
+    "healHint": "Click a spot: it is replaced by a nearby area with light and color matched to the surroundings",
+    "cloneHint": "Click: copies a nearby area as it is",
+    "objectHint": "Paint over a small object: it is filled with a nearby area",
+    "spotN": "Spot {{n}}",
+    "modeOf": "Mode of spot {{n}}",
+    "removeSpot": "Remove spot {{n}}",
+    "objectN": "Object {{n}}",
+    "removeObject": "Remove the object fix {{n}}",
+    "note": "Everything is stored as a recipe and can be changed or removed. Object removal copies a nearby area (it does not invent content): it works for small objects on simple backgrounds."
+  },
+  "portrait": {
+    "detect": "Detect faces",
+    "detecting": "Detecting…",
+    "faces_one": "{{count}} face",
+    "faces_other": "{{count}} faces",
+    "remove": "Remove portrait",
+    "noFaces": "No faces found.",
+    "field": {
+      "skin": "Smooth skin",
+      "darkCircles": "Dark circles",
+      "shine": "Skin shine",
+      "teeth": "Whiten teeth",
+      "eyes": "Enhance eyes"
+    },
+    "note": "Subtle and only in each face's regions: smooths blemishes while keeping pores, never reshapes or changes features. Detect faces first; each control at 0 changes nothing."
   }
 }

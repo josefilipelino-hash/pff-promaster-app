@@ -104,6 +104,8 @@ export function DevelopPanel({
   geometry,
   auto,
   presets,
+  masks,
+  portrait,
   retouch,
   ai,
 }: {
@@ -117,6 +119,9 @@ export function DevelopPanel({
   auto?: React.ReactNode;
   /** Secção "Presets". */
   presets?: React.ReactNode;
+  /** Secções "Máscaras" e "Retrato" (Fase 8). */
+  masks?: React.ReactNode;
+  portrait?: React.ReactNode;
   /** Secção "Retoque" (olhos vermelhos, manchas). */
   retouch?: React.ReactNode;
   /** AI Denoise: modelo disponível e progresso do cálculo (0–1) em curso. */
@@ -165,6 +170,16 @@ export function DevelopPanel({
       {presets && (
         <Section id="presets" open={!!open.presets} toggle={() => toggle("presets")}>
           {presets}
+        </Section>
+      )}
+      {masks && (
+        <Section id="masks" open={!!open.masks} toggle={() => toggle("masks")}>
+          {masks}
+        </Section>
+      )}
+      {portrait && (
+        <Section id="portrait" open={!!open.portrait} toggle={() => toggle("portrait")}>
+          {portrait}
         </Section>
       )}
       <Section id="light" open={!!open.light} toggle={() => toggle("light")} onReset={resetBlock("light", sectionFields("light"))}>

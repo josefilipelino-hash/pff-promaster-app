@@ -100,6 +100,27 @@ pub fn min_filter(src: &[f32], w: usize, h: usize, r: usize) -> Vec<f32> {
     out
 }
 
+/// *Guided filter* (He, Sun & Tang, 2010): suaviza `p` mantendo as arestas de `guide`
+/// (usado para refinar máscaras de baixa resolução pelas arestas da fotografia).
+pub fn guided_filter(guide: &[f32], p: &[f32], w: usize, h: usize, r: usize, eps: f32) -> Vec<f32> {
+    let mul = |a: &[f32], b: &[f32]| a.iter().zip(b).map(|(x, y)| x * y).collect::<Vec<f32>>();
+    let mi = box_blur(guide, w, h, r);
+    let mp = box_blur(p, w, h, r);
+    let ii = box_blur(&mul(guide, guide), w, h, r);
+    let ip = box_blur(&mul(guide, p), w, h, r);
+    let n = w * h;
+    let mut a = vec![0f32; n];
+    let mut b = vec![0f32; n];
+    for k in 0..n {
+        let var = ii[k] - mi[k] * mi[k];
+        let cov = ip[k] - mi[k] * mp[k];
+        a[k] = cov / (var + eps);
+        b[k] = mp[k] - a[k] * mi[k];
+    }
+    let (ma, mb) = (box_blur(&a, w, h, r), box_blur(&b, w, h, r));
+    (0..n).map(|k| (ma[k] * guide[k] + mb[k]).clamp(0.0, 1.0)).collect()
+}
+
 /// Amostragem bilinear de um plano em coordenadas normalizadas (0–1).
 #[inline]
 pub fn sample_plane(p: &[f32], w: usize, h: usize, u: f32, v: f32) -> f32 {

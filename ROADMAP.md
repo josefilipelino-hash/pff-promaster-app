@@ -64,8 +64,7 @@ sincronização de hora entre câmaras com sugestão automática e cronologia re
 
 Motor não destrutivo (luz, balanço de brancos, cor, HSL, curvas, detalhe, efeitos,
 geometria, objetiva), histórico, instantâneos, cópias virtuais, copiar/colar/sincronizar,
-antes/depois, histograma, qualidade dinâmica. **Por fazer (próximas fases):** máscaras e
-ajustes locais, color grading, presets (próprios, XMP, LUT), perfis de objetiva
+antes/depois, histograma, qualidade dinâmica. **Por fazer (próximas fases):** color grading, presets (próprios, XMP, LUT), perfis de objetiva
 automáticos (a correção automática por fotografia foi feita na Fase 6).
 
 Também: consistência de cor entre câmaras e condições de luz; workflow de revisão.
@@ -88,23 +87,30 @@ presets internos, XMP aproximado com relatório, LUT .cube; tonalização e P&B;
 agrupamento por iluminação/câmara/cenário/horário/balanço/flash e sincronização inteligente
 com uma referência.
 
-## Fase 8 — Exportação
+## Fase 8 — Edição localizada, retoque e retrato ✅ *(concluída 2026-11-09, ver PROJECT_STATUS.md)*
+
+Máscaras (pincel, gradientes, luminância, cor, sujeito, pessoa, rosto, pele, cabelo, roupa,
+céu, fundo, objeto) com somar/subtrair/intersetar, suavidade, fluxo, densidade e inverter; 13
+ajustes locais; corrigir, clonar, manchas, pó do sensor, remoção simples de objetos; retrato
+subtil (pele, olheiras, brilho, dentes, olhos).
+
+## Fase 9 — Exportação
 
 Receitas e lotes múltiplos, presets de exportação, gestão de cor completa (soft proofing,
 gamut), marca de água, metadados e privacidade, impressão, redes sociais, arquivo
 TIFF/DNG.
 
-## Fase 9 — Galerias
+## Fase 10 — Galerias
 
 Galeria estática com temas, slideshow, downloads, favoritas, palavra-passe (cifra), e
 publicação opcional (S3/R2/B2/SFTP).
 
-## Fase 10 — Álbuns
+## Fase 11 — Álbuns
 
 Editor, templates, montagem automática, margens, sangria, perfis, validações, exportação
 PDF/JPEG/TIFF.
 
-## Fase 11 — Otimização e distribuição
+## Fase 12 — Otimização e distribuição
 
 GPU (wgpu), otimização Apple Silicon, projetos grandes, recuperação, testes de carga,
 assinatura de instaladores.

@@ -42,6 +42,18 @@
       "sha256": "0e198461dad010cc8cb5e9e6e1cdee3f00355871744e6f9b2c6468ba8166da63",
       "bytes": 3410053,
       "source_sha256": "99a5081e32afdaa25df3ded11aa16447556692e550906caed320db31324af5ce"
+    },
+    {
+      "file": "segment_multiclass.onnx",
+      "sha256": "cdcfc7936aa2dd244c078526632218bd8d68f60035bd9dc9851a2c80197abd69",
+      "bytes": 16454499,
+      "source_sha256": "c6748b1253a99067ef71f7e26ca71096cd449baefa8f101900ea23016507e0e0"
+    },
+    {
+      "file": "segment_object.onnx",
+      "sha256": "714ce45c1ed03cdd78528d8cee9c7ef780119f6e52beee6ae185d04ca269c39a",
+      "bytes": 12388077,
+      "source_sha256": "e24338a717c1b7ad8d159666677ef400babb7f33b8ad60c4d96db4ecf694cd25"
     }
   ]
 }

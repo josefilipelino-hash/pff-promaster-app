@@ -69,6 +69,17 @@ plataforma, ecrã inicial, validação do formulário, grelha virtualizada com 3
 secções futuras desativadas, classificação por teclado e em seleção múltipla, filtro
 Favoritas + visualizador, reversão quando o núcleo recusa, paridade de traduções.
 
+## Fase 8 — edição localizada, retoque e retrato
+
+| Teste | O que verifica |
+|---|---|
+| `develop::local` (2) | gradiente linear/radial, somar/subtrair/intersetar, inverter (parte e máscara), densidade, intervalos de luminância e cor (cinzento não conta); pincel: borda suave, fluxo 50 % → 0,5, duas passagens → 0,75, apagar; polígonos |
+| `develop::local_tests` (4) | exposição/temperatura/saturação/tons locais só dentro da máscara; textura+nitidez aumentam e ruído/clareza negativa reduzem o detalhe só na máscara; a máscara acompanha o recorte; sobreposição vermelha; máscara desligada e imagem em falta sem efeito; **heal vs clone** (clone traz o escuro, heal iguala o fundo); remoção de objeto; retrato: manchas atenuadas, poros mantidos, olheiras mais claras sem ultrapassar a pele, dentes menos amarelos, **fora do rosto e contorno iguais**, quantidades a 0 = original |
+| `develop::sky`, `geometry` (+1), filtros | céu azul com torre (torre e relva fora), interior sem céu; vista ↔ fotografia inversas com recorte, rotação, espelho, perspetiva e distorção |
+| `face-analysis::segment` | retrato real: rosto, cabelo, roupa e fundo nos sítios certos; objeto por clique = a pessoa |
+| `local_edit_flow` | caminho real: céu guardado em `masks/` e escurecido (relva igual), mapeamento de pontos, origem do heal no céu, repor = original; retrato real: 8 máscaras de IA com coberturas coerentes (pessoa + fundo = 1, sujeito = pessoa), exposição só na pessoa, 1 rosto detetado, retrato só no rosto e removível; **originais intactos** |
+| Interface (+3) | máscara de IA, sobreposição no render, ajuste local, gradiente a subtrair desenhado, inverter, eliminar; pincel (fluxo, apagar, Esc); corrigir/clonar/remover mancha, remover objeto; retrato (detetar, ajustar, remover) |
+
 ## Fase 7 — presets e consistência
 
 | Teste | O que verifica |

@@ -9,11 +9,12 @@ use momento_database::people::{FaceRef, PersonRow};
 use momento_project_management::analysis::SelectionSummary;
 use momento_project_management::auto_edit::{AutoEditProgress, AutoEditResult};
 use momento_project_management::consistency::{Criterion, LookGroup};
+use momento_project_management::local_edit::MaskRasterInfo;
 use momento_project_management::preset_store::{ImportResult, PresetStore};
-use momento_project_management::AutoOptions;
 use momento_project_management::{
     AnalysisStatus, ImportRequest, NewProject, ProjectInfo, SelectionSettings,
 };
+use momento_project_management::{AutoOptions, FaceRegions};
 use momento_project_management::{Component, MatchOptions, Preset};
 use momento_project_management::{
     DevelopSettings, EditView, OffsetSuggestion, OrganizeSummary, RenderQuality,
@@ -363,11 +364,14 @@ pub async fn render_edit(
     max_height: u32,
     quality: String,
     uncropped: bool,
+    overlay: Option<usize>,
 ) -> CmdResult<tauri::ipc::Response> {
     let q = if quality == "fast" { RenderQuality::Fast } else { RenderQuality::Final };
     let bytes = state
         .session()
-        .and_then(|s| s.render_edit(key, &settings, max_width, max_height, q, uncropped))
+        .and_then(|s| {
+            s.render_edit_overlay(key, &settings, max_width, max_height, q, uncropped, overlay)
+        })
         .map_err(err)?;
     Ok(tauri::ipc::Response::new(bytes))
 }
@@ -651,6 +655,49 @@ pub async fn start_sync(
     options: MatchOptions,
 ) -> CmdResult<u64> {
     state.session().and_then(|s| s.start_sync(reference, keys, options)).map_err(err)
+}
+
+// ---------------------------------------------------------------- edição localizada (Fase 8)
+
+#[tauri::command]
+pub async fn create_mask_raster(
+    state: State<'_, AppState>,
+    key: i64,
+    kind: String,
+    point: Option<[f32; 2]>,
+) -> CmdResult<MaskRasterInfo> {
+    state.session().and_then(|s| s.create_mask_raster(key, &kind, point)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn detect_portrait(state: State<'_, AppState>, key: i64) -> CmdResult<Vec<FaceRegions>> {
+    state.session().and_then(|s| s.detect_portrait(key)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn map_points(
+    state: State<'_, AppState>,
+    key: i64,
+    settings: DevelopSettings,
+    points: Vec<[f32; 2]>,
+    to_source: bool,
+    uncropped: bool,
+) -> CmdResult<Vec<Option<[f32; 2]>>> {
+    state
+        .session()
+        .and_then(|s| s.map_points(key, &settings, &points, to_source, uncropped))
+        .map_err(err)
+}
+
+#[tauri::command]
+pub async fn suggest_heal_source(
+    state: State<'_, AppState>,
+    key: i64,
+    x: f32,
+    y: f32,
+    r: f32,
+) -> CmdResult<[f32; 2]> {
+    state.session().and_then(|s| s.suggest_heal_source(key, x, y, r)).map_err(err)
 }
 
 #[cfg(test)]
