@@ -428,7 +428,42 @@ Adaptadores planeados:
 
 ---
 
-## 11. Integração futura de IA **[definido]**
+## 11. IA local e seleção assistida **[implementado na Fase 3 — ver D-024 a D-028]**
+
+### 11.0 O que está implementado (Fase 3)
+
+```
+fotografia ──► imagem de trabalho ≤ 2048 px (preview em cache ou original reduzido, orientada)
+   │
+   ├─ métricas clássicas (momento-ai-analysis::metrics): nitidez global/pico/centro
+   │  (variância do Laplaciano, grelha 6×4), tremido (coerência do tensor de estrutura),
+   │  exposição e clipping, ruído (Immerkær), inclinação (histograma de orientações)
+   ├─ pHash + dHash
+   └─ modelos locais (momento-face-analysis, tract-onnx, Rust puro)
+        ├─ BlazeFace (multiescala: imagem + mosaicos 2×2 e 3×3) → rostos pequenos
+        ├─ malha de 478 pontos → presença, olhos (nitidez da zona dos olhos), rosto cortado
+        ├─ 52 blendshapes → olhos fechados, sorriso, boca aberta
+        └─ MobileNetV3 → embedding visual (1024-D)
+   ▼
+catálogo: analysis · face · embedding   (estado por fotografia em asset.analysis_state)
+   ▼
+motor de seleção (momento-ai-analysis::selection), recalculado em ms a partir do catálogo
+   ├─ grupos: RAW+JPEG (mesmo nome), duplicados (pHash ≤ 4 + embedding ≥ 0,97 + cópia),
+   │  sequências (tempo + semelhança visual + disposição dos rostos + várias câmaras)
+   ├─ pontuações individuais: foco, tremido, exposição, ruído, olhos, expressão,
+   │  composição, técnica, pessoas, global (foco e ruído relativos dentro do grupo)
+   ├─ piscadelas relativas à própria pessoa na sequência
+   ├─ etiquetas MELHOR / ALTERNATIVA / REVER / REJEITAR SUGERIDO / DUPLICADA por modo
+   │  (conservador, equilibrado, rigoroso) e objetivo de entrega aproximado
+   └─ razões estruturadas (código + valor) → frases traduzidas na interface
+   ▼
+catálogo: photo_group · recommendation   (nunca altera classificações nem ficheiros)
+```
+
+O texto seguinte (§11.1) é o plano original da Fase 0; as diferenças estão nas decisões
+D-024 a D-028.
+
+### 11.1 Plano original (Fase 0)
 
 - **Runtime:** ONNX Runtime via crate `ort` 2.0 (MIT/Apache; ORT 1.31). Execution
   providers: **CoreML** (macOS, usa Neural Engine/GPU quando os operadores são suportados),
@@ -664,3 +699,8 @@ ficheiros a partir do frontend (caminhos sempre resolvidos e verificados no núc
 | D-021 | 2026-11-08 | Preview de ecrã de RAW = preview embutida da câmara quando tem ≥ 1600 px, gerada **na mesma leitura** que a miniatura; revelação completa só a 100 % | Revelar sempre | Navegação imediata em milhares de RAW; uma só leitura de 40–60 MB por ficheiro |
 | D-022 | 2026-11-08 | Cache com limites LRU: previews 10 GB, resolução total 5 GB, miniaturas sem limite | Sem limite | Projetos de 15 000 RAW não esgotam o disco |
 | D-023 | 2026-11-08 | Política de 7 dias também para crates Rust (`scripts/pin-mature-crates.py`) | Só para npm | Mesma proteção da cadeia de fornecimento nos dois ecossistemas |
+| D-024 | 2026-11-09 | Inferência com **tract-onnx 0.23.9** (Rust puro, CPU) em vez de ONNX Runtime (`ort`) | `ort` 2.0 (só versões RC), Core ML/DirectML | Mesmo código e resultados em macOS (Intel e Apple Silicon) e Windows, sem bibliotecas nativas a descarregar no build. Os modelos usados são pequenos (0,4–5 MB; 1,5–23 ms por inferência), por isso a CPU basta. Sem Neural Engine/GPU por agora; D-007 fica como evolução se forem precisos modelos maiores |
+| D-025 | 2026-11-09 | Modelos **MediaPipe** (Apache-2.0): Face Landmarker (BlazeFace + malha 478 + blendshapes) e Image Embedder MobileNetV3, convertidos TFLite→ONNX por `scripts/prepare-models.py` com SHA-256 fixados; incluídos no instalador (≈ 11 MB), nunca no Git | YuNet + OpenCLIP; InsightFace (pesos não comerciais) | Uma só família de modelos, validada contra os resultados de referência publicados pela Google; os blendshapes dão diretamente “olho fechado” e “sorriso” |
+| D-026 | 2026-11-09 | Análise numa imagem de trabalho de lado maior ≤ 2048 px (preview em cache quando existe), metade dos núcleos, uma instância dos modelos por thread; estado em `asset.analysis_state` (retoma após fecho) | Resolução total; serviço externo | Rostos de ~50 px numa fotografia de grupo de 24 MP continuam avaliáveis; análise retomável |
+| D-027 | 2026-11-09 | Recomendações calculadas **a partir das métricas gravadas**, separadas da análise: mudar o modo ou o objetivo recalcula em milissegundos, sem reanalisar | Etiquetas calculadas durante a análise | 15 000 fotografias recalculadas em ≈ 32 ms (motor) |
+| D-028 | 2026-11-09 | A IA **só recomenda**: nunca altera favoritas/rejeitadas nem apaga. “Aceitar sugestões” é uma ação explícita (por fotografia ou grupo), só em fotografias ainda sem decisão, só MELHOR→favorita e REJEITAR SUGERIDO→rejeitada, reversível | Aplicar automaticamente | Pedido do utilizador: decisões finais sempre humanas |

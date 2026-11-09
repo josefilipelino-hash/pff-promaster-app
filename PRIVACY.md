@@ -24,6 +24,13 @@ abaixo são requisitos de arquitetura, não opções.
    Caminhos de ficheiros podem aparecer em registos de erro locais. Ficam apenas no
    computador (macOS: `~/Library/Logs/pt.momentostudio.desktop/`; Windows:
    `%LOCALAPPDATA%\pt.momentostudio.desktop\logs\`).
+5b. **Fase 3 — análise e IA:** toda a análise (métricas, rostos, olhos, expressões,
+   embeddings) corre neste computador com modelos incluídos na aplicação (`tract-onnx`,
+   sem serviços externos). Os modelos são preparados **antes** da compilação; a aplicação
+   não descarrega nada. Os dados faciais (caixas, 52 coeficientes de expressão por rosto,
+   embedding de 1024 valores por fotografia) ficam só em `catalog.db` do projeto;
+   “Reanalisar tudo” apaga-os e volta a calculá-los. Os registos indicam só o
+   identificador numérico da fotografia e o erro, nunca dados faciais.
 5a. **Fase 1:** a aplicação não faz nenhuma ligação de rede. As fotografias são lidas
    apenas para gerar miniaturas na pasta do projeto; os originais são abertos só para
    leitura.

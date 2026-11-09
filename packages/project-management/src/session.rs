@@ -1,8 +1,11 @@
 //! Projeto aberto: catálogo, miniaturas, importações e eventos para a interface.
 
+use crate::analysis::{AnalysisProgress, AnalysisService, SelectionSummary};
 use crate::paths::{project_folder_name, ProjectPaths};
 use crate::thumbnails::{ThumbBatch, ThumbnailService};
+pub use momento_ai_analysis::selection::{Mode as SelectionMode, Settings as SelectionSettings};
 use momento_core_types::{AssetId, CoreError, CoreResult};
+use momento_database::analysis::{AnalysisCounts, AnalysisDetails, GroupRow, RecommendationBrief};
 use momento_database::assets::{PhotoDetails, PhotoRow};
 use momento_database::import::{ImportMode, ItemIssue, SessionCounts};
 use momento_database::library::RecentProject;
@@ -64,7 +67,33 @@ pub trait SessionEvents: Send + Sync {
     fn import_progress(&self, p: &ImportProgress);
     fn import_finished(&self, s: &ImportSummary);
     fn thumbnails(&self, b: &ThumbBatch);
+    fn analysis(&self, _p: &AnalysisProgress) {}
 }
+
+/// Estado da análise para a interface.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AnalysisStatus {
+    pub running: bool,
+    pub counts: AnalysisCounts,
+    /// Modelos de IA locais encontrados (sem eles, só métricas técnicas).
+    pub models_available: bool,
+    pub settings: SelectionSettings,
+    pub summary: SelectionSummary,
+}
+
+/// Pastas extra onde procurar os modelos (ex.: recursos da aplicação instalada).
+static MODEL_PATHS: std::sync::OnceLock<Vec<PathBuf>> = std::sync::OnceLock::new();
+
+pub fn set_model_search_paths(paths: Vec<PathBuf>) {
+    let _ = MODEL_PATHS.set(paths);
+}
+
+fn models_dir() -> Option<PathBuf> {
+    momento_face_analysis::find_models_dir(MODEL_PATHS.get().map(Vec::as_slice).unwrap_or(&[]))
+}
+
+const AUTO_ANALYSIS_KEY: &str = "analysis_auto";
 
 /// Pedido de importação vindo da interface.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -163,6 +192,7 @@ pub struct ProjectSession {
     thumbs: Mutex<Option<ThumbnailService>>,
     events: Arc<dyn SessionEvents>,
     import: Mutex<Option<RunningImport>>,
+    analysis: Mutex<Option<AnalysisService>>,
 }
 
 impl ProjectSession {
@@ -205,10 +235,14 @@ impl ProjectSession {
             thumbs: Mutex::new(Some(thumbs)),
             events,
             import: Mutex::new(None),
+            analysis: Mutex::new(None),
         });
         if let Some(s) = unfinished {
             tracing::info!(sessao = s.id.0, "a retomar importação interrompida");
             session.spawn_import(s.id, s.mode, s.recursive)?;
+        } else {
+            // Retoma uma análise interrompida (só se o utilizador já a tinha iniciado).
+            session.resume_analysis_if_auto();
         }
         Ok(session)
     }
@@ -377,6 +411,7 @@ impl ProjectSession {
                         "created"
                     });
                 let issues = me.catalog().import_session_issues(session, 500).unwrap_or_default();
+                me.resume_analysis_if_auto();
                 me.events.import_finished(&ImportSummary {
                     session_id: session.0,
                     counts,
@@ -406,9 +441,153 @@ impl ProjectSession {
         }
     }
 
+    // ------------------------------------------------------------------ análise
+
+    pub fn analysis_running(&self) -> bool {
+        self.analysis
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+            .is_some_and(|a| !a.is_finished())
+    }
+
+    /// Analisa as fotografias por analisar (ou todas, com `reanalyze`). Não bloqueia.
+    pub fn start_analysis(&self, reanalyze: bool) -> CoreResult<u64> {
+        if self.analysis_running() {
+            return Err(CoreError::Other("já existe uma análise em curso".into()));
+        }
+        if reanalyze {
+            self.catalog().clear_analysis()?;
+        }
+        self.catalog().save_setting(AUTO_ANALYSIS_KEY, "1")?;
+        let ids = self.catalog().pending_analysis_ids()?;
+        let n = ids.len() as u64;
+        let ev = self.events.clone();
+        let threads = (threads() / 2).max(1);
+        let svc = crate::analysis::run(
+            self.paths.clone(),
+            self.registry.clone(),
+            models_dir(),
+            ids,
+            threads,
+            Arc::new(move |p| ev.analysis(&p)),
+        )?;
+        *self.analysis.lock().unwrap_or_else(|e| e.into_inner()) = Some(svc);
+        Ok(n)
+    }
+
+    fn resume_analysis_if_auto(&self) {
+        let auto =
+            self.catalog().load_setting(AUTO_ANALYSIS_KEY).ok().flatten().is_some_and(|v| v == "1");
+        let pending = self.catalog().analysis_counts().map(|c| c.pending).unwrap_or(0);
+        if auto && pending > 0 && !self.analysis_running() {
+            if let Err(e) = self.start_analysis(false) {
+                tracing::warn!(erro = %e, "não foi possível retomar a análise");
+            }
+        }
+    }
+
+    /// Para a análise. O que já foi analisado fica gravado; a seleção é recalculada.
+    pub fn cancel_analysis(&self) {
+        let _ = self.catalog().save_setting(AUTO_ANALYSIS_KEY, "0");
+        if let Some(a) = self.analysis.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+            a.cancel();
+        }
+    }
+
+    /// Espera pelo fim da análise em curso (testes).
+    pub fn wait_analysis(&self) {
+        let taken = self.analysis.lock().unwrap_or_else(|e| e.into_inner()).take();
+        if let Some(a) = taken {
+            a.wait();
+        }
+    }
+
+    fn selection_summary(&self) -> CoreResult<SelectionSummary> {
+        let recs = self.catalog().list_recommendations()?;
+        let groups = self.catalog().list_groups()?;
+        let mut s = SelectionSummary {
+            groups: groups.len() as u64,
+            sequences: groups.iter().filter(|g| g.kind == "sequence").count() as u64,
+            ..Default::default()
+        };
+        for r in &recs {
+            match r.label.as_str() {
+                "best" => s.best += 1,
+                "alternative" => s.alternative += 1,
+                "review" => s.review += 1,
+                "reject" => s.reject += 1,
+                _ => s.duplicate += 1,
+            }
+        }
+        Ok(s)
+    }
+
+    pub fn analysis_status(&self) -> CoreResult<AnalysisStatus> {
+        let counts = self.catalog().analysis_counts()?;
+        let settings = crate::analysis::load_settings(&self.catalog());
+        Ok(AnalysisStatus {
+            running: self.analysis_running(),
+            counts,
+            models_available: models_dir().is_some(),
+            settings,
+            summary: self.selection_summary()?,
+        })
+    }
+
+    /// Muda o modo/objetivo e recalcula as recomendações (rápido: não reanalisa).
+    pub fn set_selection_settings(
+        &self,
+        settings: SelectionSettings,
+    ) -> CoreResult<SelectionSummary> {
+        let mut c = self.catalog();
+        crate::analysis::save_settings(&c, &settings)?;
+        crate::analysis::recompute_selection(&mut c)
+    }
+
+    /// Recalcula com o estado atual (ex.: depois de o utilizador marcar favoritas).
+    pub fn recompute_selection(&self) -> CoreResult<SelectionSummary> {
+        crate::analysis::recompute_selection(&mut self.catalog())
+    }
+
+    pub fn list_recommendations(&self) -> CoreResult<Vec<RecommendationBrief>> {
+        self.catalog().list_recommendations()
+    }
+
+    pub fn list_groups(&self) -> CoreResult<Vec<GroupRow>> {
+        self.catalog().list_groups()
+    }
+
+    pub fn analysis_details(&self, id: AssetId) -> CoreResult<AnalysisDetails> {
+        self.catalog().analysis_details(id)
+    }
+
+    /// “Aceitar sugestões”: favorita nas MELHOR, rejeitada nas REJEITAR SUGERIDO — só em
+    /// fotografias sem decisão do utilizador. Reversível; nada é apagado. Alternativas,
+    /// REVER e duplicadas ficam como estão.
+    pub fn accept_recommendations(&self, ids: &[AssetId]) -> CoreResult<usize> {
+        let mut c = self.catalog();
+        let labels = c.labels_for(ids)?;
+        let picks: Vec<AssetId> = labels.iter().filter(|l| l.1 == "best").map(|l| l.0).collect();
+        let rejects: Vec<AssetId> =
+            labels.iter().filter(|l| l.1 == "reject").map(|l| l.0).collect();
+        c.accept_recommendations(&picks, &rejects)
+    }
+
+    pub fn accept_group(&self, group: i64) -> CoreResult<usize> {
+        let ids: Vec<AssetId> =
+            self.catalog().group_labels(group)?.into_iter().map(|l| l.0).collect();
+        self.accept_recommendations(&ids)
+    }
+
     /// Fecha o projeto: suspende a importação (retomada na próxima abertura) e para as
     /// miniaturas (as pendentes ficam registadas no catálogo).
     pub fn close(&self) {
+        let a = self.analysis.lock().unwrap_or_else(|e| e.into_inner()).take();
+        if let Some(a) = a {
+            a.cancel();
+            a.wait();
+        }
         if let Some(r) = self.import.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
             r.control.suspend();
         }

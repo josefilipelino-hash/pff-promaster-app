@@ -1,6 +1,6 @@
 [package]
 name = "momento-face-analysis"
-description = "Deteção, agrupamento e qualidade de rostos, sempre local."
+description = "Modelos de visão locais (MediaPipe convertidos para ONNX, executados com tract): rostos, pontos faciais, blendshapes e embeddings visuais."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,3 +9,9 @@ publish.workspace = true
 authors.workspace = true
 
 [dependencies]
+momento-core-types.workspace = true
+tract-onnx.workspace = true
+anyhow = "1"
+image.workspace = true
+serde.workspace = true
+tracing.workspace = true

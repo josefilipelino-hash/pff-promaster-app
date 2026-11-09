@@ -1,8 +1,12 @@
 use crate::state::AppState;
 use momento_core_types::{AssetId, CoreError, ErrorPayload};
+use momento_database::analysis::{AnalysisDetails, GroupRow, RecommendationBrief};
 use momento_database::assets::{PhotoDetails, PhotoRow};
 use momento_database::library::RecentProject;
-use momento_project_management::{ImportRequest, NewProject, ProjectInfo};
+use momento_project_management::analysis::SelectionSummary;
+use momento_project_management::{
+    AnalysisStatus, ImportRequest, NewProject, ProjectInfo, SelectionSettings,
+};
 use serde::Serialize;
 use std::path::Path;
 use tauri::State;
@@ -141,6 +145,63 @@ pub fn prioritize_thumbnails(state: State<'_, AppState>, ids: Vec<AssetId>) -> C
 #[tauri::command]
 pub fn save_ui_state(state: State<'_, AppState>, json: String) -> CmdResult<()> {
     state.session().and_then(|s| s.save_ui_state(&json)).map_err(err)
+}
+
+// ------------------------------------------------------------------ seleção assistida
+
+#[tauri::command]
+pub fn start_analysis(state: State<'_, AppState>, reanalyze: bool) -> CmdResult<u64> {
+    state.session().and_then(|s| s.start_analysis(reanalyze)).map_err(err)
+}
+
+#[tauri::command]
+pub fn cancel_analysis(state: State<'_, AppState>) -> CmdResult<()> {
+    state.session().map(|s| s.cancel_analysis()).map_err(err)
+}
+
+#[tauri::command]
+pub fn analysis_status(state: State<'_, AppState>) -> CmdResult<AnalysisStatus> {
+    state.session().and_then(|s| s.analysis_status()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn set_selection_settings(
+    state: State<'_, AppState>,
+    settings: SelectionSettings,
+) -> CmdResult<SelectionSummary> {
+    state.session().and_then(|s| s.set_selection_settings(settings)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn recompute_selection(state: State<'_, AppState>) -> CmdResult<SelectionSummary> {
+    state.session().and_then(|s| s.recompute_selection()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn list_recommendations(
+    state: State<'_, AppState>,
+) -> CmdResult<Vec<RecommendationBrief>> {
+    state.session().and_then(|s| s.list_recommendations()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn list_groups(state: State<'_, AppState>) -> CmdResult<Vec<GroupRow>> {
+    state.session().and_then(|s| s.list_groups()).map_err(err)
+}
+
+#[tauri::command]
+pub fn analysis_details(state: State<'_, AppState>, id: AssetId) -> CmdResult<AnalysisDetails> {
+    state.session().and_then(|s| s.analysis_details(id)).map_err(err)
+}
+
+#[tauri::command]
+pub fn accept_recommendations(state: State<'_, AppState>, ids: Vec<AssetId>) -> CmdResult<usize> {
+    state.session().and_then(|s| s.accept_recommendations(&ids)).map_err(err)
+}
+
+#[tauri::command]
+pub fn accept_group(state: State<'_, AppState>, group: i64) -> CmdResult<usize> {
+    state.session().and_then(|s| s.accept_group(group)).map_err(err)
 }
 
 #[cfg(test)]

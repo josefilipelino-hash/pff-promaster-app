@@ -69,6 +69,27 @@ plataforma, ecrã inicial, validação do formulário, grelha virtualizada com 3
 secções futuras desativadas, classificação por teclado e em seleção múltipla, filtro
 Favoritas + visualizador, reversão quando o núcleo recusa, paridade de traduções.
 
+## Fase 3 — seleção assistida
+
+| Teste | O que verifica |
+|---|---|
+| `face-analysis` (referência Google) | deteção, 478 pontos e blendshapes de `portrait.jpg` iguais aos resultados publicados pelo MediaPipe (`MOMENTO_MP_PORTRAIT`) |
+| `ai-analysis::metrics` (7) | nitidez, tremido, exposição/clipping, ruído, inclinação em imagens sintéticas controladas |
+| `ai-analysis::selection` (8) | rajada do beijo (14), duas câmaras, RAW+JPEG e duplicados, modos, objetivo, piscadela relativa, riso com olhos semicerrados, **15 000 fotografias em ≈ 32 ms** |
+| `database::analysis` | gravação/leitura, `u64` dos hashes, grupos, aceitar sem tocar em decisões do utilizador, reanálise |
+| `analysis_flow` | importar → analisar com os modelos → rajada agrupada e a mais nítida é MELHOR → modo rigoroso → aceitar grupo → objetivo → reabrir. Com `MOMENTO_FACES_DIR`, usa uma fotografia real com rosto |
+| `analysis_throughput_24mp` (ignorado por omissão) | débito com JPEG de 24 MP |
+| Interface (6 novos) | análise só a pedido, etiquetas e “1/3” na grelha, filtro por etiqueta, modo/objetivo, sequências + aceitar + comparar, comparação por teclado e “selecionar outra”, explicação e pontuações no painel, frases, matemática do zoom sincronizado |
+
+```bash
+MOMENTO_FACES_DIR=/pasta/com/fotos cargo test -p momento-project-management --release --test analysis_flow -- --nocapture
+MOMENTO_PERF_N=300 cargo test -p momento-project-management --release --test analysis_flow -- --ignored --nocapture
+```
+
+**Limitação conhecida:** não houve acesso a fotografias reais com olhos fechados; a
+deteção de olhos fechados está validada indiretamente (os coeficientes coincidem com a
+referência da Google para olhos abertos) e por testes do motor com valores sintéticos.
+
 ## Fase 2 — ficheiros reais
 
 Fontes (públicas, nunca no Git): 40 ficheiros do repositório `metadata-extractor-images`

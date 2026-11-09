@@ -14,6 +14,7 @@ pub static LOG_GUARD: OnceLock<tracing_appender::non_blocking::WorkerGuard> = On
 pub const EV_IMPORT_PROGRESS: &str = "import-progress";
 pub const EV_IMPORT_FINISHED: &str = "import-finished";
 pub const EV_THUMBNAILS: &str = "thumbnails";
+pub const EV_ANALYSIS: &str = "analysis-progress";
 
 struct Emitter2 {
     app: AppHandle,
@@ -40,6 +41,9 @@ impl SessionEvents for Emitter2 {
     }
     fn thumbnails(&self, b: &ThumbBatch) {
         let _ = self.app.emit(EV_THUMBNAILS, b);
+    }
+    fn analysis(&self, p: &momento_project_management::analysis::AnalysisProgress) {
+        let _ = self.app.emit(EV_ANALYSIS, p);
     }
 }
 

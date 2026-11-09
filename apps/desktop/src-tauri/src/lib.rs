@@ -39,6 +39,10 @@ pub fn run() {
             let state = AppState::new(&data_dir.join("library.db"), app.handle().clone())
                 .map_err(|e| Box::<dyn std::error::Error>::from(e.to_string()))?;
             app.manage(state);
+            // Modelos de IA locais incluídos como recursos da aplicação instalada.
+            if let Ok(res) = app.path().resource_dir() {
+                momento_project_management::set_model_search_paths(vec![res.join("models")]);
+            }
             tracing::info!(versao = momento_core_types::CORE_VERSION, dados = %data_dir.display(), "aplicação iniciada");
             Ok(())
         })
@@ -60,6 +64,16 @@ pub fn run() {
             commands::cancel_import,
             commands::prioritize_thumbnails,
             commands::save_ui_state,
+            commands::start_analysis,
+            commands::cancel_analysis,
+            commands::analysis_status,
+            commands::set_selection_settings,
+            commands::recompute_selection,
+            commands::list_recommendations,
+            commands::list_groups,
+            commands::analysis_details,
+            commands::accept_recommendations,
+            commands::accept_group,
         ])
         .build(tauri::generate_context!())
         .expect("falha ao iniciar a aplicação");

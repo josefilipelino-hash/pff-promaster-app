@@ -1,4 +1,4 @@
-import type { Color, PhotoRow } from "../types";
+import type { Color, Label, PhotoRow, RecommendationBrief } from "../types";
 
 export type Collection = "all" | "picks" | "rejects" | "unrated";
 
@@ -8,9 +8,11 @@ export interface Filter {
   minStars: number;
   /** Etiqueta de cor (null = qualquer). */
   color: Color | null;
+  /** Etiqueta da seleção assistida (null = qualquer). */
+  label?: Label | null;
 }
 
-export const DEFAULT_FILTER: Filter = { collection: "all", minStars: 0, color: null };
+export const DEFAULT_FILTER: Filter = { collection: "all", minStars: 0, color: null, label: null };
 
 /** “Sem classificação” = sem estrelas e sem marca de favorita/rejeitada. */
 export function inCollection(p: PhotoRow, c: Collection): boolean {
@@ -26,13 +28,29 @@ export function inCollection(p: PhotoRow, c: Collection): boolean {
   }
 }
 
-export function matches(p: PhotoRow, f: Filter): boolean {
-  return inCollection(p, f.collection) && p.stars >= f.minStars && (f.color === null || p.color === f.color);
+export type RecMap = Map<number, RecommendationBrief>;
+
+export function matches(p: PhotoRow, f: Filter, recs?: RecMap): boolean {
+  return (
+    inCollection(p, f.collection) &&
+    p.stars >= f.minStars &&
+    (f.color === null || p.color === f.color) &&
+    (!f.label || recs?.get(p.id)?.label === f.label)
+  );
 }
 
-export function applyFilter(photos: PhotoRow[], f: Filter): PhotoRow[] {
-  if (f.collection === "all" && f.minStars === 0 && f.color === null) return photos;
-  return photos.filter((p) => matches(p, f));
+export function applyFilter(photos: PhotoRow[], f: Filter, recs?: RecMap): PhotoRow[] {
+  if (f.collection === "all" && f.minStars === 0 && f.color === null && !f.label) return photos;
+  return photos.filter((p) => matches(p, f, recs));
+}
+
+export function labelCounts(photos: PhotoRow[], recs: RecMap): Record<Label, number> {
+  const c: Record<Label, number> = { best: 0, alternative: 0, review: 0, reject: 0, duplicate: 0 };
+  for (const p of photos) {
+    const r = recs.get(p.id);
+    if (r) c[r.label]++;
+  }
+  return c;
 }
 
 export function collectionCounts(photos: PhotoRow[]): Record<Collection, number> {

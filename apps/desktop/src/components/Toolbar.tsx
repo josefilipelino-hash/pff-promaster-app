@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 import { formatEventDate } from "../logic/format";
+import type { View } from "../store";
 import type { ProjectInfo } from "../types";
 
 /** Barra superior: projeto, importação, ajuda e fecho. Os filtros estão na barra inferior. */
@@ -10,6 +11,9 @@ export function Toolbar({
   onImportFolder,
   onClose,
   onHelp,
+  onCompare,
+  view,
+  onView,
 }: {
   project: ProjectInfo;
   importBusy: boolean;
@@ -17,6 +21,9 @@ export function Toolbar({
   onImportFolder: () => void;
   onClose: () => void;
   onHelp: () => void;
+  onCompare: () => void;
+  view: View;
+  onView: (v: View) => void;
 }) {
   const { t, i18n } = useTranslation();
   return (
@@ -28,6 +35,18 @@ export function Toolbar({
         </span>
       </div>
       <span className="spacer" />
+      <span className="segmented" role="group" aria-label={t("view.label")}>
+        <button type="button" className={`btn small${view === "grid" ? " active" : ""}`} aria-pressed={view === "grid"} onClick={() => onView("grid")}>
+          {t("view.grid")}
+        </button>
+        <button type="button" className={`btn small${view === "sequences" ? " active" : ""}`} aria-pressed={view === "sequences"} onClick={() => onView("sequences")}>
+          {t("view.sequences")}
+        </button>
+      </span>
+      <button type="button" className="btn" onClick={onCompare} title={`${t("compare.openHint")} (C)`}>
+        {t("compare.open")}
+      </button>
+      <span className="sep" />
       <button type="button" className="btn" disabled={importBusy} onClick={onImportFiles} title={t("import.filesHint")}>
         {t("import.files")}
       </button>

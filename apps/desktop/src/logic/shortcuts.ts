@@ -14,7 +14,8 @@ export type Action =
   | { type: "info" }
   | { type: "selectAll" }
   | { type: "import" }
-  | { type: "help" };
+  | { type: "help" }
+  | { type: "compare" };
 
 export interface KeyLike {
   key: string;
@@ -64,6 +65,8 @@ export function keyToAction(e: KeyLike, mac: boolean): Action | null {
       return { type: "zoom", dir: -1 };
     case "?":
       return { type: "help" };
+    case "c":
+      return { type: "compare" };
     case "arrowleft":
       return { type: "move", dx: -1, dy: 0, extend: e.shiftKey };
     case "arrowright":
@@ -92,6 +95,7 @@ export const SHORTCUT_HELP: [string, string][] = [
   ["+ / −", "shortcuts.zoom"],
   ["F", "shortcuts.fullscreen"],
   ["I", "shortcuts.info"],
+  ["C", "shortcuts.compare"],
   ["Mod + Shift + I", "shortcuts.import"],
   ["?", "shortcuts.help"],
 ];

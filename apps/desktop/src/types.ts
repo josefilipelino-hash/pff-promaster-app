@@ -146,3 +146,135 @@ export interface AppInfo {
   os: string;
   arch: string;
 }
+
+// --- Seleção assistida (Fase 3) ---------------------------------------------------------
+
+export type Label = "best" | "alternative" | "review" | "reject" | "duplicate";
+export const LABELS: Label[] = ["best", "alternative", "review", "reject", "duplicate"];
+export type SelectionMode = "conservative" | "balanced" | "strict";
+export const SELECTION_MODES: SelectionMode[] = ["conservative", "balanced", "strict"];
+
+export interface SelectionSettings {
+  mode: SelectionMode;
+  /** Número aproximado de fotografias a entregar (null = sem objetivo). */
+  target: number | null;
+}
+
+export interface SelectionSummary {
+  best: number;
+  alternative: number;
+  review: number;
+  reject: number;
+  duplicate: number;
+  groups: number;
+  sequences: number;
+  durationMs: number;
+}
+
+export interface AnalysisCounts {
+  total: number;
+  analyzed: number;
+  failed: number;
+  pending: number;
+}
+
+export interface AnalysisStatus {
+  running: boolean;
+  counts: AnalysisCounts;
+  modelsAvailable: boolean;
+  settings: SelectionSettings;
+  summary: SelectionSummary;
+}
+
+export interface AnalysisProgress {
+  done: number;
+  failed: number;
+  total: number;
+  remaining: number;
+  finished: boolean;
+}
+
+export interface RecommendationBrief {
+  asset: number;
+  label: Label;
+  groupId: number | null;
+  rank: number;
+  groupSize: number;
+}
+
+export interface GroupRow {
+  id: number;
+  kind: "sequence" | "duplicate" | "raw_jpeg";
+  size: number;
+  /** Do melhor para o pior. */
+  members: number[];
+}
+
+export interface AnalysisRow {
+  models: string | null;
+  width: number;
+  height: number;
+  sharpness: number;
+  focusPeak: number;
+  focusCenter: number;
+  motionBlur: number;
+  brightness: number;
+  highlightsClipped: number;
+  shadowsCrushed: number;
+  contrast: number;
+  noise: number;
+  tiltDegrees: number | null;
+  phash: number;
+  dhash: number;
+  durationMs: number;
+}
+
+export interface FaceRow {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  px: number;
+  detScore: number;
+  presence: number;
+  blinkLeft: number;
+  blinkRight: number;
+  smile: number;
+  jawOpen: number;
+  sharpness: number;
+  eyeSharpness: number;
+  cut: boolean;
+}
+
+export interface Reason {
+  code: string;
+  value?: number;
+}
+
+export interface RecommendationRow {
+  asset: number;
+  label: Label;
+  rank: number;
+  groupSize: number;
+  summary: string;
+  /** JSON `[{code, value?}]`. */
+  reasons: string;
+  focus: number;
+  motion: number;
+  exposure: number;
+  noise: number;
+  eyes: number | null;
+  expression: number | null;
+  composition: number;
+  technical: number;
+  people: number | null;
+  overall: number;
+}
+
+export interface AnalysisDetails {
+  analysis: AnalysisRow | null;
+  faces: FaceRow[];
+  recommendation: RecommendationRow | null;
+  groupId: number | null;
+  error: string | null;
+}

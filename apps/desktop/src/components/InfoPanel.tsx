@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { cameraName, formatAperture, formatBytes, formatCaptureTime, formatExposure, formatFocal } from "../logic/format";
 import { useStore } from "../store";
 import type { Color, PhotoRow } from "../types";
+import { AnalysisSection } from "./AnalysisSection";
 import { ColorButtons, FlagButtons, Stars } from "./Rating";
 
 /** Nome do formato: para RAW sobre TIFF usa-se a extensão (NEF, ARW, DNG…). */
@@ -19,10 +20,14 @@ export function InfoPanel({
   photo,
   selectedCount,
   onRate,
+  onCompareGroup,
+  onAccept,
 }: {
   photo: PhotoRow | null;
   selectedCount: number;
   onRate: (kind: "stars" | "flag" | "color", value: number | Color | null) => void;
+  onCompareGroup?: (ids: number[]) => void;
+  onAccept?: (id: number) => void;
 }) {
   const { t, i18n } = useTranslation();
   const details = useStore((s) => (photo ? s.details.get(photo.id) : undefined));
@@ -84,6 +89,7 @@ export function InfoPanel({
           <span>{d.partialNote}</span>
         </div>
       )}
+      <AnalysisSection photo={photo} onCompareGroup={onCompareGroup ?? (() => {})} onAccept={onAccept ?? (() => {})} />
       <dl className="info-list">
         {rows
           .filter(([, v]) => v)

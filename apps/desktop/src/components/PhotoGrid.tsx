@@ -2,7 +2,8 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { useTranslation } from "react-i18next";
 import { api, imageUrl } from "../api";
 import { useStore } from "../store";
-import type { PhotoRow } from "../types";
+import type { PhotoRow, RecommendationBrief } from "../types";
+import { LabelChip } from "./LabelChip";
 
 const GAP = 8;
 const FOOTER = 24;
@@ -41,6 +42,7 @@ interface CellProps {
   onOpen: (id: number) => void;
   failedLabel: string;
   partialLabel: string;
+  rec?: RecommendationBrief;
 }
 
 /** Extensão do ficheiro em maiúsculas (ex.: CR3), mostrada no rodapé da célula. */
@@ -49,7 +51,7 @@ export function extLabel(fileName: string): string {
   return i >= 0 ? fileName.slice(i + 1).toUpperCase().slice(0, 5) : "";
 }
 
-const Cell = memo(function Cell({ photo, size, token, version, selected, focused, onClick, onOpen, failedLabel, partialLabel }: CellProps) {
+const Cell = memo(function Cell({ photo, size, token, version, selected, focused, onClick, onOpen, failedLabel, partialLabel, rec }: CellProps) {
   return (
     <div
       className={`cell${selected ? " selected" : ""}${focused ? " focused" : ""}${photo.flag === -1 ? " rejected" : ""}`}
@@ -70,6 +72,12 @@ const Cell = memo(function Cell({ photo, size, token, version, selected, focused
           <span className="thumb-pending" />
         )}
         {photo.color && <span className={`cell-color c-${photo.color}`} />}
+        {rec && (
+          <span className="cell-rec">
+            <LabelChip label={rec.label} compact />
+            {rec.groupSize > 1 && rec.label !== "duplicate" && <span className="cell-group">{`${rec.rank + 1}/${rec.groupSize}`}</span>}
+          </span>
+        )}
         {photo.partial && (
           <span className="cell-partial" title={partialLabel}>
             {partialLabel}
@@ -101,6 +109,7 @@ export function PhotoGrid({
   const thumbSize = useStore((s) => s.thumbSize);
   const selection = useStore((s) => s.selection);
   const versions = useStore((s) => s.thumbVersion);
+  const recs = useStore((s) => s.recs);
   const scroller = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ width: 800, height: 600 });
   const [scrollTop, setScrollTop] = useState(0);
@@ -172,6 +181,7 @@ export function PhotoGrid({
             onOpen={onOpen}
             failedLabel={t("grid.thumbFailed")}
             partialLabel={t("grid.partial")}
+            rec={recs.get(p.id)}
           />
         ))}
       </div>,

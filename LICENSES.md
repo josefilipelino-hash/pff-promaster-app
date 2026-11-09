@@ -18,7 +18,7 @@ para não fechar opções futuras.
 Verificação automática das licenças transitivas com `cargo-deny` e `pnpm licenses list`:
 ainda **não** implementada (adiada para a Fase 2; as licenças diretas foram verificadas manualmente no crates.io e no npm).
 
-## Dependências em uso (Fase 2)
+## Dependências em uso (Fase 3)
 
 ### Rust (diretas)
 
@@ -48,6 +48,8 @@ ainda **não** implementada (adiada para a Fase 2; as licenças diretas foram ve
 | image-webp (via image) | 0.2.4 | MIT OR Apache-2.0 | WebP |
 | objc2-image-io, objc2-core-graphics, objc2-core-foundation (só macOS) | 0.3.2 | Zlib OR Apache-2.0 OR MIT | HEIC/HEIF/AVIF via ImageIO |
 | windows (só Windows) | 0.62.2 | MIT OR Apache-2.0 | HEIC/HEIF/AVIF via WIC |
+| **tract-onnx** (+ tract-core, tract-hir, tract-linalg…) | 0.23.9 | MIT OR Apache-2.0 | inferência dos modelos de IA (Fase 3) |
+| anyhow | 1 | MIT OR Apache-2.0 | erros internos da inferência |
 
 **LibRaw sob CDDL-1.0:** o copyleft da CDDL aplica-se apenas aos ficheiros da própria
 LibRaw (que não modificamos e cujo código-fonte está disponível no submódulo). Permite a
@@ -89,7 +91,7 @@ builds para macOS e Windows.
 | XMP | xmp_toolkit (Adobe XMP Toolkit) | 1.12 | MIT OR Apache-2.0 (toolkit: BSD-3) | 2 |
 | macOS ImageIO / Vision / Core ML / AppKit | objc2-image-io, objc2-vision, objc2-core-ml, objc2-app-kit | 0.3 | Zlib OR Apache-2.0 OR MIT (bindings); frameworks do sistema | 2–5 |
 | Gestão de cor | lcms2 (LittleCMS 2) | 6.2 | MIT | 2 |
-| IA | ort (ONNX Runtime 1.31) | 2.0.0-rc.15 | MIT OR Apache-2.0 (ORT: MIT) | 3 |
+| IA (acelerada, se necessário) | ort (ONNX Runtime 1.31) | 2.0.0-rc.15 | MIT OR Apache-2.0 (ORT: MIT) | adiada (D-024) |
 | Correção de lente | lensfun (porta Rust) / base de dados Lensfun | 0.7 | **LGPL-3.0-or-later** (crate em Rust, ligação estática → reavaliar ou usar só os dados); dados CC-BY-SA-3.0 | 4 |
 | GPU | wgpu | 30 | MIT OR Apache-2.0 | 9 |
 | JPEG rápido | turbojpeg (libjpeg-turbo) | 1.5 | Unlicense OR MIT (crate); IJG/BSD-3/Zlib | 1–2 se necessário |
@@ -107,7 +109,18 @@ Nota: a escolha final de cada crate é revista no momento da adição (versão, 
 licença exata do pacote publicado). Esta tabela confirma apenas que as bibliotecas
 existem e são adequadas à data de 2026-11-08.
 
-## Modelos de IA (avaliação inicial, Fase 3)
+## Modelos de IA (Fase 3)
 
-Ver `ARCHITECTURE.md §11`. Cada modelo só entra em `models/manifest.json` depois de
-confirmar a licença **dos pesos** (que pode diferir da licença do código).
+Ver `ARCHITECTURE.md §11` e D-024/D-025. Os pesos não são versionados: são descarregados
+por `scripts/prepare-models.py` (URLs e SHA-256 fixados) e incluídos no instalador.
+
+| Modelo | Origem | Licença dos pesos | Tamanho (ONNX) | Uso |
+|---|---|---|---|---|
+| BlazeFace short-range (`face_detector`) | Google MediaPipe, `face_landmarker.task` | Apache-2.0 | 0,4 MB | deteção de rostos |
+| Face landmarks 478 (`face_landmarks_detector`) | idem | Apache-2.0 | 4,9 MB | pontos faciais, presença |
+| Face blendshapes (`face_blendshapes`) | idem | Apache-2.0 | 1,9 MB | olhos fechados, sorriso, boca |
+| MobileNetV3-small image embedder (`image_embedder`) | Google MediaPipe | Apache-2.0 | 4,2 MB | semelhança visual |
+
+Licença confirmada no *model card* do MediaPipe Face Landmarker e do Image Embedder
+(Apache-2.0). A conversão (tf2onnx 1.17, só no momento da preparação, não incluído na
+aplicação) é Apache-2.0.

@@ -1,5 +1,37 @@
 {
-  "$comment": "Registo de modelos de IA. Os pesos NÃO são versionados: são descarregados por scripts/download-models (Fase 3) e verificados por SHA-256. Cada entrada exige licença verificada (ver LICENSES.md).",
+  "$comment": "Registo de modelos de IA. Os pesos NÃO são versionados: scripts/prepare-models.py descarrega-os das URLs abaixo, verifica o SHA-256 e converte-os para ONNX (models.lock.json fixa o resultado). Licenças em LICENSES.md.",
   "schemaVersion": 1,
-  "models": []
+  "models": [
+    {
+      "id": "face_detector",
+      "file": "face_detector.onnx",
+      "source": "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task",
+      "sourceMember": "face_detector.tflite",
+      "license": "Apache-2.0",
+      "task": "deteção de rostos (BlazeFace short-range, 128×128)"
+    },
+    {
+      "id": "face_landmarks_detector",
+      "file": "face_landmarks_detector.onnx",
+      "source": "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task",
+      "sourceMember": "face_landmarks_detector.tflite",
+      "license": "Apache-2.0",
+      "task": "478 pontos faciais + presença (256×256)"
+    },
+    {
+      "id": "face_blendshapes",
+      "file": "face_blendshapes.onnx",
+      "source": "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task",
+      "sourceMember": "face_blendshapes.tflite",
+      "license": "Apache-2.0",
+      "task": "52 coeficientes de expressão (olhos fechados, sorriso…)"
+    },
+    {
+      "id": "image_embedder",
+      "file": "image_embedder.onnx",
+      "source": "https://storage.googleapis.com/mediapipe-models/image_embedder/mobilenet_v3_small/float32/latest/mobilenet_v3_small.tflite",
+      "license": "Apache-2.0",
+      "task": "embedding visual de 1024 dimensões (MobileNetV3-small)"
+    }
+  ]
 }

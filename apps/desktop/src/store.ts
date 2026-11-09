@@ -2,7 +2,21 @@ import { create } from "zustand";
 import { api } from "./api";
 import { DEFAULT_FILTER, type Filter } from "./logic/filters";
 import { EMPTY_SELECTION, type Selection } from "./logic/selection";
-import type { Color, ErrorPayload, ImportProgress, ImportSummary, PhotoDetails, PhotoRow, ProjectInfo, ThumbBatch } from "./types";
+import type { RecMap } from "./logic/filters";
+import type {
+  AnalysisDetails,
+  AnalysisProgress,
+  AnalysisStatus,
+  Color,
+  ErrorPayload,
+  GroupRow,
+  ImportProgress,
+  ImportSummary,
+  PhotoDetails,
+  PhotoRow,
+  ProjectInfo,
+  ThumbBatch,
+} from "./types";
 
 export const THUMB_MIN = 100;
 export const THUMB_MAX = 400;
@@ -20,7 +34,11 @@ export interface UiState {
   thumbSize: number;
   focusId: number | null;
   infoOpen: boolean;
+  view?: View;
 }
+
+/** Vista principal: grelha de fotografias ou lista de sequências/grupos. */
+export type View = "grid" | "sequences";
 
 interface State {
   project: ProjectInfo | null;
@@ -41,6 +59,16 @@ interface State {
   pendingImport: { paths: string[]; hasFolders: boolean } | null;
   helpOpen: boolean;
   toasts: Toast[];
+  view: View;
+  // Seleção assistida
+  analysis: AnalysisStatus | null;
+  analysisProgress: AnalysisProgress | null;
+  recs: RecMap;
+  groups: GroupRow[];
+  groupById: Map<number, GroupRow>;
+  analysisDetails: Map<number, AnalysisDetails>;
+  /** Fotografias na comparação lado a lado (2–4), ou null. */
+  compare: number[] | null;
 }
 
 interface Actions {
@@ -63,6 +91,11 @@ interface Actions {
   toast(kind: Toast["kind"], text: string): void;
   dismissToast(id: number): void;
   uiState(): UiState;
+  setView(v: View): void;
+  reloadSelection(): Promise<void>;
+  setAnalysisProgress(p: AnalysisProgress | null): void;
+  loadAnalysisDetails(id: number): Promise<void>;
+  openCompare(ids: number[] | null): void;
 }
 
 let toastSeq = 1;
@@ -82,6 +115,7 @@ export function parseUiState(json: string | null): Partial<UiState> {
     if (typeof v.thumbSize === "number") out.thumbSize = Math.min(THUMB_MAX, Math.max(THUMB_MIN, v.thumbSize));
     if (typeof v.focusId === "number") out.focusId = v.focusId;
     if (typeof v.infoOpen === "boolean") out.infoOpen = v.infoOpen;
+    if (v.view === "grid" || v.view === "sequences") out.view = v.view;
     return out;
   } catch {
     return {};
@@ -106,6 +140,14 @@ export const useStore = create<State & Actions>((set, get) => ({
   pendingImport: null,
   helpOpen: false,
   toasts: [],
+  view: "grid",
+  analysis: null,
+  analysisProgress: null,
+  recs: new Map(),
+  groups: [],
+  groupById: new Map(),
+  analysisDetails: new Map(),
+  compare: null,
 
   setProject(p) {
     if (!p) {
@@ -121,6 +163,14 @@ export const useStore = create<State & Actions>((set, get) => ({
         importSummary: null,
         thumbProgress: null,
         thumbVersion: new Map(),
+        view: "grid",
+        analysis: null,
+        analysisProgress: null,
+        recs: new Map(),
+        groups: [],
+        groupById: new Map(),
+        analysisDetails: new Map(),
+        compare: null,
       });
       return;
     }
@@ -134,6 +184,8 @@ export const useStore = create<State & Actions>((set, get) => ({
       importRunning: p.importRunning,
       viewerId: null,
       details: new Map(),
+      view: ui.view ?? "grid",
+      compare: null,
     });
   },
 
@@ -252,7 +304,38 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   uiState() {
     const s = get();
-    return { filter: s.filter, thumbSize: s.thumbSize, focusId: s.selection.focus, infoOpen: s.infoOpen };
+    return { filter: s.filter, thumbSize: s.thumbSize, focusId: s.selection.focus, infoOpen: s.infoOpen, view: s.view };
+  },
+
+  setView(v) {
+    set({ view: v });
+  },
+
+  async reloadSelection() {
+    const [analysis, recs, groups] = await Promise.all([api.analysisStatus(), api.listRecommendations(), api.listGroups()]);
+    set({
+      analysis,
+      recs: new Map(recs.map((r) => [r.asset, r])),
+      groups,
+      groupById: new Map(groups.map((g) => [g.id, g])),
+      analysisDetails: new Map(),
+    });
+  },
+
+  setAnalysisProgress(p) {
+    set({ analysisProgress: p });
+  },
+
+  async loadAnalysisDetails(id) {
+    if (get().analysisDetails.has(id)) return;
+    const d = await api.analysisDetails(id);
+    const m = new Map(get().analysisDetails);
+    m.set(id, d);
+    set({ analysisDetails: m });
+  },
+
+  openCompare(ids) {
+    set({ compare: ids && ids.length >= 1 ? ids.slice(0, 4) : null });
   },
 }));
 

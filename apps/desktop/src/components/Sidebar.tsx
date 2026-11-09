@@ -1,5 +1,8 @@
 import { useTranslation } from "react-i18next";
 import type { Collection } from "../logic/filters";
+import type { View } from "../store";
+import type { Label } from "../types";
+import { SelectionPanel } from "./SelectionPanel";
 
 const COLLECTIONS: Collection[] = ["all", "picks", "rejects", "unrated"];
 
@@ -10,7 +13,25 @@ const UPCOMING: [string, number][] = [
   ["export", 6],
 ];
 
-export function Sidebar({ active, counts, onSelect }: { active: Collection; counts: Record<Collection, number>; onSelect: (c: Collection) => void }) {
+export function Sidebar({
+  active,
+  counts,
+  onSelect,
+  labelCounts,
+  activeLabel,
+  onLabel,
+  view,
+  onView,
+}: {
+  active: Collection;
+  counts: Record<Collection, number>;
+  onSelect: (c: Collection) => void;
+  labelCounts: Record<Label, number>;
+  activeLabel: Label | null;
+  onLabel: (l: Label | null) => void;
+  view: View;
+  onView: (v: View) => void;
+}) {
   const { t } = useTranslation();
   return (
     <nav className="sidebar" aria-label={t("sidebar.label")}>
@@ -18,13 +39,14 @@ export function Sidebar({ active, counts, onSelect }: { active: Collection; coun
       <ul>
         {COLLECTIONS.map((c) => (
           <li key={c}>
-            <button type="button" className={`side-item${active === c ? " active" : ""}`} aria-current={active === c} onClick={() => onSelect(c)}>
+            <button type="button" className={`side-item${active === c && view === "grid" && !activeLabel ? " active" : ""}`} aria-current={active === c} onClick={() => onSelect(c)}>
               <span>{t(`collection.${c}`)}</span>
               <span className="count">{counts[c].toLocaleString()}</span>
             </button>
           </li>
         ))}
       </ul>
+      <SelectionPanel labelCounts={labelCounts} activeLabel={activeLabel} onLabel={onLabel} view={view} onView={onView} />
       <h3 className="sidebar-title">{t("sidebar.upcoming")}</h3>
       <ul>
         {UPCOMING.map(([k, phase]) => (

@@ -124,6 +124,90 @@ pub const CATALOG: &[&str] = &[
     ALTER TABLE import_item_v3 RENAME TO import_item;
     CREATE INDEX import_item_by_state ON import_item(session_id, state);
     "#,
+    // v4 — Fase 3: análise, rostos, embeddings, grupos e recomendações.
+    r#"
+    ALTER TABLE asset ADD COLUMN analysis_state INTEGER NOT NULL DEFAULT 0 CHECK (analysis_state IN (0, 1, 2));
+    ALTER TABLE asset ADD COLUMN analysis_error TEXT;
+
+    CREATE TABLE analysis (
+        asset_id           INTEGER PRIMARY KEY REFERENCES asset(id) ON DELETE CASCADE,
+        version            INTEGER NOT NULL,
+        analyzed_at        INTEGER NOT NULL,
+        models             TEXT,
+        width              INTEGER NOT NULL,
+        height             INTEGER NOT NULL,
+        sharpness          REAL NOT NULL,
+        focus_peak         REAL NOT NULL,
+        focus_center       REAL NOT NULL,
+        motion_blur        REAL NOT NULL,
+        brightness         REAL NOT NULL,
+        highlights_clipped REAL NOT NULL,
+        shadows_crushed    REAL NOT NULL,
+        contrast           REAL NOT NULL,
+        noise              REAL NOT NULL,
+        tilt_degrees       REAL,
+        phash              INTEGER NOT NULL,
+        dhash              INTEGER NOT NULL,
+        face_count         INTEGER NOT NULL,
+        duration_ms        INTEGER NOT NULL
+    ) STRICT;
+
+    CREATE TABLE face (
+        id            INTEGER PRIMARY KEY,
+        asset_id      INTEGER NOT NULL REFERENCES asset(id) ON DELETE CASCADE,
+        x             REAL NOT NULL,
+        y             REAL NOT NULL,
+        w             REAL NOT NULL,
+        h             REAL NOT NULL,
+        px            REAL NOT NULL,
+        det_score     REAL NOT NULL,
+        presence      REAL NOT NULL,
+        blink_left    REAL NOT NULL,
+        blink_right   REAL NOT NULL,
+        smile         REAL NOT NULL,
+        jaw_open      REAL NOT NULL,
+        sharpness     REAL NOT NULL,
+        eye_sharpness REAL NOT NULL,
+        cut           INTEGER NOT NULL,
+        blendshapes   BLOB
+    ) STRICT;
+    CREATE INDEX face_by_asset ON face(asset_id);
+
+    CREATE TABLE embedding (
+        asset_id INTEGER NOT NULL REFERENCES asset(id) ON DELETE CASCADE,
+        model    TEXT NOT NULL,
+        vector   BLOB NOT NULL,
+        PRIMARY KEY (asset_id, model)
+    ) STRICT;
+
+    CREATE TABLE photo_group (
+        id   INTEGER PRIMARY KEY,
+        kind TEXT NOT NULL CHECK (kind IN ('sequence', 'duplicate', 'raw_jpeg')),
+        size INTEGER NOT NULL
+    ) STRICT;
+
+    CREATE TABLE recommendation (
+        asset_id    INTEGER PRIMARY KEY REFERENCES asset(id) ON DELETE CASCADE,
+        label       TEXT NOT NULL CHECK (label IN ('best', 'alternative', 'review', 'reject', 'duplicate')),
+        group_id    INTEGER REFERENCES photo_group(id) ON DELETE SET NULL,
+        rank        INTEGER NOT NULL,
+        group_size  INTEGER NOT NULL,
+        summary     TEXT NOT NULL,
+        reasons     TEXT NOT NULL,
+        focus       REAL NOT NULL,
+        motion      REAL NOT NULL,
+        exposure    REAL NOT NULL,
+        noise       REAL NOT NULL,
+        eyes        REAL,
+        expression  REAL,
+        composition REAL NOT NULL,
+        technical   REAL NOT NULL,
+        people      REAL,
+        overall     REAL NOT NULL,
+        computed_at INTEGER NOT NULL
+    ) STRICT;
+    CREATE INDEX recommendation_by_group ON recommendation(group_id, rank);
+    "#,
 ];
 
 /// Migrações da biblioteca global (projetos recentes).

@@ -1,0 +1,29 @@
+{
+  "generator": "scripts/prepare-models.py",
+  "models": [
+    {
+      "file": "face_detector.onnx",
+      "sha256": "1218b744aa0c89ee031a5e384d8f9ffd3a65f886b8a69fef9bbe8d32c459d89e",
+      "bytes": 418463,
+      "source_sha256": "b4578f35940bf5a1a655214a1cce5cab13eba73c1297cd78e1a04c2380b0152f"
+    },
+    {
+      "file": "face_landmarks_detector.onnx",
+      "sha256": "0e4883819c2711b5d5d79bada2ff84cd177bae5c5a4233f10ff7da6df5a48db7",
+      "bytes": 4920994,
+      "source_sha256": "c7d54204ce0448474c7f3fa9af494787c0965cbdd6f20fc72867e43046bd43d5"
+    },
+    {
+      "file": "face_blendshapes.onnx",
+      "sha256": "212b9bcf7b093612b5c0c8efad1d36db0d90d262acf4d71e782168f88b703f7f",
+      "bytes": 1883894,
+      "source_sha256": "4f36dded049db18d76048567439b2a7f58f1daabc00d78bfe8f3ad396a2d2082"
+    },
+    {
+      "file": "image_embedder.onnx",
+      "sha256": "bbfa9c61ca0a16140c8b8b4fa8386520f3ff70a1634c2fadb2fae297f274a637",
+      "bytes": 4189824,
+      "source_sha256": "bbbb4c51a55a53905af1daec995ca1aae355046f8839bb8c9f5ce9271394bc40"
+    }
+  ]
+}

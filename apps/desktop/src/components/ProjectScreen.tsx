@@ -4,11 +4,13 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { api, events, isMac } from "../api";
-import { applyFilter, collectionCounts } from "../logic/filters";
+import { applyFilter, collectionCounts, labelCounts } from "../logic/filters";
 import { clickSelect, moveFocus, restrict, selectAll, targets } from "../logic/selection";
 import { keyToAction, type Action } from "../logic/shortcuts";
 import { errorText, useStore } from "../store";
-import type { Color, ImportMode } from "../types";
+import type { Color, GroupRow, ImportMode, Label } from "../types";
+import { CompareView, type CompareHandle } from "./CompareView";
+import { SequencesView } from "./SequencesView";
 import { HelpOverlay } from "./HelpOverlay";
 import { ImportDialog, ImportReport } from "./ImportDialogs";
 import { InfoPanel } from "./InfoPanel";
@@ -39,11 +41,14 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
   const project = s.project!;
   const layoutRef = useRef<GridLayout>({ columns: 1, cell: 180, rowHeight: 212 });
   const viewerRef = useRef<ViewerHandle | null>(null);
+  const compareRef = useRef<CompareHandle | null>(null);
+  const [compareActive, setCompareActive] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
   const mac = isMac();
 
-  const visible = useMemo(() => applyFilter(s.photos, s.filter), [s.photos, s.filter]);
+  const visible = useMemo(() => applyFilter(s.photos, s.filter, s.recs), [s.photos, s.filter, s.recs]);
+  const lCounts = useMemo(() => labelCounts(s.photos, s.recs), [s.photos, s.recs]);
   const order = useMemo(() => visible.map((p) => p.id), [visible]);
   const counts = useMemo(() => collectionCounts(s.photos), [s.photos]);
   const focusPhoto = s.selection.focus !== null ? (s.photos[s.index.get(s.selection.focus) ?? -1] ?? null) : null;
@@ -52,9 +57,10 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
 
   const fail = useCallback((e: unknown) => s.toast("error", errorText(e, t)), [s, t]);
 
-  // Carregar fotografias ao abrir.
+  // Carregar fotografias e seleção assistida ao abrir.
   useEffect(() => {
     s.reloadPhotos().catch(fail);
+    s.reloadSelection().catch(fail);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.path]);
 
@@ -96,6 +102,16 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
         else st.toast("info", t("report.toast", { count: sum.counts.imported }));
       }),
       events.thumbnails((b) => useStore.getState().applyThumbBatch(b)),
+      events.analysis((p) => {
+        const st = useStore.getState();
+        st.setAnalysisProgress(p.finished ? null : p);
+        if (p.finished) {
+          st.reloadSelection().catch(() => {});
+          st.toast("info", t("selection.finished", { count: p.done }));
+        } else if (st.analysis && !st.analysis.running) {
+          st.reloadSelection().catch(() => {});
+        }
+      }),
       getCurrentWebview().onDragDropEvent((e) => {
         const p = e.payload;
         if (p.type === "enter" || p.type === "over") setDragging(true);
@@ -114,20 +130,85 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
   }, [t]);
 
   // Guardar o estado da interface no catálogo (com atraso para agrupar alterações).
-  const uiJson = JSON.stringify({ filter: s.filter, thumbSize: s.thumbSize, focusId: s.selection.focus, infoOpen: s.infoOpen });
+  const uiJson = JSON.stringify({ filter: s.filter, thumbSize: s.thumbSize, focusId: s.selection.focus, infoOpen: s.infoOpen, view: s.view });
   useEffect(() => {
     const h = setTimeout(() => api.saveUiState(uiJson).catch(() => {}), 500);
     return () => clearTimeout(h);
   }, [uiJson]);
 
+  // Com objetivo de entrega, as favoritas do utilizador contam: recalcula (com atraso).
+  const recomputeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleRecompute = useCallback(() => {
+    if (useStore.getState().analysis?.settings.target == null) return;
+    if (recomputeTimer.current) clearTimeout(recomputeTimer.current);
+    recomputeTimer.current = setTimeout(() => {
+      api
+        .recomputeSelection()
+        .then(() => useStore.getState().reloadSelection())
+        .catch(() => {});
+    }, 900);
+  }, []);
+
   const rate = useCallback(
     (kind: "stars" | "flag" | "color", value: number | Color | null, ids?: number[]) => {
       const st = useStore.getState();
-      const list = ids ?? (st.viewerId !== null ? [st.viewerId] : targets(st.selection));
+      const cmp = st.compare;
+      const list = ids ?? (cmp ? [cmp[compareActive] ?? cmp[0]!] : st.viewerId !== null ? [st.viewerId] : targets(st.selection));
       if (list.length === 0) return;
-      st.rate(kind, value, list).catch(fail);
+      st.rate(kind, value, list)
+        .then(() => kind === "flag" && scheduleRecompute())
+        .catch(fail);
     },
-    [fail],
+    [fail, compareActive, scheduleRecompute],
+  );
+
+  const openCompare = useCallback((ids: number[]) => {
+    const st = useStore.getState();
+    const uniq = [...new Set(ids)].slice(0, 4);
+    if (uniq.length < 2) return void st.toast("info", t("compare.needTwo"));
+    setCompareActive(0);
+    st.openViewer(null);
+    st.openCompare(uniq);
+  }, [t]);
+
+  /** Comparar: 2–4 selecionadas; ou a sequência da fotografia com foco. */
+  const compareFromSelection = useCallback(() => {
+    const st = useStore.getState();
+    const sel = order.filter((id) => st.selection.ids.has(id));
+    if (sel.length >= 2) return openCompare(sel);
+    const focus = st.selection.focus;
+    const g = focus !== null ? st.recs.get(focus)?.groupId : null;
+    const group = g != null ? st.groupById.get(g) : undefined;
+    if (group && focus !== null) return openCompare([focus, ...group.members.filter((m) => m !== focus)]);
+    st.toast("info", t("compare.needTwo"));
+  }, [order, openCompare, t]);
+
+  const acceptIds = useCallback(
+    async (ids: number[]) => {
+      try {
+        const n = await api.acceptRecommendations(ids);
+        await useStore.getState().reloadPhotos();
+        scheduleRecompute();
+        useStore.getState().toast("info", t("selection.accepted", { count: n }));
+      } catch (e) {
+        fail(e);
+      }
+    },
+    [fail, scheduleRecompute, t],
+  );
+
+  const acceptGroup = useCallback(
+    async (g: GroupRow) => {
+      try {
+        const n = await api.acceptGroup(g.id);
+        await useStore.getState().reloadPhotos();
+        scheduleRecompute();
+        useStore.getState().toast("info", t("selection.accepted", { count: n }));
+      } catch (e) {
+        fail(e);
+      }
+    },
+    [fail, scheduleRecompute, t],
   );
 
   const toggleFullscreen = useCallback(async () => {
@@ -187,7 +268,32 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
   const handleAction = useCallback(
     (a: Action) => {
       const st = useStore.getState();
+      // Na comparação: teclas aplicam-se ao painel ativo; ← → mudam de painel.
+      if (st.compare) {
+        switch (a.type) {
+          case "stars":
+          case "flag":
+            return rate(a.type, a.value);
+          case "move":
+            if (a.dx !== 0) setCompareActive((i) => Math.max(0, Math.min(st.compare!.length - 1, i + a.dx)));
+            return;
+          case "close":
+            return st.openCompare(null);
+          case "toggleZoom":
+            return compareRef.current?.toggleZoom();
+          case "zoom":
+            return compareRef.current?.zoom(a.dir);
+          case "compare":
+            return st.openCompare(null);
+          case "help":
+            return st.setHelpOpen(true);
+          default:
+            return;
+        }
+      }
       switch (a.type) {
+        case "compare":
+          return compareFromSelection();
         case "stars":
           return rate("stars", a.value);
         case "flag":
@@ -234,7 +340,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [order, rate, focusPhoto, fullscreen, toggleFullscreen],
+    [order, rate, focusPhoto, fullscreen, toggleFullscreen, compareFromSelection],
   );
 
   useEffect(() => {
@@ -254,7 +360,24 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
 
   return (
     <div className={`project${immersive ? " immersive" : ""}${s.infoOpen ? "" : " no-info"}`}>
-      {!immersive && <Sidebar active={s.filter.collection} counts={counts} onSelect={(c) => s.setFilter({ collection: c })} />}
+      {!immersive && (
+        <Sidebar
+          active={s.filter.collection}
+          counts={counts}
+          onSelect={(c) => {
+            s.setFilter({ collection: c, label: null });
+            s.setView("grid");
+          }}
+          labelCounts={lCounts}
+          activeLabel={s.filter.label ?? null}
+          onLabel={(l: Label | null) => {
+            s.setFilter({ label: l });
+            s.setView("grid");
+          }}
+          view={s.view}
+          onView={(v) => s.setView(v)}
+        />
+      )}
       <section className="main">
         {!immersive && (
           <Toolbar
@@ -264,6 +387,9 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
             onImportFolder={() => void chooseImport(true)}
             onClose={() => void closeProject()}
             onHelp={() => s.setHelpOpen(true)}
+            onCompare={compareFromSelection}
+            view={s.view}
+            onView={(v) => s.setView(v)}
           />
         )}
         <div className="content">
@@ -280,6 +406,8 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
                 </button>
               </div>
             </div>
+          ) : s.view === "sequences" ? (
+            <SequencesView onSelect={onClickPhoto} onOpen={(id) => s.openViewer(id)} onCompare={openCompare} onAcceptGroup={(g) => void acceptGroup(g)} />
           ) : visible.length === 0 ? (
             <div className="empty-state">
               <p className="muted">{t("project.noMatches")}</p>
@@ -300,11 +428,36 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
               handleRef={viewerRef}
             />
           )}
+          {s.compare && (
+            <CompareView
+              ids={s.compare}
+              active={compareActive}
+              setActive={setCompareActive}
+              onClose={() => s.openCompare(null)}
+              onRate={(k, v, ids) => rate(k, v, ids)}
+              onReplace={(slot, id) => {
+                const next = s.compare!.slice();
+                const existing = next.indexOf(id);
+                if (existing >= 0) next[existing] = next[slot]!;
+                next[slot] = id;
+                s.openCompare(next);
+              }}
+              handleRef={compareRef}
+            />
+          )}
           {dragging && <div className="drop-overlay">{t("import.dropHere")}</div>}
         </div>
         {!immersive && <StatusBar total={s.photos.length} visible={visible.length} selected={s.selection.ids.size} onCancelImport={() => api.cancelImport().catch(fail)} showSize={viewerPhoto === null} />}
       </section>
-      {s.infoOpen && !immersive && <InfoPanel photo={viewerPhoto ?? focusPhoto} selectedCount={viewerPhoto ? 1 : s.selection.ids.size} onRate={(k, v) => rate(k, v)} />}
+      {s.infoOpen && !immersive && (
+        <InfoPanel
+          photo={s.compare ? (s.photos[s.index.get(s.compare[compareActive] ?? -1) ?? -1] ?? null) : (viewerPhoto ?? focusPhoto)}
+          selectedCount={viewerPhoto || s.compare ? 1 : s.selection.ids.size}
+          onRate={(k, v) => rate(k, v)}
+          onCompareGroup={openCompare}
+          onAccept={(id) => void acceptIds([id])}
+        />
+      )}
 
       {s.pendingImport && <ImportDialog paths={s.pendingImport.paths} originalsDir={project.originalsDir} onCancel={() => s.setPendingImport(null)} onStart={(m, r) => void startImport(m, r)} />}
       {s.importSummary && <ImportReport summary={s.importSummary} onClose={() => s.setImportSummary(null)} />}

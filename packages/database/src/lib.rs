@@ -10,6 +10,7 @@
 //!
 //! Nunca se edita uma migração já publicada: cria-se uma nova no fim da lista.
 
+pub mod analysis;
 pub mod assets;
 pub mod import;
 pub mod library;

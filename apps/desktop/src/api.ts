@@ -1,7 +1,14 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  AnalysisDetails,
+  AnalysisProgress,
+  AnalysisStatus,
   AppInfo,
+  GroupRow,
+  RecommendationBrief,
+  SelectionSettings,
+  SelectionSummary,
   Color,
   ImportMode,
   ImportProgress,
@@ -35,6 +42,17 @@ export const api = {
   cancelImport: () => invoke<void>("cancel_import"),
   prioritizeThumbnails: (ids: number[]) => invoke<void>("prioritize_thumbnails", { ids }),
   saveUiState: (json: string) => invoke<void>("save_ui_state", { json }),
+  // Seleção assistida (análise local; nada sai do computador).
+  startAnalysis: (reanalyze: boolean) => invoke<number>("start_analysis", { reanalyze }),
+  cancelAnalysis: () => invoke<void>("cancel_analysis"),
+  analysisStatus: () => invoke<AnalysisStatus>("analysis_status"),
+  setSelectionSettings: (settings: SelectionSettings) => invoke<SelectionSummary>("set_selection_settings", { settings }),
+  recomputeSelection: () => invoke<SelectionSummary>("recompute_selection"),
+  listRecommendations: () => invoke<RecommendationBrief[]>("list_recommendations"),
+  listGroups: () => invoke<GroupRow[]>("list_groups"),
+  analysisDetails: (id: number) => invoke<AnalysisDetails>("analysis_details", { id }),
+  acceptRecommendations: (ids: number[]) => invoke<number>("accept_recommendations", { ids }),
+  acceptGroup: (group: number) => invoke<number>("accept_group", { group }),
 };
 
 export const events = {
@@ -44,6 +62,8 @@ export const events = {
     listen<ImportSummary>("import-finished", (e) => cb(e.payload)),
   thumbnails: (cb: (b: ThumbBatch) => void): Promise<UnlistenFn> =>
     listen<ThumbBatch>("thumbnails", (e) => cb(e.payload)),
+  analysis: (cb: (p: AnalysisProgress) => void): Promise<UnlistenFn> =>
+    listen<AnalysisProgress>("analysis-progress", (e) => cb(e.payload)),
 };
 
 export type ImageLevel = "thumb" | "preview" | "full";

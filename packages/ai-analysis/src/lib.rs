@@ -1,8 +1,16 @@
 //! # momento-ai-analysis
 //!
-//! Análise técnica e por IA local (ONNX Runtime / Core ML).
+//! Tudo o que não precisa de redes neuronais e é determinístico e explicável:
 //!
-//! **Estado:** reservado — sem implementação. Entra em desenvolvimento na Fase 3
-//! (ver `ROADMAP.md`). A responsabilidade deste módulo está descrita em
-//! `ARCHITECTURE.md`. Não expõe API pública até essa fase, para que nenhuma parte da
-//! aplicação dependa de funcionalidade inexistente.
+//! - [`metrics`]: nitidez (global, pico de foco, rosto, olhos), desfocagem de movimento,
+//!   exposição, realces queimados, sombras bloqueadas, ruído, contraste, horizonte;
+//! - [`hash`]: hashes percetuais (pHash DCT e dHash) para duplicados e semelhança;
+//! - [`selection`]: agrupamento em sequências/duplicados/pares RAW+JPEG, pontuação por
+//!   critério, etiquetas (Melhor, Alternativa, Rever, Rejeitar sugerido) e explicações.
+//!
+//! Os modelos de visão (rostos, olhos, expressões, embeddings) estão em
+//! `momento-face-analysis`; este crate recebe os resultados já calculados.
+
+pub mod hash;
+pub mod metrics;
+pub mod selection;

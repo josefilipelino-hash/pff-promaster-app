@@ -44,7 +44,7 @@ embutidos, processo auxiliar de descodificação, registo de erros por ficheiro,
 sincronização de hora entre câmaras. **Critério-chave:** cada formato marcado como
 “testado” em `SUPPORTED_FORMATS.md` tem um ficheiro real verificado.
 
-## Fase 3 — Seleção automática
+## Fase 3 — Seleção automática ✅ *(concluída 2026-11-09, ver PROJECT_STATUS.md)*
 
 Duplicados (hash e percetual), semelhança, rajadas e sequências, nitidez global e facial,
 exposição, clipping, olhos fechados, expressões, recomendação explicada por grupo,

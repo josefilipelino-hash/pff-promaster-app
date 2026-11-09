@@ -1,6 +1,6 @@
 [package]
 name = "momento-ai-analysis"
-description = "Análise técnica e por IA local (ONNX Runtime / Core ML)."
+description = "Análise técnica clássica (nitidez, movimento, exposição, ruído, horizonte), hashes percetuais, agrupamento em sequências e recomendações explicadas."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,3 +9,9 @@ publish.workspace = true
 authors.workspace = true
 
 [dependencies]
+image.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+momento-test-fixtures.workspace = true

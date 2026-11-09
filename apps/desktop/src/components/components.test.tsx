@@ -23,11 +23,31 @@ const apiMock = {
   cancelImport: vi.fn(async () => {}),
   prioritizeThumbnails: vi.fn(async () => {}),
   saveUiState: vi.fn(async () => {}),
+  startAnalysis: vi.fn(async () => 10),
+  cancelAnalysis: vi.fn(async () => {}),
+  analysisStatus: vi.fn(async () => analysisStatus(0, 10)),
+  setSelectionSettings: vi.fn(async () => summary),
+  recomputeSelection: vi.fn(async () => summary),
+  listRecommendations: vi.fn(async () => [] as unknown[]),
+  listGroups: vi.fn(async () => [] as unknown[]),
+  analysisDetails: vi.fn(async () => ({ analysis: null, faces: [], recommendation: null, groupId: null, error: null }) as unknown),
+  acceptRecommendations: vi.fn(async () => 1),
+  acceptGroup: vi.fn(async () => 2),
 };
+const summary = { best: 1, alternative: 1, review: 0, reject: 1, duplicate: 0, groups: 1, sequences: 1, durationMs: 1 };
+function analysisStatus(analyzed: number, total: number) {
+  return {
+    running: false,
+    counts: { total, analyzed, failed: 0, pending: total - analyzed },
+    modelsAvailable: true,
+    settings: { mode: "balanced", target: null },
+    summary,
+  };
+}
 vi.mock("../api", async (orig) => {
   const real = await orig<typeof import("../api")>();
   const noop = async () => () => {};
-  return { ...real, api: apiMock, events: { importProgress: noop, importFinished: noop, thumbnails: noop } };
+  return { ...real, api: apiMock, events: { importProgress: noop, importFinished: noop, thumbnails: noop, analysis: noop } };
 });
 vi.mock("@tauri-apps/api/webview", () => ({ getCurrentWebview: () => ({ onDragDropEvent: async () => () => {} }) }));
 vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ isFullscreen: async () => false, setFullscreen: vi.fn(async () => {}) }) }));
@@ -46,6 +66,9 @@ const { useStore } = await import("../store");
 const { folderPreview } = await import("./NewProjectDialog");
 const { computeLayout, visibleRows } = await import("./PhotoGrid");
 const { fitScale, stepZoom } = await import("./Viewer");
+const { clampCenter, fitCss, zoomAt, FIT_VIEW } = await import("./CompareView");
+const { explain, joinList } = await import("../logic/explain");
+const i18n = (await import("../i18n")).default;
 
 const project: ProjectInfo = {
   path: "/trabalho/2026-06-15_Ana_e_Pedro.momento",
@@ -225,7 +248,129 @@ describe("formatos e estados (Fase 2)", () => {
   });
 });
 
+describe("seleção assistida (Fase 3)", () => {
+  const recs = [
+    { asset: 1, label: "best", groupId: 7, rank: 0, groupSize: 3 },
+    { asset: 2, label: "alternative", groupId: 7, rank: 1, groupSize: 3 },
+    { asset: 3, label: "reject", groupId: 7, rank: 2, groupSize: 3 },
+    { asset: 4, label: "review", groupId: null, rank: 0, groupSize: 1 },
+  ];
+  async function openAnalyzed() {
+    apiMock.listPhotos.mockResolvedValue(rows(6).map((r) => ({ ...r, flag: 0 })));
+    apiMock.analysisStatus.mockResolvedValue(analysisStatus(6, 6));
+    apiMock.listRecommendations.mockResolvedValue(recs);
+    apiMock.listGroups.mockResolvedValue([{ id: 7, kind: "sequence", size: 3, members: [1, 2, 3] }]);
+    act(() => useStore.getState().setProject(project));
+    render(<App />);
+    await screen.findByText("Casamento Ana & Pedro");
+    await act(async () => {});
+  }
+
+  it("antes da análise: explica e oferece analisar (nada corre sozinho)", async () => {
+    apiMock.listPhotos.mockResolvedValue(rows(10));
+    apiMock.analysisStatus.mockResolvedValue(analysisStatus(0, 10));
+    act(() => useStore.getState().setProject(project));
+    render(<App />);
+    await screen.findByText("Casamento Ana & Pedro");
+    await act(async () => {});
+    expect(screen.getByText(/Nada é enviado para a internet/)).toBeTruthy();
+    expect(apiMock.startAnalysis).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Analisar 10 fotografias" }));
+    await act(async () => {});
+    expect(apiMock.startAnalysis).toHaveBeenCalledWith(false);
+  });
+
+  it("etiquetas na grelha, contagens e filtro por etiqueta", async () => {
+    await openAnalyzed();
+    expect(document.querySelector('[data-id="1"]')!.textContent).toContain("Melhor");
+    expect(document.querySelector('[data-id="1"]')!.textContent).toContain("1/3");
+    expect(document.querySelector('[data-id="3"]')!.textContent).toContain("Rejeitar?");
+    fireEvent.click(screen.getByRole("button", { name: /Rejeitar sugerido\s*1/ }));
+    expect(document.querySelectorAll(".cell").length).toBe(1);
+    expect(document.querySelector('[data-id="3"]')).toBeTruthy();
+  });
+
+  it("modo e objetivo de entrega são enviados ao núcleo", async () => {
+    await openAnalyzed();
+    fireEvent.change(screen.getByRole("combobox", { name: /Modo/ }), { target: { value: "strict" } });
+    await act(async () => {});
+    expect(apiMock.setSelectionSettings).toHaveBeenCalledWith({ mode: "strict", target: null });
+    const input = screen.getByPlaceholderText("Sem objetivo");
+    fireEvent.change(input, { target: { value: "350" } });
+    fireEvent.blur(input);
+    await act(async () => {});
+    expect(apiMock.setSelectionSettings).toHaveBeenCalledWith({ mode: "balanced", target: 350 });
+  });
+
+  it("vista de sequências: aceitar sugestões do grupo e comparar", async () => {
+    await openAnalyzed();
+    fireEvent.click(screen.getByRole("button", { name: /^Sequências\s*1$/ }));
+    const row = screen.getByRole("region", { name: "Sequência" });
+    expect(within(row).getByText(/3 fotografias/)).toBeTruthy();
+    fireEvent.click(within(row).getByRole("button", { name: "Aceitar sugestões" }));
+    await act(async () => {});
+    expect(apiMock.acceptGroup).toHaveBeenCalledWith(7);
+    fireEvent.click(within(row).getByRole("button", { name: "Comparar" }));
+    const cmp = screen.getByRole("region", { name: "Comparação" });
+    // Melhor + alternativa (a rejeitada fica de fora da comparação inicial).
+    expect(cmp.querySelectorAll(".compare-pane").length).toBe(2);
+  });
+
+  it("comparação: teclas no painel ativo, trocar por outra e fechar", async () => {
+    await openAnalyzed();
+    fireEvent.mouseDown(document.querySelector('[data-id="1"]')!);
+    fireEvent.keyDown(window, { key: "c" });
+    const cmp = screen.getByRole("region", { name: "Comparação" });
+    expect(cmp.querySelectorAll(".compare-pane").length).toBe(3);
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    fireEvent.keyDown(window, { key: "x" });
+    fireEvent.keyDown(window, { key: "3" });
+    await act(async () => {});
+    expect(apiMock.setFlag).toHaveBeenCalledWith([2], -1);
+    expect(apiMock.setStars).toHaveBeenCalledWith([2], 3);
+    const swap = within(cmp).getAllByRole("combobox", { name: "Selecionar outra…" })[0]!;
+    fireEvent.change(swap, { target: { value: "3" } });
+    expect(useStore.getState().compare).toEqual([3, 2, 1]);
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(screen.queryByRole("region", { name: "Comparação" })).toBeNull();
+  });
+
+  it("painel de informação: explicação e pontuações individuais", async () => {
+    apiMock.analysisDetails.mockResolvedValue({
+      analysis: { models: "x", width: 2048, height: 1365, sharpness: 2, focusPeak: 2.5, focusCenter: 2, motionBlur: 0.1, brightness: 0.5, highlightsClipped: 0.01, shadowsCrushed: 0, contrast: 0.6, noise: 2, tiltDegrees: 0.4, phash: 1, dhash: 2, durationMs: 100 },
+      faces: [{ x: 0.1, y: 0.1, w: 0.1, h: 0.1, px: 160, detScore: 0.9, presence: 0.99, blinkLeft: 0.1, blinkRight: 0.12, smile: 0.8, jawOpen: 0.1, sharpness: 2.4, eyeSharpness: 2.5, cut: false }],
+      recommendation: { asset: 1, label: "best", rank: 0, groupSize: 3, summary: "bestInSequence", reasons: '[{"code":"sharpestFace"},{"code":"allFacesVisible","value":2},{"code":"bestExposure"}]', focus: 0.95, motion: 0.9, exposure: 0.88, noise: 0.8, eyes: 1, expression: 0.8, composition: 1, technical: 0.9, people: 0.93, overall: 0.92 },
+      groupId: 7,
+      error: null,
+    });
+    await openAnalyzed();
+    fireEvent.mouseDown(document.querySelector('[data-id="1"]')!);
+    expect(await screen.findByText("Melhor fotografia desta sequência: maior nitidez facial, ambos os rostos visíveis e melhor exposição.")).toBeTruthy();
+    expect(screen.getByText("Olhos abertos")).toBeTruthy();
+    expect(screen.getByText("Sequência de 3 · 1.ª")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Aceitar: marcar favorita" }));
+    await act(async () => {});
+    expect(apiMock.acceptRecommendations).toHaveBeenCalledWith([1]);
+  });
+});
+
 describe("cálculos de layout", () => {
+  it("explicações em linguagem natural", () => {
+    const t = i18n.t.bind(i18n) as (k: string, o?: Record<string, unknown>) => string;
+    expect(joinList(["a", "b", "c"], "e")).toBe("a, b e c");
+    expect(explain("rejectSuggested", [{ code: "eyesClosed", value: 2 }, { code: "tilted", value: -3.44 }], t, "pt-PT")).toBe("Rejeição sugerida: olhos fechados em 2 pessoas e inclinada -3,4°.");
+    expect(explain("goodSingle", [], t, "pt-PT")).toBe("Boa fotografia.");
+  });
+  it("comparação sincronizada", () => {
+    expect(fitCss(6000, 4000, 600, 600)).toBeCloseTo(0.1);
+    expect(clampCenter(0.9, 300, 600)).toBe(0.5); // imagem menor que o painel: centrada
+    expect(clampCenter(0.99, 1200, 600)).toBeCloseTo(0.75);
+    // O ponto sob o cursor mantém-se: zoom 1→2 a 100 px à direita do centro (disp 600).
+    const v = zoomAt(FIT_VIEW, 2, 100, 0, 600, 400);
+    const before = 0.5 + 100 / 600;
+    expect(v.cx + 100 / 1200).toBeCloseTo(before);
+    expect(zoomAt(v, 0.5, 0, 0, 1200, 800)).toEqual(FIT_VIEW);
+  });
   it("pré-visualização do nome da pasta igual ao núcleo Rust", () => {
     // Mesmos casos que packages/project-management/src/paths.rs
     expect(folderPreview("2026-06-15", "Ana & Pedro", "x")).toBe("2026-06-15_Ana_e_Pedro.momento");

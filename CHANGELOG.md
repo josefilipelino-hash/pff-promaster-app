@@ -5,6 +5,28 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [0.3.0] — 2026-11-09 — Fase 3: seleção assistida
+
+### Adicionado
+- Análise **local** em segundo plano (retomável): nitidez global, pico de foco e centro,
+  tremido, exposição, realces queimados, sombras bloqueadas, ruído, inclinação, pHash/dHash.
+- IA local (modelos MediaPipe, Apache-2.0, executados com `tract-onnx` em Rust puro):
+  deteção de rostos multiescala, 478 pontos faciais, 52 blendshapes (olhos fechados,
+  sorriso, boca aberta), nitidez do rosto e dos olhos, rostos cortados, embedding visual.
+- Grupos: pares RAW+JPEG, duplicados quase idênticos, sequências/rajadas (tempo,
+  semelhança visual, disposição dos rostos, várias câmaras).
+- Recomendações **MELHOR / ALTERNATIVA / REVER / REJEITAR SUGERIDO / DUPLICADA** com
+  pontuações individuais guardadas e explicação em frase (“Melhor fotografia desta
+  sequência: maior nitidez facial, ambos os rostos visíveis e melhor exposição.”).
+- Modos conservador / equilibrado / rigoroso e objetivo de entrega aproximado
+  (recalculados sem reanalisar).
+- Vista **Sequências**, **comparação lado a lado** (2–4) com zoom e deslocamento
+  sincronizados, estrelas, aceitar, rejeitar e “selecionar outra”; tecla **C**.
+- “Aceitar sugestões” por fotografia ou grupo (explícito, reversível, só sem decisão
+  prévia). Nada é apagado nem alterado automaticamente.
+- Catálogo v4 (análise, rostos, embeddings, grupos, recomendações).
+- `scripts/prepare-models.py` e passo de modelos no CI; modelos incluídos no instalador.
+
 ## [0.2.0] — 2026-11-08 — Fase 2: formatos e RAW
 
 ### Adicionado
