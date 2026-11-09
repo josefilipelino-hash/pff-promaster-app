@@ -9,7 +9,9 @@ import { clickSelect, moveFocus, restrict, selectAll, targets } from "../logic/s
 import { keyToAction, type Action } from "../logic/shortcuts";
 import { errorText, useStore } from "../store";
 import type { Color, GroupRow, ImportMode, Label } from "../types";
+import { ClockDialog } from "./ClockDialog";
 import { CompareView, type CompareHandle } from "./CompareView";
+import { PeopleView } from "./PeopleView";
 import { SequencesView } from "./SequencesView";
 import { HelpOverlay } from "./HelpOverlay";
 import { ImportDialog, ImportReport } from "./ImportDialogs";
@@ -47,7 +49,8 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
   const [fullscreen, setFullscreen] = useState(false);
   const mac = isMac();
 
-  const visible = useMemo(() => applyFilter(s.photos, s.filter, s.recs), [s.photos, s.filter, s.recs]);
+    const org = useMemo(() => ({ photoPersons: s.photoPersons, photoMoment: s.photoMoment }), [s.photoPersons, s.photoMoment]);
+  const visible = useMemo(() => applyFilter(s.photos, s.filter, s.recs, org), [s.photos, s.filter, s.recs, org]);
   const lCounts = useMemo(() => labelCounts(s.photos, s.recs), [s.photos, s.recs]);
   const order = useMemo(() => visible.map((p) => p.id), [visible]);
   const counts = useMemo(() => collectionCounts(s.photos), [s.photos]);
@@ -60,7 +63,8 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
   // Carregar fotografias e seleção assistida ao abrir.
   useEffect(() => {
     s.reloadPhotos().catch(fail);
-    s.reloadSelection().catch(fail);
+        s.reloadSelection().catch(fail);
+    s.reloadOrganization().catch(fail);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project.path]);
 
@@ -105,8 +109,9 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
       events.analysis((p) => {
         const st = useStore.getState();
         st.setAnalysisProgress(p.finished ? null : p);
-        if (p.finished) {
+                if (p.finished) {
           st.reloadSelection().catch(() => {});
+          st.reloadOrganization().catch(() => {});
           st.toast("info", t("selection.finished", { count: p.done }));
         } else if (st.analysis && !st.analysis.running) {
           st.reloadSelection().catch(() => {});
@@ -196,6 +201,35 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
     },
     [fail, scheduleRecompute, t],
   );
+
+    // Organização: momentos (arrastar/escolher) e pessoas.
+  const assignMoment = useCallback(
+    async (ids: number[], moment: number | null) => {
+      try {
+        const n = await api.assignMoment(ids, moment);
+        await useStore.getState().reloadOrganization();
+        useStore.getState().toast("info", t("moments.moved", { count: n }));
+      } catch (e) {
+        fail(e);
+      }
+    },
+    [fail, t],
+  );
+  const resetMoments = useCallback(
+    async (ids: number[]) => {
+      try {
+        await api.resetMoments(ids);
+        await useStore.getState().reloadOrganization();
+      } catch (e) {
+        fail(e);
+      }
+    },
+    [fail],
+  );
+  const reloadAfterClock = useCallback(async () => {
+    const st = useStore.getState();
+    await Promise.all([st.reloadPhotos(), st.reloadSelection(), st.reloadOrganization()]).catch(fail);
+  }, [fail]);
 
   const acceptGroup = useCallback(
     async (g: GroupRow) => {
@@ -346,7 +380,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const st = useStore.getState();
-      if (isTyping(e.target) || st.pendingImport || st.importSummary || st.helpOpen) return;
+            if (isTyping(e.target) || st.pendingImport || st.importSummary || st.helpOpen || st.clockOpen) return;
       const a = keyToAction(e, mac);
       if (!a) return;
       e.preventDefault();
@@ -374,8 +408,19 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
             s.setFilter({ label: l });
             s.setView("grid");
           }}
-          view={s.view}
+                    view={s.view}
           onView={(v) => s.setView(v)}
+          activeMoment={s.filter.moment ?? null}
+          onMoment={(m) => {
+            s.setFilter({ moment: m });
+            s.setView("grid");
+          }}
+          onDropMoment={(ids, m) => void assignMoment(ids, m)}
+          activePersons={s.filter.persons ?? []}
+          onPersons={(ids) => {
+            s.setFilter({ persons: ids });
+            s.setView("grid");
+          }}
         />
       )}
       <section className="main">
@@ -406,6 +451,13 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
                 </button>
               </div>
             </div>
+                    ) : s.view === "people" ? (
+            <PeopleView
+              onShowPerson={(id) => {
+                s.setFilter({ persons: [id] });
+                s.setView("grid");
+              }}
+            />
           ) : s.view === "sequences" ? (
             <SequencesView onSelect={onClickPhoto} onOpen={(id) => s.openViewer(id)} onCompare={openCompare} onAcceptGroup={(g) => void acceptGroup(g)} />
           ) : visible.length === 0 ? (
@@ -454,14 +506,22 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
           photo={s.compare ? (s.photos[s.index.get(s.compare[compareActive] ?? -1) ?? -1] ?? null) : (viewerPhoto ?? focusPhoto)}
           selectedCount={viewerPhoto || s.compare ? 1 : s.selection.ids.size}
           onRate={(k, v) => rate(k, v)}
-          onCompareGroup={openCompare}
+                    onCompareGroup={openCompare}
           onAccept={(id) => void acceptIds([id])}
+          onMoment={(ids, m) => void assignMoment(viewerPhoto || s.compare ? ids : targets(s.selection), m)}
+          onResetMoment={(ids) => void resetMoments(viewerPhoto || s.compare ? ids : targets(s.selection))}
+          onPerson={(id) => {
+            s.setFilter({ persons: [id] });
+            s.setView("grid");
+          }}
         />
       )}
 
       {s.pendingImport && <ImportDialog paths={s.pendingImport.paths} originalsDir={project.originalsDir} onCancel={() => s.setPendingImport(null)} onStart={(m, r) => void startImport(m, r)} />}
       {s.importSummary && <ImportReport summary={s.importSummary} onClose={() => s.setImportSummary(null)} />}
-      {s.helpOpen && <HelpOverlay onClose={() => s.setHelpOpen(false)} />}
+            {s.helpOpen && <HelpOverlay onClose={() => s.setHelpOpen(false)} />}
+      {s.clockOpen && <ClockDialog onClose={() => s.setClockOpen(false)} onApplied={() => void reloadAfterClock()} />}
+      {s.dragIds && <div className="drag-badge">{t("moments.dropHint", { count: s.dragIds.length })}</div>}
     </div>
   );
 }

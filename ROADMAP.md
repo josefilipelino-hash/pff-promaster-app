@@ -50,16 +50,25 @@ Duplicados (hash e percetual), semelhança, rajadas e sequências, nitidez globa
 exposição, clipping, olhos fechados, expressões, recomendação explicada por grupo,
 comparação lado a lado com zoom sincronizado, proteção de fotografias.
 
-## Fase 4 — Edição
+## Fase 4 — Organização de casamentos ✅ *(concluída 2026-11-09, ver PROJECT_STATUS.md)*
+
+> Por pedido do utilizador, a organização do casamento (planeada como Fase 5) foi feita
+> antes da edição. A numeração seguinte desloca-se uma fase.
+
+Pessoas (deteção e agrupamento local de rostos, noiva/noivo/pais/irmãos/padrinhos/
+madrinhas, pesquisas “noiva + mãe”, “noivos juntos”), 25 momentos automáticos com
+confiança e “Por classificar”, momentos personalizados, arrastar entre momentos,
+sincronização de hora entre câmaras com sugestão automática e cronologia reconstruída.
+
+## Fase 5 — Edição
 
 Motor não destrutivo (luz, cor, curvas, HSL, color grading, nitidez, denoise, correção de
 lente, geometria), histórico, snapshots, cópias virtuais, copiar/colar/sincronizar,
 presets (próprios, XMP, LUT), edição em lote, correção automática por fotografia.
 
-## Fase 5 — Organização de casamentos
+Também: consistência de cor entre câmaras e condições de luz; workflow de revisão.
 
-Momentos automáticos e personalizáveis, pessoas e noivos, consistência entre câmaras e
-condições de luz, workflow de revisão.
+
 
 ## Fase 6 — Exportação
 

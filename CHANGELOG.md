@@ -5,6 +5,27 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [0.4.0] — 2026-11-09 — Fase 4: organização do casamento
+
+### Adicionado
+- **Pessoas:** identidade facial local (SFace, OpenCV Zoo, Apache-2.0) com alinhamento por
+  5 pontos; agrupamento automático (dois rostos da mesma fotografia nunca são a mesma
+  pessoa); identificação com nome e papel (noiva, noivo, mãe/pai da noiva e do noivo,
+  irmãos, padrinho, madrinha, pessoa importante); juntar grupos, “não é esta pessoa”,
+  ocultar, reagrupar, apagar dados de pessoas. As decisões sobrevivem à reanálise.
+- **Pesquisas:** todas as fotografias da noiva/do noivo, noivos juntos, noiva + mãe,
+  noivo + pai, qualquer pessoa (combinações com “e”).
+- **Momentos:** 25 momentos de casamento classificados automaticamente só com confiança
+  suficiente (hora corrigida, cerimónia detetada, GPS, cena/objetos com EfficientNet-Lite2,
+  rostos, pessoas identificadas, semelhança com os exemplos do utilizador);
+  “Por classificar”; momentos personalizados; arrastar fotografias para um momento; escolha
+  no painel; voltar ao automático.
+- **Sincronização de câmaras:** desvio por câmara (“Sony +3min42s”), sugestão automática
+  pela semelhança visual entre câmaras, cronologia, sequências e momentos reconstruídos;
+  a hora EXIF original nunca é alterada.
+- GPS lido do EXIF. Catálogo v5.
+
+
 ## [0.3.0] — 2026-11-09 — Fase 3: seleção assistida
 
 ### Adicionado

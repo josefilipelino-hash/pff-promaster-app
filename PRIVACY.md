@@ -24,6 +24,11 @@ abaixo são requisitos de arquitetura, não opções.
    Caminhos de ficheiros podem aparecer em registos de erro locais. Ficam apenas no
    computador (macOS: `~/Library/Logs/pt.momentostudio.desktop/`; Windows:
    `%LOCALAPPDATA%\pt.momentostudio.desktop\logs\`).
+5c. **Fase 4 — pessoas (dados biométricos):** a identidade facial (vetor de 128 valores
+   por rosto, SFace) é calculada e guardada **só** no `catalog.db` do projeto; nunca é
+   enviada para fora, nem usada entre projetos. Nomes e papéis são escritos pelo
+   utilizador. “Gerir pessoas” permite apagar todos os dados de pessoas do projeto
+   (`clear_people`: identidades, grupos e nomes). Os registos nunca contêm vetores faciais.
 5b. **Fase 3 — análise e IA:** toda a análise (métricas, rostos, olhos, expressões,
    embeddings) corre neste computador com modelos incluídos na aplicação (`tract-onnx`,
    sem serviços externos). Os modelos são preparados **antes** da compilação; a aplicação

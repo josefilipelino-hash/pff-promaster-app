@@ -27,6 +27,8 @@ pub struct ExifSpec {
     pub iso: Option<u16>,
     pub focal_length: Option<(u32, u32)>,
     pub focal_length_35mm: Option<u16>,
+    /// Latitude e longitude em graus decimais (GPS IFD).
+    pub gps: Option<(f64, f64)>,
 }
 
 const ASCII: u16 = 2;
@@ -86,7 +88,30 @@ fn ifd(mut entries: Vec<Entry>, start: u32) -> Vec<u8> {
     head
 }
 
-/// Bloco TIFF com IFD0 + sub-IFD EXIF (little-endian).
+fn rationals(tag: u16, v: &[(u32, u32)]) -> Entry {
+    let data = v.iter().flat_map(|(n, d)| [n.to_le_bytes(), d.to_le_bytes()].concat()).collect();
+    Entry { tag, typ: RATIONAL, count: v.len() as u32, data }
+}
+
+/// Graus decimais → (graus, minutos, segundos×1000) como racionais EXIF.
+fn dms(v: f64) -> [(u32, u32); 3] {
+    let a = v.abs();
+    let d = a.floor();
+    let m = ((a - d) * 60.0).floor();
+    let s = ((a - d) * 60.0 - m) * 60.0;
+    [(d as u32, 1), (m as u32, 1), ((s * 1000.0).round() as u32, 1000)]
+}
+
+fn gps_entries(lat: f64, lon: f64) -> Vec<Entry> {
+    vec![
+        ascii(0x0001, if lat >= 0.0 { "N" } else { "S" }),
+        rationals(0x0002, &dms(lat)),
+        ascii(0x0003, if lon >= 0.0 { "E" } else { "W" }),
+        rationals(0x0004, &dms(lon)),
+    ]
+}
+
+/// Bloco TIFF com IFD0 + sub-IFD EXIF + GPS IFD opcional (little-endian).
 pub fn exif_tiff(spec: &ExifSpec) -> Vec<u8> {
     let mut ifd0 = Vec::new();
     if let Some(v) = &spec.make {
@@ -133,16 +158,29 @@ pub fn exif_tiff(spec: &ExifSpec) -> Vec<u8> {
     if has_exif {
         ifd0.push(long(0x8769, 0)); // valor provisório
     }
+    if spec.gps.is_some() {
+        ifd0.push(long(0x8825, 0)); // valor provisório
+    }
     let ifd0_bytes_len = ifd(ifd0_clone(&ifd0), 8).len() as u32;
+    let exif_start = 8 + ifd0_bytes_len;
+    let exif_len = if has_exif { ifd(ifd0_clone(&exif), exif_start).len() as u32 } else { 0 };
+    let gps_start = exif_start + exif_len;
     if has_exif {
-        let last = ifd0.iter_mut().find(|e| e.tag == 0x8769).unwrap();
-        last.data = (8 + ifd0_bytes_len).to_le_bytes().to_vec();
+        let e = ifd0.iter_mut().find(|e| e.tag == 0x8769).unwrap();
+        e.data = exif_start.to_le_bytes().to_vec();
+    }
+    if spec.gps.is_some() {
+        let e = ifd0.iter_mut().find(|e| e.tag == 0x8825).unwrap();
+        e.data = gps_start.to_le_bytes().to_vec();
     }
     let mut out = b"II*\0".to_vec();
     out.extend_from_slice(&8u32.to_le_bytes());
     out.extend_from_slice(&ifd(ifd0, 8));
     if has_exif {
-        out.extend_from_slice(&ifd(exif, 8 + ifd0_bytes_len));
+        out.extend_from_slice(&ifd(exif, exif_start));
+    }
+    if let Some((lat, lon)) = spec.gps {
+        out.extend_from_slice(&ifd(gps_entries(lat, lon), gps_start));
     }
     out
 }
@@ -321,5 +359,6 @@ pub fn spec_for(i: u32, orientation: u16) -> ExifSpec {
         iso: Some([100, 400, 800, 3200, 6400][(i % 5) as usize]),
         focal_length: Some([(35, 1), (50, 1), (85, 1), (24, 1), (70, 1)][(i % 5) as usize]),
         focal_length_35mm: Some([35, 50, 85, 24, 70][(i % 5) as usize]),
+        gps: None,
     }
 }

@@ -12,9 +12,12 @@
 
 pub mod analysis;
 pub mod assets;
+pub mod clock;
 pub mod import;
 pub mod library;
 pub mod migrations;
+pub mod moments;
+pub mod people;
 pub mod project;
 pub mod ui_state;
 
@@ -26,6 +29,15 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub use rusqlite;
 
 /// Versão de esquema do catálogo que esta compilação conhece.
+/// Chave de câmara (marca + modelo + n.º de série) de um `asset` com o alias `a`.
+pub const CAMERA_KEY_SQL: &str = "trim(coalesce(a.camera_make, '') || ' ' || coalesce(a.camera_model, '') || ' ' || coalesce(a.camera_serial, ''))";
+/// Junção com a correção de hora da câmara (alias `cc`).
+pub const CLOCK_JOIN_SQL: &str = "LEFT JOIN camera_clock cc ON cc.camera_key = trim(coalesce(a.camera_make, '') || ' ' || coalesce(a.camera_model, '') || ' ' || coalesce(a.camera_serial, ''))";
+/// Hora de captura corrigida (texto ISO) — igual à original quando não há correção.
+pub const CORRECTED_TIME_SQL: &str = "CASE WHEN a.capture_time IS NULL OR coalesce(cc.offset_ms, 0) = 0 THEN a.capture_time ELSE strftime('%Y-%m-%dT%H:%M:%f', julianday(a.capture_time) + cc.offset_ms / 86400000.0) END";
+/// Ordem cronológica corrigida.
+pub const CORRECTED_ORDER_SQL: &str = "a.capture_time IS NULL, julianday(a.capture_time) + coalesce(cc.offset_ms, 0) / 86400000.0, a.file_name, a.id";
+
 pub const SCHEMA_VERSION: u32 = migrations::CATALOG.len() as u32;
 
 pub(crate) fn db_err(e: rusqlite::Error) -> CoreError {

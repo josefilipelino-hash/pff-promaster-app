@@ -32,7 +32,27 @@ const apiMock = {
   listGroups: vi.fn(async () => [] as unknown[]),
   analysisDetails: vi.fn(async () => ({ analysis: null, faces: [], recommendation: null, groupId: null, error: null }) as unknown),
   acceptRecommendations: vi.fn(async () => 1),
-  acceptGroup: vi.fn(async () => 2),
+    acceptGroup: vi.fn(async () => 2),
+  rebuildOrganization: vi.fn(async () => ({})),
+  listPersons: vi.fn(async () => [] as unknown[]),
+  personFaces: vi.fn(async () => [] as unknown[]),
+  photoPersons: vi.fn(async () => [] as [number, number][]),
+  updatePerson: vi.fn(async () => {}),
+  mergePersons: vi.fn(async () => {}),
+  excludeFaces: vi.fn(async () => 1),
+  reclusterPeople: vi.fn(async () => 2),
+  clearPeople: vi.fn(async () => {}),
+  listMoments: vi.fn(async () => [] as unknown[]),
+  assetMoments: vi.fn(async () => [] as unknown[]),
+  createMoment: vi.fn(async () => 99),
+  renameMoment: vi.fn(async () => {}),
+  deleteMoment: vi.fn(async () => {}),
+  assignMoment: vi.fn(async () => 2),
+  resetMoments: vi.fn(async () => 1),
+  reclassifyMoments: vi.fn(async () => [0, 0]),
+  listCameras: vi.fn(async () => [] as unknown[]),
+  suggestOffsets: vi.fn(async () => [] as unknown[]),
+  setCameraOffsets: vi.fn(async () => ({})),
 };
 const summary = { best: 1, alternative: 1, review: 0, reject: 1, duplicate: 0, groups: 1, sequences: 1, durationMs: 1 };
 function analysisStatus(analyzed: number, total: number) {
@@ -68,6 +88,8 @@ const { computeLayout, visibleRows } = await import("./PhotoGrid");
 const { fitScale, stepZoom } = await import("./Viewer");
 const { clampCenter, fitCss, zoomAt, FIT_VIEW } = await import("./CompareView");
 const { explain, joinList } = await import("../logic/explain");
+const { parseOffset, formatOffset } = await import("../logic/clock");
+const { faceCrop } = await import("./FaceThumb");
 const i18n = (await import("../i18n")).default;
 
 const project: ProjectInfo = {
@@ -161,7 +183,7 @@ describe("ecrã de projeto", () => {
 
   it("secções futuras estão desativadas e identificadas", async () => {
     await openProject(5);
-    for (const name of [/Momentos/, /Pessoas/, /Exportação/]) {
+        for (const name of [/Exportação/]) {
       const b = screen.getByRole("button", { name }) as HTMLButtonElement;
       expect(b.disabled).toBe(true);
     }
@@ -354,7 +376,169 @@ describe("seleção assistida (Fase 3)", () => {
   });
 });
 
+describe("organização do casamento (Fase 4)", () => {
+  const moments = [
+    { id: 1, kind: "bride_prep", name: null, sort: 10, custom: false, count: 1 },
+    { id: 13, kind: "kiss", name: null, sort: 130, custom: false, count: 1 },
+    { id: 21, kind: "cake", name: null, sort: 210, custom: false, count: 0 },
+    { id: 50, kind: null, name: "Fogo de artifício", sort: 999, custom: true, count: 0 },
+  ];
+  const persons = [
+    { id: 7, name: "Ana", role: "bride", hidden: false, faceCount: 3, photoCount: 3, cover: { faceId: 1, asset: 1, x: 0.4, y: 0.2, w: 0.1, h: 0.1, source: 1 } },
+    { id: 8, name: "Pedro", role: "groom", hidden: false, faceCount: 2, photoCount: 2, cover: null },
+    { id: 9, name: null, role: "bride_mother", hidden: false, faceCount: 1, photoCount: 1, cover: null },
+    { id: 10, name: null, role: null, hidden: false, faceCount: 4, photoCount: 4, cover: null },
+  ];
+  async function openOrganized() {
+    apiMock.listPhotos.mockResolvedValue(rows(6).map((r) => ({ ...r, flag: 0 })));
+    apiMock.analysisStatus.mockResolvedValue(analysisStatus(6, 6));
+    apiMock.listMoments.mockResolvedValue(moments);
+    apiMock.assetMoments.mockResolvedValue([
+      { asset: 1, momentId: 1, confidence: 0.72, source: "auto", reasons: "[]" },
+      { asset: 2, momentId: 13, confidence: null, source: "user", reasons: null },
+    ]);
+    apiMock.listPersons.mockResolvedValue(persons);
+    // Fotografia 1: noiva; 2: noiva + noivo; 3: noiva + mãe da noiva + noivo; 4: noivo.
+    apiMock.photoPersons.mockResolvedValue([[1, 7], [2, 7], [2, 8], [3, 7], [3, 9], [3, 8], [4, 8]]);
+    act(() => useStore.getState().setProject(project));
+    render(<App />);
+    await screen.findByText("Casamento Ana & Pedro");
+    await act(async () => {});
+  }
+  const cells = () => [...document.querySelectorAll(".cell")].map((c) => Number(c.getAttribute("data-id")));
+
+  it("pesquisas: noiva, noivos juntos, noiva + mãe, uma pessoa", async () => {
+    await openOrganized();
+    fireEvent.click(screen.getByRole("button", { name: /Todas as fotografias da noiva/ }));
+    expect(cells()).toEqual([1, 2, 3]);
+    fireEvent.click(screen.getByRole("button", { name: /Noivos juntos/ }));
+    expect(cells()).toEqual([2, 3]);
+    fireEvent.click(screen.getByRole("button", { name: /Noiva \+ mãe/ }));
+    expect(cells()).toEqual([3]);
+    expect((screen.getByRole("button", { name: /Noivo \+ pai/ }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: /^Pedro\s*2$/ }));
+    expect(cells()).toEqual([2, 3, 4]);
+  });
+
+  it("momentos: filtro, por classificar e arrastar fotografias para um momento", async () => {
+    await openOrganized();
+    const panel = screen.getByRole("region", { name: "Momentos" });
+    expect(within(panel).getByText("Preparação da noiva")).toBeTruthy();
+    expect(within(panel).queryByText("Bolo")).toBeNull(); // vazio: escondido
+    expect(within(panel).getByText("Fogo de artifício")).toBeTruthy(); // personalizado: sempre
+    fireEvent.click(within(panel).getByRole("button", { name: /Por classificar\s*4/ }));
+    expect(cells()).toEqual([3, 4, 5, 6]);
+        fireEvent.click(within(panel).getByRole("button", { name: /Por classificar/ }));
+    
+        // Arrastar a fotografia 3 (com a 4 selecionada também) para “Fogo de artifício”.
+    fireEvent.mouseDown(document.querySelector('[data-id="3"]')!);
+    fireEvent.mouseDown(document.querySelector('[data-id="4"]')!, { shiftKey: true });
+    fireEvent.mouseMove(window, { clientX: 300, clientY: 300, buttons: 1 });
+    expect(await screen.findByText(/Largue 2 fotografias num momento/)).toBeTruthy();
+        expect(within(panel).queryByText("Bolo")).toBeNull(); // a lista não muda durante o arrasto
+    fireEvent.mouseUp(within(panel).getByRole("button", { name: /Fogo de artifício/ }));
+    await act(async () => {});
+        expect(apiMock.assignMoment).toHaveBeenCalledWith([3, 4], 50);
+    expect(screen.queryByText(/Largue 2 fotografias/)).toBeNull(); // regressão: o aviso desaparece ao largar
+  });
+
+  it("criar momento personalizado e escolher momento no painel", async () => {
+    await openOrganized();
+    fireEvent.click(screen.getByRole("button", { name: /\+ Novo momento/ }));
+    const input = screen.getByPlaceholderText("Nome do momento");
+    fireEvent.change(input, { target: { value: "Fogo de artifício 2" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.blur(input);
+    await act(async () => {});
+    expect(apiMock.createMoment).toHaveBeenCalledWith("Fogo de artifício 2", null);
+    fireEvent.mouseDown(document.querySelector('[data-id="1"]')!);
+    expect(await screen.findByText("Automático · confiança 72 %")).toBeTruthy();
+    fireEvent.change(screen.getByRole("combobox", { name: /Momento/ }), { target: { value: "21" } });
+    await act(async () => {});
+    expect(apiMock.assignMoment).toHaveBeenCalledWith([1], 21);
+  });
+
+  it("gerir pessoas: nome, papel, não é esta pessoa, juntar", async () => {
+    apiMock.personFaces.mockResolvedValue([{ faceId: 31, asset: 1, x: 0.4, y: 0.2, w: 0.1, h: 0.1, source: 0 }]);
+    await openOrganized();
+    fireEvent.click(screen.getByRole("button", { name: /^Pessoas$/ }));
+    const card = await screen.findByRole("article", { name: "Pessoa 10" });
+    fireEvent.change(within(card).getByRole("textbox", { name: "Nome" }), { target: { value: "Rui" } });
+    fireEvent.blur(within(card).getByRole("textbox", { name: "Nome" }));
+    await act(async () => {});
+    expect(apiMock.updatePerson).toHaveBeenCalledWith(10, "Rui", null, false);
+    fireEvent.change(within(card).getByRole("combobox", { name: "Papel" }), { target: { value: "best_man" } });
+    await act(async () => {});
+    // Regressão: mudar o papel logo a seguir mantém o nome acabado de escrever.
+    expect(apiMock.updatePerson).toHaveBeenLastCalledWith(10, "Rui", "best_man", false);
+    fireEvent.click(await within(card).findByRole("button", { name: "Não é esta pessoa" }));
+    await act(async () => {});
+    expect(apiMock.excludeFaces).toHaveBeenCalledWith([31]);
+    fireEvent.click(within(card).getByRole("checkbox", { name: "Selecionar" }));
+    fireEvent.click(within(screen.getByRole("article", { name: "Ana" })).getByRole("checkbox", { name: "Selecionar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Juntar 2 selecionadas" }));
+    await act(async () => {});
+    expect(apiMock.mergePersons).toHaveBeenCalledWith(10, 7);
+  });
+
+  it("sincronizar câmaras: sugestão (Sony +3min42s, DJI −1min15s) e reconstruir", async () => {
+    apiMock.listCameras.mockResolvedValue([
+      { key: "Canon EOS R5", make: "Canon", model: "EOS R5", serial: null, photos: 900, firstTime: "2026-06-15T10:00:00", lastTime: "2026-06-15T23:50:00", offsetMs: 0, reference: false },
+      { key: "SONY ILCE-7M4", make: "SONY", model: "ILCE-7M4", serial: null, photos: 400, firstTime: null, lastTime: null, offsetMs: 0, reference: false },
+      { key: "DJI FC3582", make: "DJI", model: "FC3582", serial: null, photos: 40, firstTime: null, lastTime: null, offsetMs: 0, reference: false },
+    ]);
+    apiMock.suggestOffsets.mockResolvedValue([
+      { camera: "SONY ILCE-7M4", offsetMs: -222000, votes: 31, agreement: 0.94 },
+      { camera: "DJI FC3582", offsetMs: 75000, votes: 6, agreement: 0.8 },
+    ]);
+    await openOrganized();
+    fireEvent.click(screen.getByRole("button", { name: /Sincronizar câmaras/ }));
+    const dialog = await screen.findByRole("dialog", { name: "Sincronizar câmaras" });
+    await act(async () => {});
+    fireEvent.click(within(dialog).getByRole("button", { name: "Sugerir automaticamente" }));
+    await act(async () => {});
+    expect(apiMock.suggestOffsets).toHaveBeenCalledWith("Canon EOS R5");
+    expect((within(dialog).getByRole("textbox", { name: /Desvio de SONY/ }) as HTMLInputElement).value).toBe("+3min42s");
+    expect((within(dialog).getByRole("textbox", { name: /Desvio de DJI/ }) as HTMLInputElement).value).toBe("-1min15s");
+    fireEvent.change(within(dialog).getByRole("textbox", { name: /Desvio de DJI/ }), { target: { value: "abc" } });
+    expect((within(dialog).getByRole("button", { name: /Aplicar/ }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(within(dialog).getByRole("textbox", { name: /Desvio de DJI/ }), { target: { value: "-1:15" } });
+    fireEvent.click(within(dialog).getByRole("button", { name: /Aplicar/ }));
+    await act(async () => {});
+    expect(apiMock.setCameraOffsets).toHaveBeenCalledWith([
+      { key: "Canon EOS R5", offsetMs: 0, reference: true },
+      { key: "SONY ILCE-7M4", offsetMs: -222000, reference: false },
+      { key: "DJI FC3582", offsetMs: 75000, reference: false },
+    ]);
+  });
+});
+
 describe("cálculos de layout", () => {
+  it("desvios de relógio", () => {
+    expect(parseOffset("+3min42s")).toBe(222000);
+    expect(parseOffset("+3m42s")).toBe(222000);
+    expect(parseOffset("-1min15s")).toBe(-75000);
+    expect(parseOffset("+00:03:42")).toBe(222000);
+    expect(parseOffset("-1:15")).toBe(-75000);
+    expect(parseOffset("+1h2m")).toBe(3720000);
+    expect(parseOffset("0")).toBe(0);
+    expect(parseOffset("abc")).toBeNull();
+    expect(formatOffset(222000)).toBe("+3min42s");
+    expect(formatOffset(-75000)).toBe("-1min15s");
+    expect(formatOffset(3600000)).toBe("+1h");
+    expect(formatOffset(0)).toBe("0");
+  });
+  it("recorte do rosto a partir da miniatura", () => {
+    // Rosto de 10 % no centro de uma fotografia 6000×4000, avatar de 60 px.
+    const c = faceCrop({ faceId: 1, asset: 1, x: 0.45, y: 0.45, w: 0.1, h: 0.1, source: 0 }, 6000, 4000, 60);
+        const nums = (v: string) => v.split(" ").map((x) => parseFloat(x));
+    const [sw, sh] = nums(c.backgroundSize); // lado = 600 × 1,5 = 900 px → escala 60/900
+    expect(sw).toBeCloseTo(400);
+    expect(sh).toBeCloseTo(266.667, 2);
+    const [px, py] = nums(c.backgroundPosition);
+    expect(px).toBeCloseTo(-170);
+    expect(py).toBeCloseTo(-103.333, 2);
+  });
   it("explicações em linguagem natural", () => {
     const t = i18n.t.bind(i18n) as (k: string, o?: Record<string, unknown>) => string;
     expect(joinList(["a", "b", "c"], "e")).toBe("a, b e c");

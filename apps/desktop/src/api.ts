@@ -1,6 +1,14 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  AssetMoment,
+  CameraOffset,
+  CameraRow,
+  FaceRef,
+  MomentRow,
+  OffsetSuggestion,
+  OrganizeSummary,
+  PersonRow,
   AnalysisDetails,
   AnalysisProgress,
   AnalysisStatus,
@@ -52,7 +60,28 @@ export const api = {
   listGroups: () => invoke<GroupRow[]>("list_groups"),
   analysisDetails: (id: number) => invoke<AnalysisDetails>("analysis_details", { id }),
   acceptRecommendations: (ids: number[]) => invoke<number>("accept_recommendations", { ids }),
-  acceptGroup: (group: number) => invoke<number>("accept_group", { group }),
+    acceptGroup: (group: number) => invoke<number>("accept_group", { group }),
+  // Organização (pessoas, momentos, câmaras) — dados biométricos só no catálogo local.
+  rebuildOrganization: () => invoke<OrganizeSummary>("rebuild_organization"),
+  listPersons: () => invoke<PersonRow[]>("list_persons"),
+  personFaces: (person: number, limit: number) => invoke<FaceRef[]>("person_faces", { person, limit }),
+  photoPersons: () => invoke<[number, number][]>("photo_persons"),
+  updatePerson: (id: number, name: string | null, role: string | null, hidden: boolean) => invoke<void>("update_person", { id, name, role, hidden }),
+  mergePersons: (from: number, into: number) => invoke<void>("merge_persons", { from, into }),
+  excludeFaces: (faces: number[]) => invoke<number>("exclude_faces", { faces }),
+  reclusterPeople: () => invoke<number>("recluster_people"),
+  clearPeople: () => invoke<void>("clear_people"),
+  listMoments: () => invoke<MomentRow[]>("list_moments"),
+  assetMoments: () => invoke<AssetMoment[]>("asset_moments"),
+  createMoment: (name: string, after: number | null) => invoke<number>("create_moment", { name, after }),
+  renameMoment: (id: number, name: string) => invoke<void>("rename_moment", { id, name }),
+  deleteMoment: (id: number) => invoke<void>("delete_moment", { id }),
+  assignMoment: (ids: number[], moment: number | null) => invoke<number>("assign_moment", { ids, moment }),
+  resetMoments: (ids: number[]) => invoke<number>("reset_moments", { ids }),
+  reclassifyMoments: () => invoke<[number, number]>("reclassify_moments"),
+  listCameras: () => invoke<CameraRow[]>("list_cameras"),
+  suggestOffsets: (reference: string) => invoke<OffsetSuggestion[]>("suggest_offsets", { reference }),
+  setCameraOffsets: (offsets: CameraOffset[]) => invoke<OrganizeSummary>("set_camera_offsets", { offsets }),
 };
 
 export const events = {

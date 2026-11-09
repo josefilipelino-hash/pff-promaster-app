@@ -5,7 +5,7 @@
 //! Na interface da Fase 1, “fotografia” = asset + variante principal; o identificador
 //! exposto é o `AssetId`.
 
-use crate::{db_err, now_unix, Catalog};
+use crate::{db_err, now_unix, Catalog, CLOCK_JOIN_SQL, CORRECTED_ORDER_SQL, CORRECTED_TIME_SQL};
 use momento_core_types::{AssetId, CoreError, CoreResult, ImportSessionId};
 use rusqlite::{params, ErrorCode, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -66,6 +66,8 @@ pub struct NewAsset {
     pub embedded_preview: Option<String>,
     /// `None` = suporte completo; `Some(nota)` = parcial, com o motivo.
     pub partial_note: Option<String>,
+    /// Latitude/longitude (graus decimais).
+    pub gps: Option<(f64, f64)>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -129,6 +131,12 @@ pub struct PhotoDetails {
     pub codec_detail: Option<String>,
     pub embedded_preview: Option<String>,
     pub partial_note: Option<String>,
+    /// Hora corrigida pela sincronização de câmaras (igual a `capture_time` sem correção).
+    pub corrected_time: Option<String>,
+    /// Correção aplicada à câmara desta fotografia (ms).
+    pub clock_offset_ms: i64,
+    pub gps_lat: Option<f64>,
+    pub gps_lon: Option<f64>,
 }
 
 /// Localização de um original para servir previews.
@@ -162,10 +170,10 @@ impl Catalog {
                         capture_offset, camera_make, camera_model, camera_serial, lens, iso,
                         exposure_time, f_number, focal_length, focal_length_35mm,
                         import_session_id, imported_at, bit_depth, color_space, codec,
-                        codec_detail, embedded_preview, support, support_note)
+                        codec_detail, embedded_preview, support, support_note, gps_lat, gps_lon)
                      VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
                             ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28,
-                            ?29, ?30)",
+                            ?29, ?30, ?31, ?32)",
                 )
                 .map_err(db_err)?;
             let mut var = tx
@@ -209,7 +217,9 @@ impl Catalog {
                     a.codec_detail,
                     a.embedded_preview,
                     if a.partial_note.is_some() { "partial" } else { "full" },
-                    a.partial_note
+                    a.partial_note,
+                    a.gps.map(|g| g.0),
+                    a.gps.map(|g| g.1)
                 ]);
                 match res {
                     Ok(_) => {
@@ -287,18 +297,20 @@ impl Catalog {
             .map_err(db_err)
     }
 
-    /// Todas as fotografias, ordenadas por data de captura e nome.
+    /// Todas as fotografias, por ordem cronológica **corrigida** (sincronização de câmaras).
+    /// `capture_time` é a hora corrigida.
     pub fn list_photos(&self) -> CoreResult<Vec<PhotoRow>> {
         let mut st = self
             .connection()
-            .prepare(
-                "SELECT a.id, a.file_name, a.capture_time, a.width, a.height, a.orientation,
+            .prepare(&format!(
+                "SELECT a.id, a.file_name, {CORRECTED_TIME_SQL}, a.width, a.height, a.orientation,
                         r.stars, r.flag, r.color, a.thumb_state, a.support, a.format
                  FROM asset a
                  JOIN variant v ON v.asset_id = a.id AND v.is_master = 1
                  JOIN rating r ON r.variant_id = v.id
-                 ORDER BY a.capture_time IS NULL, a.capture_time, a.file_name, a.id",
-            )
+                 {CLOCK_JOIN_SQL}
+                 ORDER BY {CORRECTED_ORDER_SQL}"
+            ))
             .map_err(db_err)?;
         let rows = st
             .query_map([], |r| {
@@ -324,12 +336,15 @@ impl Catalog {
     pub fn photo_details(&self, id: AssetId) -> CoreResult<Option<PhotoDetails>> {
         self.connection()
             .query_row(
-                "SELECT id, path, source_path, file_name, file_size, format, width, height,
+                &format!(
+                    "SELECT id, path, source_path, file_name, file_size, format, width, height,
                         orientation, capture_time, capture_offset, camera_make, camera_model,
                         camera_serial, lens, iso, exposure_time, f_number, focal_length,
                         focal_length_35mm, imported_at, thumb_error, bit_depth, color_space,
-                        codec, codec_detail, embedded_preview, support_note
-                 FROM asset WHERE id = ?1",
+                        codec, codec_detail, embedded_preview, support_note, {CORRECTED_TIME_SQL},
+                        coalesce(cc.offset_ms, 0), gps_lat, gps_lon
+                 FROM asset a {CLOCK_JOIN_SQL} WHERE a.id = ?1"
+                ),
                 [id.0],
                 |r| {
                     Ok(PhotoDetails {
@@ -361,6 +376,10 @@ impl Catalog {
                         codec_detail: r.get(25)?,
                         embedded_preview: r.get(26)?,
                         partial_note: r.get(27)?,
+                        corrected_time: r.get(28)?,
+                        clock_offset_ms: r.get(29)?,
+                        gps_lat: r.get(30)?,
+                        gps_lon: r.get(31)?,
                     })
                 },
             )

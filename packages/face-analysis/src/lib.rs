@@ -10,14 +10,18 @@
 //! | `face_landmarks_detector.onnx` | 256×256 | 478 pontos faciais + presença |
 //! | `face_blendshapes.onnx` | 146 pontos | 52 coeficientes (olhos fechados, sorriso, …) |
 //! | `image_embedder.onnx` (MobileNetV3-small) | 224×224 | vetor visual de 1024 dimensões |
+//! | `face_identity.onnx` (SFace, OpenCV Zoo) | 112×112 alinhado | identidade facial (128-D), opcional |
+//! | `scene_classifier.onnx` (EfficientNet-Lite2) | 260×260 | 1000 classes ImageNet (cena/objetos), opcional |
 //!
 //! O pré e pós-processamento reproduz o do MediaPipe (âncoras SSD, NMS ponderado, recorte
 //! ×1,5 rodado pelos olhos, subconjunto de 146 pontos) e é validado contra os resultados
 //! de referência publicados pela Google (`portrait.jpg`).
 
 mod detector;
+pub mod identity;
 mod mesh;
 mod models;
+pub mod scene;
 mod tensor;
 
 /// Modelo otimizado e pronto a executar.
@@ -25,7 +29,10 @@ pub(crate) type Plan = std::sync::Arc<tract_onnx::prelude::TypedRunnableModel>;
 
 pub use detector::FaceDetection;
 pub use mesh::{blendshape_index, FaceMesh, BLENDSHAPE_NAMES};
-pub use models::{find_models_dir, VisionModels, MODEL_FILES};
+pub use models::{
+    find_models_dir, VisionModels, MAX_IDENTITIES_PER_PHOTO, MIN_FACE_PX_FOR_IDENTITY, MODEL_FILES,
+    OPTIONAL_MODEL_FILES,
+};
 
 /// Resultado completo para um rosto.
 #[derive(Debug, Clone, serde::Serialize)]
@@ -39,6 +46,9 @@ pub struct FaceResult {
     /// 478 pontos (x, y) em píxeis da imagem analisada.
     #[serde(skip)]
     pub landmarks: Vec<(f32, f32)>,
+    /// Identidade (SFace, 128-D normalizado), se o modelo existir e o rosto for grande o suficiente.
+    #[serde(skip)]
+    pub identity: Option<Vec<f32>>,
 }
 
 impl FaceResult {

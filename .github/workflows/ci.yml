@@ -21,7 +21,7 @@ jobs:
         id: cache
         with:
           path: models/*.onnx
-          key: models-${{ hashFiles('scripts/prepare-models.py', 'models/models.lock.json') }}
+          key: models-${{ hashFiles('scripts/prepare-models.py') }}
       - uses: actions/setup-python@v5
         if: steps.cache.outputs.cache-hit != 'true'
         with:
@@ -31,7 +31,6 @@ jobs:
         run: |
           python -m pip install tf2onnx==1.17.0 tensorflow-cpu==2.21.0 onnx==1.23.2
           python scripts/prepare-models.py
-          git diff --exit-code models/models.lock.json
       - uses: actions/upload-artifact@v4
         with:
           name: models

@@ -1,13 +1,13 @@
 //! Repositório da análise (Fase 3): métricas, rostos, embeddings, grupos e recomendações.
 //! Os tipos são primitivos para não acoplar a base de dados aos crates de análise.
 
-use crate::{db_err, now_unix, Catalog};
+use crate::{db_err, now_unix, Catalog, CLOCK_JOIN_SQL, CORRECTED_TIME_SQL};
 use momento_core_types::{AssetId, CoreResult};
 use rusqlite::{params, OptionalExtension};
 use serde::{Deserialize, Serialize};
 
 /// Versão do algoritmo de análise (mudar obriga a reanalisar).
-pub const ANALYSIS_VERSION: i64 = 1;
+pub const ANALYSIS_VERSION: i64 = 2;
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -49,6 +49,13 @@ pub struct FaceRow {
     pub cut: bool,
     #[serde(skip)]
     pub blendshapes: Vec<f32>,
+    /// Identificador do rosto no catálogo (0 antes de gravar).
+    pub id: i64,
+    /// Pessoa atribuída (agrupamento ou utilizador).
+    pub person_id: Option<i64>,
+    /// Identidade SFace (128-D); vazia se o rosto for pequeno ou o modelo não existir.
+    #[serde(skip)]
+    pub identity: Vec<f32>,
 }
 
 /// Resultado completo de uma fotografia, gravado numa transação.
@@ -58,6 +65,8 @@ pub struct AnalysisResult {
     pub row: AnalysisRow,
     pub faces: Vec<FaceRow>,
     pub embedding: Option<(String, Vec<f32>)>,
+    /// Classes ImageNet mais prováveis (índice, probabilidade).
+    pub scene: Vec<(u16, f32)>,
 }
 
 /// Dados para o motor de seleção.
@@ -73,6 +82,8 @@ pub struct SelectionRow {
     pub faces: Vec<FaceRow>,
     pub embedding: Option<Vec<f32>>,
     pub user_flag: i8,
+    pub gps: Option<(f64, f64)>,
+    pub iso: Option<u32>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -171,6 +182,36 @@ fn read_analysis(r: &rusqlite::Row, o: usize) -> rusqlite::Result<AnalysisRow> {
 const ANALYSIS_COLS: &str = "a.models, a.width, a.height, a.sharpness, a.focus_peak, a.focus_center, a.motion_blur, a.brightness, a.highlights_clipped, a.shadows_crushed, a.contrast, a.noise, a.tilt_degrees, a.phash, a.dhash, a.duration_ms";
 const FACE_COLS: &str = "x, y, w, h, px, det_score, presence, blink_left, blink_right, smile, jaw_open, sharpness, eye_sharpness, cut, blendshapes";
 
+const FACE_READ_COLS: &str = "x, y, w, h, px, det_score, presence, blink_left, blink_right, smile, jaw_open, sharpness, eye_sharpness, cut, blendshapes, id, person_id";
+
+pub(crate) fn scene_to_blob(v: &[(u16, f32)]) -> Vec<u8> {
+    v.iter()
+        .flat_map(|(i, p)| [i.to_le_bytes().as_slice(), p.to_le_bytes().as_slice()].concat())
+        .collect()
+}
+pub(crate) fn blob_to_scene(b: &[u8]) -> Vec<(u16, f32)> {
+    b.chunks_exact(6)
+        .map(|c| (u16::from_le_bytes([c[0], c[1]]), f32::from_le_bytes([c[2], c[3], c[4], c[5]])))
+        .collect()
+}
+
+/// Rosto anterior com decisão do utilizador: (caixa, pessoa, origem).
+type KeptFace = ((f32, f32, f32, f32), Option<i64>, i64);
+
+fn iou(a: (f32, f32, f32, f32), b: (f32, f32, f32, f32)) -> f32 {
+    let x1 = a.0.max(b.0);
+    let y1 = a.1.max(b.1);
+    let x2 = (a.0 + a.2).min(b.0 + b.2);
+    let y2 = (a.1 + a.3).min(b.1 + b.3);
+    let inter = (x2 - x1).max(0.0) * (y2 - y1).max(0.0);
+    let u = a.2 * a.3 + b.2 * b.3 - inter;
+    if u <= 0.0 {
+        0.0
+    } else {
+        inter / u
+    }
+}
+
 fn read_face(r: &rusqlite::Row, o: usize) -> rusqlite::Result<FaceRow> {
     Ok(FaceRow {
         x: r.get(o)?,
@@ -191,6 +232,9 @@ fn read_face(r: &rusqlite::Row, o: usize) -> rusqlite::Result<FaceRow> {
             .get::<_, Option<Vec<u8>>>(o + 14)?
             .map(|b| blob_to_f32s(&b))
             .unwrap_or_default(),
+        id: r.get(o + 15)?,
+        person_id: r.get(o + 16)?,
+        identity: Vec::new(),
     })
 }
 
@@ -235,6 +279,14 @@ impl Catalog {
         let tx = self.connection_mut().transaction().map_err(db_err)?;
         {
             let mut del_f = tx.prepare("DELETE FROM face WHERE asset_id = ?1").map_err(db_err)?;
+            // Decisões do utilizador sobre pessoas (confirmar/excluir) sobrevivem à reanálise:
+            // passam para o novo rosto na mesma posição (IoU ≥ 0,5).
+            let mut old_f = tx
+                .prepare("SELECT x, y, w, h, person_id, person_source FROM face WHERE asset_id = ?1 AND person_source != 0")
+                .map_err(db_err)?;
+            let mut ins_s = tx
+                .prepare("INSERT OR REPLACE INTO scene(asset_id, top) VALUES(?1, ?2)")
+                .map_err(db_err)?;
             let mut ins_a = tx
                 .prepare(
                     "INSERT OR REPLACE INTO analysis(asset_id, version, analyzed_at, models, width, height, sharpness,
@@ -244,7 +296,7 @@ impl Catalog {
                 )
                 .map_err(db_err)?;
             let mut ins_f = tx
-                .prepare(&format!("INSERT INTO face(asset_id, {FACE_COLS}) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)"))
+                .prepare(&format!("INSERT INTO face(asset_id, {FACE_COLS}, identity, person_id, person_source) VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)"))
                 .map_err(db_err)?;
             let mut ins_e = tx
                 .prepare(
@@ -256,7 +308,19 @@ impl Catalog {
                 .map_err(db_err)?;
             for res in results {
                 let a = &res.row;
+                let kept: Vec<KeptFace> = old_f
+                    .query_map([res.asset.0], |r| {
+                        Ok(((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?), r.get(4)?, r.get(5)?))
+                    })
+                    .map_err(db_err)?
+                    .collect::<Result<_, _>>()
+                    .map_err(db_err)?;
                 del_f.execute([res.asset.0]).map_err(db_err)?;
+                if !res.scene.is_empty() {
+                    ins_s
+                        .execute(params![res.asset.0, scene_to_blob(&res.scene)])
+                        .map_err(db_err)?;
+                }
                 ins_a
                     .execute(params![
                         res.asset.0,
@@ -282,6 +346,13 @@ impl Catalog {
                     ])
                     .map_err(db_err)?;
                 for f in &res.faces {
+                    let carried = kept
+                        .iter()
+                        .map(|k| (iou(k.0, (f.x, f.y, f.w, f.h)), k))
+                        .filter(|(o, _)| *o >= 0.5)
+                        .max_by(|a, b| a.0.total_cmp(&b.0))
+                        .map(|(_, k)| (k.1, k.2));
+                    let (pid, src) = carried.unwrap_or((None, 0));
                     ins_f
                         .execute(params![
                             res.asset.0,
@@ -299,7 +370,10 @@ impl Catalog {
                             f.sharpness,
                             f.eye_sharpness,
                             f.cut as i64,
-                            (!f.blendshapes.is_empty()).then(|| f32s_to_blob(&f.blendshapes))
+                            (!f.blendshapes.is_empty()).then(|| f32s_to_blob(&f.blendshapes)),
+                            (!f.identity.is_empty()).then(|| f32s_to_blob(&f.identity)),
+                            pid,
+                            src
                         ])
                         .map_err(db_err)?;
                 }
@@ -320,15 +394,18 @@ impl Catalog {
         let c = self.connection();
         let mut st = c
             .prepare(&format!(
-                "SELECT s.id, s.path, s.format, s.file_name, s.capture_time,
+                "SELECT s.id, s.path, s.format, s.file_name, {corrected},
                         trim(coalesce(s.camera_make, '') || ' ' || coalesce(s.camera_model, '') || ' ' || coalesce(s.camera_serial, '')),
-                        r.flag, {ANALYSIS_COLS}
+                        r.flag, {ANALYSIS_COLS}, s.gps_lat, s.gps_lon, s.iso
                  FROM asset s
                  JOIN analysis a ON a.asset_id = s.id
                  JOIN variant v ON v.asset_id = s.id AND v.is_master = 1
                  JOIN rating r ON r.variant_id = v.id
+                 {clock}
                  WHERE s.analysis_state = 1
-                 ORDER BY s.id"
+                 ORDER BY s.id",
+                corrected = CORRECTED_TIME_SQL.replace("a.capture_time", "s.capture_time"),
+                clock = CLOCK_JOIN_SQL.replace("a.camera", "s.camera"),
             ))
             .map_err(db_err)?;
         let mut rows: Vec<SelectionRow> = st
@@ -342,6 +419,11 @@ impl Catalog {
                     camera: r.get::<_, String>(5).ok().filter(|s| !s.is_empty()),
                     user_flag: r.get(6)?,
                     analysis: read_analysis(r, 7)?,
+                    gps: match (r.get::<_, Option<f64>>(23)?, r.get::<_, Option<f64>>(24)?) {
+                        (Some(a), Some(b)) => Some((a, b)),
+                        _ => None,
+                    },
+                    iso: r.get(25)?,
                     ..Default::default()
                 })
             })
@@ -351,7 +433,7 @@ impl Catalog {
         let index: std::collections::HashMap<i64, usize> =
             rows.iter().enumerate().map(|(i, r)| (r.asset.0, i)).collect();
         let mut fst = c
-            .prepare(&format!("SELECT asset_id, {FACE_COLS} FROM face ORDER BY asset_id, id"))
+            .prepare(&format!("SELECT asset_id, {FACE_READ_COLS} FROM face ORDER BY asset_id, id"))
             .map_err(db_err)?;
         let faces =
             fst.query_map([], |r| Ok((r.get::<_, i64>(0)?, read_face(r, 1)?))).map_err(db_err)?;
@@ -516,7 +598,7 @@ impl Catalog {
             .map_err(db_err)?;
         let mut st = c
             .prepare(&format!(
-                "SELECT {FACE_COLS} FROM face WHERE asset_id = ?1 ORDER BY w * h DESC"
+                "SELECT {FACE_READ_COLS} FROM face WHERE asset_id = ?1 ORDER BY w * h DESC"
             ))
             .map_err(db_err)?;
         let faces = st
@@ -574,8 +656,8 @@ impl Catalog {
     pub fn clear_analysis(&mut self) -> CoreResult<()> {
         let tx = self.connection_mut().transaction().map_err(db_err)?;
         tx.execute_batch(
-            "DELETE FROM recommendation; DELETE FROM photo_group; DELETE FROM face; DELETE FROM embedding;
-             DELETE FROM analysis; UPDATE asset SET analysis_state = 0, analysis_error = NULL;",
+            "DELETE FROM recommendation; DELETE FROM photo_group; DELETE FROM embedding; DELETE FROM scene;
+             DELETE FROM face WHERE person_source = 0; DELETE FROM analysis; UPDATE asset SET analysis_state = 0, analysis_error = NULL;",
         )
         .map_err(db_err)?;
         tx.commit().map_err(db_err)
@@ -627,6 +709,10 @@ impl Catalog {
     }
 }
 
+pub(crate) fn blob_to_f32s_pub(b: &[u8]) -> Vec<f32> {
+    blob_to_f32s(b)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -668,6 +754,7 @@ mod tests {
             },
             faces: vec![face.clone(), face],
             embedding: Some(("mobilenet_v3_small".into(), vec![0.25; 1024])),
+            scene: Vec::new(),
         };
         c.save_analyses(&[res], &[(ids[2], "falhou".into())]).unwrap();
         let counts = c.analysis_counts().unwrap();

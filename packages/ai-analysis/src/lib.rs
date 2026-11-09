@@ -6,11 +6,17 @@
 //!   exposição, realces queimados, sombras bloqueadas, ruído, contraste, horizonte;
 //! - [`hash`]: hashes percetuais (pHash DCT e dHash) para duplicados e semelhança;
 //! - [`selection`]: agrupamento em sequências/duplicados/pares RAW+JPEG, pontuação por
-//!   critério, etiquetas (Melhor, Alternativa, Rever, Rejeitar sugerido) e explicações.
+//!   critério, etiquetas (Melhor, Alternativa, Rever, Rejeitar sugerido) e explicações;
+//! - [`people`]: agrupamento de rostos por identidade (pessoas);
+//! - [`moments`]: classificação de momentos do casamento (com confiança);
+//! - [`clock`]: sugestão da correção de hora entre câmaras.
 //!
 //! Os modelos de visão (rostos, olhos, expressões, embeddings) estão em
 //! `momento-face-analysis`; este crate recebe os resultados já calculados.
 
+pub mod clock;
 pub mod hash;
 pub mod metrics;
+pub mod moments;
+pub mod people;
 pub mod selection;

@@ -4,6 +4,7 @@ import { cameraName, formatAperture, formatBytes, formatCaptureTime, formatExpos
 import { useStore } from "../store";
 import type { Color, PhotoRow } from "../types";
 import { AnalysisSection } from "./AnalysisSection";
+import { OrganizationSection } from "./OrganizationSection";
 import { ColorButtons, FlagButtons, Stars } from "./Rating";
 
 /** Nome do formato: para RAW sobre TIFF usa-se a extensão (NEF, ARW, DNG…). */
@@ -20,14 +21,20 @@ export function InfoPanel({
   photo,
   selectedCount,
   onRate,
-  onCompareGroup,
+    onCompareGroup,
   onAccept,
+  onMoment,
+  onResetMoment,
+  onPerson,
 }: {
   photo: PhotoRow | null;
   selectedCount: number;
   onRate: (kind: "stars" | "flag" | "color", value: number | Color | null) => void;
-  onCompareGroup?: (ids: number[]) => void;
+    onCompareGroup?: (ids: number[]) => void;
   onAccept?: (id: number) => void;
+  onMoment?: (ids: number[], moment: number | null) => void;
+  onResetMoment?: (ids: number[]) => void;
+  onPerson?: (id: number) => void;
 }) {
   const { t, i18n } = useTranslation();
   const details = useStore((s) => (photo ? s.details.get(photo.id) : undefined));
@@ -89,6 +96,7 @@ export function InfoPanel({
           <span>{d.partialNote}</span>
         </div>
       )}
+            <OrganizationSection photo={photo} onMoment={(m) => onMoment?.([photo.id], m)} onReset={() => onResetMoment?.([photo.id])} onPerson={(id) => onPerson?.(id)} />
       <AnalysisSection photo={photo} onCompareGroup={onCompareGroup ?? (() => {})} onAccept={onAccept ?? (() => {})} />
       <dl className="info-list">
         {rows

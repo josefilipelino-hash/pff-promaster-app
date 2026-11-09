@@ -30,6 +30,8 @@ pub struct ExifSummary {
     /// Milímetros.
     pub focal_length: Option<f64>,
     pub focal_length_35mm: Option<u32>,
+    /// Coordenadas GPS em graus decimais (latitude, longitude), quando existem.
+    pub gps: Option<(f64, f64)>,
 }
 
 impl Default for ExifSummary {
@@ -47,6 +49,7 @@ impl Default for ExifSummary {
             f_number: None,
             focal_length: None,
             focal_length_35mm: None,
+            gps: None,
         }
     }
 }
@@ -89,6 +92,26 @@ fn rational(e: &Exif, tag: Tag) -> Option<f64> {
         other => other.get_uint(0).map(|u| u as f64),
     }?;
     (v.is_finite() && v > 0.0).then_some(v)
+}
+
+/// Graus decimais a partir de (graus, minutos, segundos) e da referência N/S/E/W.
+fn gps_coord(e: &Exif, tag: Tag, ref_tag: Tag, neg: &str) -> Option<f64> {
+    let Value::Rational(v) = &field(e, tag)?.value else { return None };
+    if v.len() < 3 {
+        return None;
+    }
+    let deg = v[0].to_f64() + v[1].to_f64() / 60.0 + v[2].to_f64() / 3600.0;
+    let sign =
+        if text(e, ref_tag).is_some_and(|r| r.eq_ignore_ascii_case(neg)) { -1.0 } else { 1.0 };
+    deg.is_finite().then_some(sign * deg)
+}
+
+fn gps(e: &Exif) -> Option<(f64, f64)> {
+    let lat = gps_coord(e, Tag::GPSLatitude, Tag::GPSLatitudeRef, "S")?;
+    let lon = gps_coord(e, Tag::GPSLongitude, Tag::GPSLongitudeRef, "W")?;
+    // (0, 0) costuma significar “sem GPS” em câmaras que escrevem o bloco vazio.
+    ((-90.0..=90.0).contains(&lat) && (-180.0..=180.0).contains(&lon) && (lat, lon) != (0.0, 0.0))
+        .then_some((lat, lon))
 }
 
 /// Converte `AAAA:MM:DD HH:MM:SS` em `AAAA-MM-DDTHH:MM:SS`, validando os campos.
@@ -155,6 +178,7 @@ fn summarize(e: &Exif) -> ExifSummary {
         f_number: rational(e, Tag::FNumber),
         focal_length: rational(e, Tag::FocalLength),
         focal_length_35mm: uint(e, Tag::FocalLengthIn35mmFilm).filter(|v| *v > 0),
+        gps: gps(e),
     }
 }
 
@@ -180,6 +204,19 @@ mod tests {
         assert_eq!(s.f_number, Some(1.4));
         assert_eq!(s.focal_length, Some(24.0));
         assert_eq!(s.focal_length_35mm, Some(24));
+    }
+
+    #[test]
+    fn reads_gps_coordinates() {
+        let spec = ExifSpec { gps: Some((38.7967, -9.3906)), ..spec_for(0, 1) }; // Sintra
+        let s = read_exif(&jpeg_bytes(&test_image(32, 32, 1, 1), Some(&spec), 80));
+        let (lat, lon) = s.gps.unwrap();
+        assert!((lat - 38.7967).abs() < 1e-5 && (lon + 9.3906).abs() < 1e-5, "{lat} {lon}");
+        assert_eq!(s.camera_model.as_deref(), Some("EOS R5"), "EXIF continua legível");
+        assert_eq!(
+            read_exif(&jpeg_bytes(&test_image(8, 8, 1, 1), Some(&spec_for(0, 1)), 80)).gps,
+            None
+        );
     }
 
     #[test]

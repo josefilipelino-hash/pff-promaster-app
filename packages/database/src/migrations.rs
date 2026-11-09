@@ -208,6 +208,60 @@ pub const CATALOG: &[&str] = &[
     ) STRICT;
     CREATE INDEX recommendation_by_group ON recommendation(group_id, rank);
     "#,
+    // v5 — Fase 4: GPS, relógios das câmaras, pessoas, identidade facial, cena e momentos.
+    r#"
+    ALTER TABLE asset ADD COLUMN gps_lat REAL;
+    ALTER TABLE asset ADD COLUMN gps_lon REAL;
+
+    -- Correção de hora por câmara (marca + modelo + n.º de série). offset_ms soma-se à hora EXIF.
+    CREATE TABLE camera_clock (
+        camera_key TEXT PRIMARY KEY,
+        offset_ms  INTEGER NOT NULL DEFAULT 0,
+        reference  INTEGER NOT NULL DEFAULT 0 CHECK (reference IN (0, 1))
+    ) STRICT;
+
+    CREATE TABLE person (
+        id         INTEGER PRIMARY KEY,
+        name       TEXT,
+        role       TEXT,
+        hidden     INTEGER NOT NULL DEFAULT 0 CHECK (hidden IN (0, 1)),
+        created_at INTEGER NOT NULL
+    ) STRICT;
+
+    -- identity: SFace 128-D; person_source: 0 automático, 1 confirmado pelo utilizador,
+    -- 2 excluído pelo utilizador (“não é esta pessoa”: nunca volta a ser atribuído).
+    ALTER TABLE face ADD COLUMN identity BLOB;
+    ALTER TABLE face ADD COLUMN person_id INTEGER REFERENCES person(id) ON DELETE SET NULL;
+    ALTER TABLE face ADD COLUMN person_source INTEGER NOT NULL DEFAULT 0;
+    CREATE INDEX face_by_person ON face(person_id);
+
+    -- Classes ImageNet mais prováveis (u16 índice + f32 probabilidade, 25 pares).
+    CREATE TABLE scene (
+        asset_id INTEGER PRIMARY KEY REFERENCES asset(id) ON DELETE CASCADE,
+        top      BLOB NOT NULL
+    ) STRICT;
+
+    CREATE TABLE moment (
+        id     INTEGER PRIMARY KEY,
+        kind   TEXT UNIQUE,
+        name   TEXT,
+        sort   INTEGER NOT NULL,
+        custom INTEGER NOT NULL DEFAULT 0 CHECK (custom IN (0, 1))
+    ) STRICT;
+
+    CREATE TABLE asset_moment (
+        asset_id   INTEGER PRIMARY KEY REFERENCES asset(id) ON DELETE CASCADE,
+        moment_id  INTEGER REFERENCES moment(id) ON DELETE CASCADE,
+        confidence REAL,
+        source     TEXT NOT NULL CHECK (source IN ('auto', 'user')),
+        reasons    TEXT
+    ) STRICT;
+    CREATE INDEX asset_moment_by_moment ON asset_moment(moment_id);
+
+    -- A análise ganha identidade facial e cena: as fotografias já analisadas ficam por
+    -- reanalisar (as recomendações atuais mantêm-se até lá).
+    UPDATE asset SET analysis_state = 0 WHERE analysis_state = 1;
+    "#,
 ];
 
 /// Migrações da biblioteca global (projetos recentes).

@@ -3,27 +3,39 @@
   "models": [
     {
       "file": "face_detector.onnx",
-      "sha256": "1218b744aa0c89ee031a5e384d8f9ffd3a65f886b8a69fef9bbe8d32c459d89e",
+      "sha256": "f33bfe99beca76267e994f934ea715530447ae2890022959a34c54218bb9d54f",
       "bytes": 418463,
       "source_sha256": "b4578f35940bf5a1a655214a1cce5cab13eba73c1297cd78e1a04c2380b0152f"
     },
     {
       "file": "face_landmarks_detector.onnx",
-      "sha256": "0e4883819c2711b5d5d79bada2ff84cd177bae5c5a4233f10ff7da6df5a48db7",
+      "sha256": "97a7eac1b7a17bca44f2449ac7e7a3cb960d839fd8ffd44ddc3036211fa712af",
       "bytes": 4920994,
       "source_sha256": "c7d54204ce0448474c7f3fa9af494787c0965cbdd6f20fc72867e43046bd43d5"
     },
     {
       "file": "face_blendshapes.onnx",
-      "sha256": "212b9bcf7b093612b5c0c8efad1d36db0d90d262acf4d71e782168f88b703f7f",
-      "bytes": 1883894,
+      "sha256": "8a3c8f5c0ce894960e2dc71c225997a88d80d69ac1ab803544e648735456ee95",
+      "bytes": 1882258,
       "source_sha256": "4f36dded049db18d76048567439b2a7f58f1daabc00d78bfe8f3ad396a2d2082"
     },
     {
       "file": "image_embedder.onnx",
-      "sha256": "bbfa9c61ca0a16140c8b8b4fa8386520f3ff70a1634c2fadb2fae297f274a637",
+      "sha256": "92548f4119625da2e534f66add75f5548f22f5635a8958585c919d77c77ea39f",
       "bytes": 4189824,
       "source_sha256": "bbbb4c51a55a53905af1daec995ca1aae355046f8839bb8c9f5ce9271394bc40"
+    },
+    {
+      "file": "scene_classifier.onnx",
+      "sha256": "c06351862fcb98a3f3216f05708be282bd116955a8bdfb6d1680ae1fffebe304",
+      "bytes": 24353312,
+      "source_sha256": "94b6c84a5d6de20f932558de213b50e0338dcc06ab83d8d64b12128a476b4b83"
+    },
+    {
+      "file": "face_identity.onnx",
+      "sha256": "ae6a6ac44d2bdc87924e75fb23d8212430dd24f037f5e035c21deff99afc8b61",
+      "bytes": 38688787,
+      "source_sha256": "0ba9fbfa01b5270c96627c4ef784da859931e02f04419c829e83484087c34e79"
     }
   ]
 }

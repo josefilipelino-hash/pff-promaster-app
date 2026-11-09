@@ -2,11 +2,15 @@ use crate::state::AppState;
 use momento_core_types::{AssetId, CoreError, ErrorPayload};
 use momento_database::analysis::{AnalysisDetails, GroupRow, RecommendationBrief};
 use momento_database::assets::{PhotoDetails, PhotoRow};
+use momento_database::clock::{CameraOffset, CameraRow};
 use momento_database::library::RecentProject;
+use momento_database::moments::{AssetMoment, MomentRow};
+use momento_database::people::{FaceRef, PersonRow};
 use momento_project_management::analysis::SelectionSummary;
 use momento_project_management::{
     AnalysisStatus, ImportRequest, NewProject, ProjectInfo, SelectionSettings,
 };
+use momento_project_management::{OffsetSuggestion, OrganizeSummary};
 use serde::Serialize;
 use std::path::Path;
 use tauri::State;
@@ -202,6 +206,135 @@ pub fn accept_recommendations(state: State<'_, AppState>, ids: Vec<AssetId>) -> 
 #[tauri::command]
 pub fn accept_group(state: State<'_, AppState>, group: i64) -> CmdResult<usize> {
     state.session().and_then(|s| s.accept_group(group)).map_err(err)
+}
+
+// ------------------------------------------------------------------ organização (Fase 4)
+
+#[tauri::command]
+pub async fn rebuild_organization(state: State<'_, AppState>) -> CmdResult<OrganizeSummary> {
+    state.session().map(|s| s.rebuild()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn list_persons(state: State<'_, AppState>) -> CmdResult<Vec<PersonRow>> {
+    state.session().and_then(|s| s.list_persons()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn person_faces(
+    state: State<'_, AppState>,
+    person: i64,
+    limit: u32,
+) -> CmdResult<Vec<FaceRef>> {
+    state.session().and_then(|s| s.person_faces(person, limit)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn photo_persons(state: State<'_, AppState>) -> CmdResult<Vec<(AssetId, i64)>> {
+    state.session().and_then(|s| s.photo_persons()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn update_person(
+    state: State<'_, AppState>,
+    id: i64,
+    name: Option<String>,
+    role: Option<String>,
+    hidden: bool,
+) -> CmdResult<()> {
+    state
+        .session()
+        .and_then(|s| s.update_person(id, name.as_deref(), role.as_deref(), hidden))
+        .map_err(err)
+}
+
+#[tauri::command]
+pub async fn merge_persons(state: State<'_, AppState>, from: i64, into: i64) -> CmdResult<()> {
+    state.session().and_then(|s| s.merge_persons(from, into)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn exclude_faces(state: State<'_, AppState>, faces: Vec<i64>) -> CmdResult<usize> {
+    state.session().and_then(|s| s.exclude_faces(&faces)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn recluster_people(state: State<'_, AppState>) -> CmdResult<u64> {
+    state.session().and_then(|s| s.recluster_people()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn clear_people(state: State<'_, AppState>) -> CmdResult<()> {
+    state.session().and_then(|s| s.clear_people()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn list_moments(state: State<'_, AppState>) -> CmdResult<Vec<MomentRow>> {
+    state.session().and_then(|s| s.list_moments()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn asset_moments(state: State<'_, AppState>) -> CmdResult<Vec<AssetMoment>> {
+    state.session().and_then(|s| s.asset_moments()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn create_moment(
+    state: State<'_, AppState>,
+    name: String,
+    after: Option<i64>,
+) -> CmdResult<i64> {
+    state.session().and_then(|s| s.create_moment(&name, after)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn rename_moment(state: State<'_, AppState>, id: i64, name: String) -> CmdResult<()> {
+    state.session().and_then(|s| s.rename_moment(id, &name)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn delete_moment(state: State<'_, AppState>, id: i64) -> CmdResult<()> {
+    state.session().and_then(|s| s.delete_moment(id)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn assign_moment(
+    state: State<'_, AppState>,
+    ids: Vec<AssetId>,
+    moment: Option<i64>,
+) -> CmdResult<usize> {
+    state.session().and_then(|s| s.assign_moment(&ids, moment)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn reset_moments(state: State<'_, AppState>, ids: Vec<AssetId>) -> CmdResult<usize> {
+    state.session().and_then(|s| s.reset_moments(&ids)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn reclassify_moments(state: State<'_, AppState>) -> CmdResult<(u64, u64)> {
+    state.session().and_then(|s| s.reclassify_moments()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn list_cameras(state: State<'_, AppState>) -> CmdResult<Vec<CameraRow>> {
+    state.session().and_then(|s| s.list_cameras()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn suggest_offsets(
+    state: State<'_, AppState>,
+    reference: String,
+) -> CmdResult<Vec<OffsetSuggestion>> {
+    state.session().and_then(|s| s.suggest_offsets(&reference)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn set_camera_offsets(
+    state: State<'_, AppState>,
+    offsets: Vec<CameraOffset>,
+) -> CmdResult<OrganizeSummary> {
+    state.session().and_then(|s| s.set_camera_offsets(&offsets)).map_err(err)
 }
 
 #[cfg(test)]

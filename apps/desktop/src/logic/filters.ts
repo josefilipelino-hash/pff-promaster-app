@@ -8,8 +8,19 @@ export interface Filter {
   minStars: number;
   /** Etiqueta de cor (null = qualquer). */
   color: Color | null;
-  /** Etiqueta da seleção assistida (null = qualquer). */
+    /** Etiqueta da seleção assistida (null = qualquer). */
   label?: Label | null;
+  /** Pessoas que têm de aparecer **todas** na fotografia (ex.: noiva + mãe). */
+  persons?: number[];
+  /** Momento (id), “unclassified” = Por classificar, null = qualquer. */
+  moment?: number | "unclassified" | null;
+}
+
+/** Dados de organização usados pelos filtros. */
+export interface OrgMaps {
+  photoPersons?: Map<number, number[]>;
+  /** Momento efetivo de cada fotografia (null = por classificar). */
+  photoMoment?: Map<number, number | null>;
 }
 
 export const DEFAULT_FILTER: Filter = { collection: "all", minStars: 0, color: null, label: null };
@@ -30,18 +41,34 @@ export function inCollection(p: PhotoRow, c: Collection): boolean {
 
 export type RecMap = Map<number, RecommendationBrief>;
 
-export function matches(p: PhotoRow, f: Filter, recs?: RecMap): boolean {
-  return (
-    inCollection(p, f.collection) &&
-    p.stars >= f.minStars &&
-    (f.color === null || p.color === f.color) &&
-    (!f.label || recs?.get(p.id)?.label === f.label)
-  );
+export function matches(p: PhotoRow, f: Filter, recs?: RecMap, org?: OrgMaps): boolean {
+  if (!inCollection(p, f.collection) || p.stars < f.minStars || (f.color !== null && p.color !== f.color)) return false;
+  if (f.label && recs?.get(p.id)?.label !== f.label) return false;
+  if (f.persons && f.persons.length > 0) {
+    const here = org?.photoPersons?.get(p.id) ?? [];
+    if (!f.persons.every((x) => here.includes(x))) return false;
+  }
+  if (f.moment != null) {
+    const m = org?.photoMoment?.get(p.id) ?? null;
+    if (f.moment === "unclassified" ? m !== null : m !== f.moment) return false;
+  }
+  return true;
 }
 
-export function applyFilter(photos: PhotoRow[], f: Filter, recs?: RecMap): PhotoRow[] {
-  if (f.collection === "all" && f.minStars === 0 && f.color === null && !f.label) return photos;
-  return photos.filter((p) => matches(p, f, recs));
+export function applyFilter(photos: PhotoRow[], f: Filter, recs?: RecMap, org?: OrgMaps): PhotoRow[] {
+  if (f.collection === "all" && f.minStars === 0 && f.color === null && !f.label && !(f.persons && f.persons.length) && f.moment == null) return photos;
+  return photos.filter((p) => matches(p, f, recs, org));
+}
+
+/** Contagens por momento (inclui “unclassified”). */
+export function momentCounts(photos: PhotoRow[], photoMoment: Map<number, number | null>): Map<number | "unclassified", number> {
+  const c = new Map<number | "unclassified", number>();
+  for (const p of photos) {
+    const m = photoMoment.get(p.id) ?? null;
+    const k = m === null ? "unclassified" : m;
+    c.set(k, (c.get(k) ?? 0) + 1);
+  }
+  return c;
 }
 
 export function labelCounts(photos: PhotoRow[], recs: RecMap): Record<Label, number> {

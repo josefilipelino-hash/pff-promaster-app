@@ -354,6 +354,7 @@ fn process_file_inner(path_str: &str, shared: &Shared) -> CoreResult<Processed> 
             Some(SupportLevel::Partial(n)) => Some(n.clone()),
             _ => None,
         },
+        gps: exif.gps,
     })))
 }
 

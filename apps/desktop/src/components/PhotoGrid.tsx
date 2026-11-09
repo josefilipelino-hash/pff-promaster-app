@@ -161,7 +161,40 @@ export function PhotoGrid({
     return () => clearTimeout(h);
   }, [pendingKey]);
 
-  const onScroll = useCallback(() => setScrollTop(scroller.current?.scrollTop ?? 0), []);
+    const onScroll = useCallback(() => setScrollTop(scroller.current?.scrollTop ?? 0), []);
+
+  // Arrastar fotografias para um momento (barra lateral). Implementado com eventos do rato
+  // (e não HTML5 drag-and-drop, que o WebView2 do Windows bloqueia com a importação por
+  // arrastar ativa).
+  const press = useRef<{ x: number; y: number; id: number } | null>(null);
+  const onCellDown = useCallback(
+    (id: number, e: React.MouseEvent) => {
+      if (e.button === 0) press.current = { x: e.clientX, y: e.clientY, id };
+      onClickPhoto(id, e);
+    },
+    [onClickPhoto],
+  );
+  useEffect(() => {
+    const move = (e: MouseEvent) => {
+      const p = press.current;
+      const st = useStore.getState();
+      if (!p || st.dragIds || (e.buttons & 1) === 0) return;
+      if (Math.abs(e.clientX - p.x) + Math.abs(e.clientY - p.y) < 6) return;
+      const sel = st.selection.ids;
+      st.setDrag(sel.has(p.id) ? [...sel] : [p.id]);
+    };
+    const up = () => {
+      press.current = null;
+      // Depois dos alvos (que tratam o mouseup primeiro).
+      setTimeout(() => useStore.getState().setDrag(null), 0);
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    return () => {
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+    };
+  }, []);
 
   const rows = [];
   for (let r = first; r <= last; r++) {
@@ -177,7 +210,7 @@ export function PhotoGrid({
             version={versions.get(p.id) ?? 0}
             selected={selection.ids.has(p.id)}
             focused={selection.focus === p.id}
-            onClick={onClickPhoto}
+                        onClick={onCellDown}
             onOpen={onOpen}
             failedLabel={t("grid.thumbFailed")}
             partialLabel={t("grid.partial")}

@@ -4,6 +4,9 @@ import { DEFAULT_FILTER, type Filter } from "./logic/filters";
 import { EMPTY_SELECTION, type Selection } from "./logic/selection";
 import type { RecMap } from "./logic/filters";
 import type {
+  AssetMoment,
+  MomentRow,
+  PersonRow,
   AnalysisDetails,
   AnalysisProgress,
   AnalysisStatus,
@@ -38,7 +41,7 @@ export interface UiState {
 }
 
 /** Vista principal: grelha de fotografias ou lista de sequências/grupos. */
-export type View = "grid" | "sequences";
+export type View = "grid" | "sequences" | "people";
 
 interface State {
   project: ProjectInfo | null;
@@ -67,8 +70,19 @@ interface State {
   groups: GroupRow[];
   groupById: Map<number, GroupRow>;
   analysisDetails: Map<number, AnalysisDetails>;
-  /** Fotografias na comparação lado a lado (2–4), ou null. */
+    /** Fotografias na comparação lado a lado (2–4), ou null. */
   compare: number[] | null;
+  // Organização (Fase 4)
+  persons: PersonRow[];
+  personById: Map<number, PersonRow>;
+  photoPersons: Map<number, number[]>;
+  moments: MomentRow[];
+  assetMoments: Map<number, AssetMoment>;
+  /** Momento efetivo de cada fotografia (null = por classificar). */
+  photoMoment: Map<number, number | null>;
+  /** Fotografias a ser arrastadas (para um momento), ou null. */
+  dragIds: number[] | null;
+  clockOpen: boolean;
 }
 
 interface Actions {
@@ -95,7 +109,10 @@ interface Actions {
   reloadSelection(): Promise<void>;
   setAnalysisProgress(p: AnalysisProgress | null): void;
   loadAnalysisDetails(id: number): Promise<void>;
-  openCompare(ids: number[] | null): void;
+    openCompare(ids: number[] | null): void;
+  reloadOrganization(): Promise<void>;
+  setDrag(ids: number[] | null): void;
+  setClockOpen(o: boolean): void;
 }
 
 let toastSeq = 1;
@@ -115,7 +132,7 @@ export function parseUiState(json: string | null): Partial<UiState> {
     if (typeof v.thumbSize === "number") out.thumbSize = Math.min(THUMB_MAX, Math.max(THUMB_MIN, v.thumbSize));
     if (typeof v.focusId === "number") out.focusId = v.focusId;
     if (typeof v.infoOpen === "boolean") out.infoOpen = v.infoOpen;
-    if (v.view === "grid" || v.view === "sequences") out.view = v.view;
+        if (v.view === "grid" || v.view === "sequences" || v.view === "people") out.view = v.view;
     return out;
   } catch {
     return {};
@@ -146,8 +163,17 @@ export const useStore = create<State & Actions>((set, get) => ({
   recs: new Map(),
   groups: [],
   groupById: new Map(),
-  analysisDetails: new Map(),
+    analysisDetails: new Map(),
   compare: null,
+  persons: [],
+  personById: new Map(),
+  photoPersons: new Map(),
+  moments: [],
+  assetMoments: new Map(),
+  photoMoment: new Map(),
+  dragIds: null,
+  clockOpen: false,
+
 
   setProject(p) {
     if (!p) {
@@ -169,8 +195,16 @@ export const useStore = create<State & Actions>((set, get) => ({
         recs: new Map(),
         groups: [],
         groupById: new Map(),
-        analysisDetails: new Map(),
+                analysisDetails: new Map(),
         compare: null,
+        persons: [],
+        personById: new Map(),
+        photoPersons: new Map(),
+        moments: [],
+        assetMoments: new Map(),
+        photoMoment: new Map(),
+        dragIds: null,
+        clockOpen: false,
       });
       return;
     }
@@ -334,8 +368,29 @@ export const useStore = create<State & Actions>((set, get) => ({
     set({ analysisDetails: m });
   },
 
-  openCompare(ids) {
+    openCompare(ids) {
     set({ compare: ids && ids.length >= 1 ? ids.slice(0, 4) : null });
+  },
+
+  async reloadOrganization() {
+    const [persons, pairs, moments, am] = await Promise.all([api.listPersons(), api.photoPersons(), api.listMoments(), api.assetMoments()]);
+    const photoPersons = new Map<number, number[]>();
+    for (const [a, p] of pairs) {
+      const l = photoPersons.get(a);
+      if (l) l.push(p);
+      else photoPersons.set(a, [p]);
+    }
+    const assetMoments = new Map(am.map((m) => [m.asset, m]));
+    const photoMoment = new Map<number, number | null>(am.map((m) => [m.asset, m.momentId]));
+    set({ persons, personById: new Map(persons.map((p) => [p.id, p])), photoPersons, moments, assetMoments, photoMoment });
+  },
+
+  setDrag(ids) {
+    set({ dragIds: ids && ids.length > 0 ? ids : null });
+  },
+
+  setClockOpen(o) {
+    set({ clockOpen: o });
   },
 }));
 

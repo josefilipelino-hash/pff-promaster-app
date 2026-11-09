@@ -69,6 +69,22 @@ plataforma, ecrã inicial, validação do formulário, grelha virtualizada com 3
 secções futuras desativadas, classificação por teclado e em seleção múltipla, filtro
 Favoritas + visualizador, reversão quando o núcleo recusa, paridade de traduções.
 
+## Fase 4 — organização do casamento
+
+| Teste | O que verifica |
+|---|---|
+| `face-analysis` (runtimes oficiais) | SFace no tract = onnxruntime (cos 1,000000); EfficientNet-Lite2 no tract = TFLite (diferença máx. 5,5e-7); mesma pessoa 0,96–0,98 vs diferentes < 0,08 (`MOMENTO_REF_DIR`, `MOMENTO_FACES_DIR`) |
+| `ai-analysis::people` (4) | grupos puros, convidados isolados não viram pessoas, pessoas confirmadas atraem rostos, excluídos ignorados, dois rostos da mesma fotografia nunca juntos, 30 000 rostos em ≈ 7–9 s |
+| `ai-analysis::moments` (5) | dia de casamento sintético (25 momentos) todo correto; sem pistas nada é forçado; aprendizagem com exemplos (incl. momento personalizado); GPS separa cenas; 15 000 fotografias em ≈ 0,2 s |
+| `ai-analysis::clock` (2) | Canon certa, Sony +3min42s, DJI −1min15s recuperados; sem correspondências não há sugestão |
+| `database` (+4) | GPS, relógios (ordem corrigida, EXIF intacto), momentos (utilizador prevalece, personalizados), pessoas (grupos, nomes, juntar, excluir, sobrevivência à reanálise) |
+| `organize_flow` | fotografias reais: 2 pessoas agrupadas, identificar noiva/noivo, noivos juntos, sugestão Sony ≈ −3min42s, cronologia reconstruída, momento personalizado aprendido, reabrir |
+| Interface (+7) | pesquisas por pessoas, filtro por momento, arrastar para momento, criar momento, gerir pessoas, sincronizar câmaras, desvios de relógio, recorte de rosto |
+
+**Limitação:** a precisão dos momentos foi medida num dia **sintético** (pistas fabricadas
+como as dos modelos) e numa aplicação real sem fotografias de casamento. Falta medir com um
+casamento real.
+
 ## Fase 3 — seleção assistida
 
 | Teste | O que verifica |

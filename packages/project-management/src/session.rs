@@ -1,14 +1,19 @@
 //! Projeto aberto: catálogo, miniaturas, importações e eventos para a interface.
 
 use crate::analysis::{AnalysisProgress, AnalysisService, SelectionSummary};
+pub use crate::organize::OrganizeSummary;
 use crate::paths::{project_folder_name, ProjectPaths};
 use crate::thumbnails::{ThumbBatch, ThumbnailService};
+pub use momento_ai_analysis::clock::OffsetSuggestion;
 pub use momento_ai_analysis::selection::{Mode as SelectionMode, Settings as SelectionSettings};
 use momento_core_types::{AssetId, CoreError, CoreResult};
 use momento_database::analysis::{AnalysisCounts, AnalysisDetails, GroupRow, RecommendationBrief};
 use momento_database::assets::{PhotoDetails, PhotoRow};
+use momento_database::clock::{CameraOffset, CameraRow};
 use momento_database::import::{ImportMode, ItemIssue, SessionCounts};
 use momento_database::library::RecentProject;
+use momento_database::moments::{AssetMoment, MomentRow};
+use momento_database::people::{FaceRef, PersonRow};
 use momento_database::project::ProjectRecord;
 use momento_database::Catalog;
 use momento_image_codecs::CodecRegistry;
@@ -578,6 +583,141 @@ impl ProjectSession {
         let ids: Vec<AssetId> =
             self.catalog().group_labels(group)?.into_iter().map(|l| l.0).collect();
         self.accept_recommendations(&ids)
+    }
+
+    // ------------------------------------------------------------------ organização (Fase 4)
+
+    /// Recalcula seleção, pessoas e momentos a partir do catálogo (sem reanalisar).
+    pub fn rebuild(&self) -> OrganizeSummary {
+        crate::organize::rebuild(&mut self.catalog())
+    }
+
+    pub fn list_persons(&self) -> CoreResult<Vec<PersonRow>> {
+        self.catalog().list_persons()
+    }
+
+    pub fn person_faces(&self, person: i64, limit: u32) -> CoreResult<Vec<FaceRef>> {
+        self.catalog().person_faces(person, limit)
+    }
+
+    /// Pares (fotografia, pessoa) para pesquisar “noiva + mãe”, “noivos juntos”…
+    pub fn photo_persons(&self) -> CoreResult<Vec<(AssetId, i64)>> {
+        self.catalog().photo_persons()
+    }
+
+    /// Identificar uma pessoa (nome, papel, ocultar). Os momentos são reavaliados (os
+    /// papéis noiva/noivo ajudam a distinguir preparações, sessão do casal…).
+    pub fn update_person(
+        &self,
+        id: i64,
+        name: Option<&str>,
+        role: Option<&str>,
+        hidden: bool,
+    ) -> CoreResult<()> {
+        let mut c = self.catalog();
+        c.update_person(id, name, role, hidden)?;
+        crate::organize::refresh_moments(&mut c).map(|_| ())
+    }
+
+    pub fn merge_persons(&self, from: i64, into: i64) -> CoreResult<()> {
+        let mut c = self.catalog();
+        c.merge_persons(from, into)?;
+        crate::organize::refresh_moments(&mut c).map(|_| ())
+    }
+
+    /// “Não é esta pessoa”.
+    pub fn exclude_faces(&self, faces: &[i64]) -> CoreResult<usize> {
+        self.catalog().exclude_faces(faces)
+    }
+
+    /// Atribui rostos a uma pessoa existente ou a uma nova (`person = None`).
+    pub fn assign_faces(&self, faces: &[i64], person: Option<i64>) -> CoreResult<i64> {
+        let c = self.catalog();
+        let p = match person {
+            Some(p) => p,
+            None => c.create_person(None, None)?,
+        };
+        c.assign_faces(faces, p)?;
+        Ok(p)
+    }
+
+    /// Reagrupa rostos (ex.: depois de juntar/excluir vários).
+    pub fn recluster_people(&self) -> CoreResult<u64> {
+        let mut c = self.catalog();
+        let n = crate::organize::recluster_people(&mut c)?;
+        crate::organize::refresh_moments(&mut c)?;
+        Ok(n)
+    }
+
+    /// Apaga todos os dados de pessoas (identidades incluídas) deste projeto.
+    pub fn clear_people(&self) -> CoreResult<()> {
+        self.catalog().clear_people()
+    }
+
+    pub fn list_moments(&self) -> CoreResult<Vec<MomentRow>> {
+        self.catalog().list_moments()
+    }
+
+    pub fn asset_moments(&self) -> CoreResult<Vec<AssetMoment>> {
+        self.catalog().asset_moments()
+    }
+
+    pub fn create_moment(&self, name: &str, after: Option<i64>) -> CoreResult<i64> {
+        self.catalog().create_moment(name, after)
+    }
+
+    pub fn rename_moment(&self, id: i64, name: &str) -> CoreResult<()> {
+        self.catalog().rename_moment(id, name)
+    }
+
+    pub fn delete_moment(&self, id: i64) -> CoreResult<()> {
+        let mut c = self.catalog();
+        c.delete_moment(id)?;
+        crate::organize::refresh_moments(&mut c).map(|_| ())
+    }
+
+    /// Arrastar fotografias para um momento (`None` = “Por classificar”). As fotografias
+    /// parecidas sem decisão do utilizador são reavaliadas com este exemplo.
+    pub fn assign_moment(&self, ids: &[AssetId], moment: Option<i64>) -> CoreResult<usize> {
+        let mut c = self.catalog();
+        let n = c.assign_moment(ids, moment)?;
+        crate::organize::refresh_moments(&mut c)?;
+        Ok(n)
+    }
+
+    /// Devolve fotografias à classificação automática.
+    pub fn reset_moments(&self, ids: &[AssetId]) -> CoreResult<usize> {
+        let mut c = self.catalog();
+        let n = c.clear_user_moments(ids)?;
+        crate::organize::refresh_moments(&mut c)?;
+        Ok(n)
+    }
+
+    pub fn reclassify_moments(&self) -> CoreResult<(u64, u64)> {
+        crate::organize::refresh_moments(&mut self.catalog())
+    }
+
+    pub fn list_cameras(&self) -> CoreResult<Vec<CameraRow>> {
+        self.catalog().list_cameras()
+    }
+
+    pub fn suggest_offsets(&self, reference: &str) -> CoreResult<Vec<OffsetSuggestion>> {
+        crate::organize::suggest_offsets(&self.catalog(), reference)
+    }
+
+    /// Grava as correções de hora e reconstrói a cronologia: ordem das fotografias,
+    /// sequências/recomendações e momentos.
+    pub fn set_camera_offsets(&self, offsets: &[CameraOffset]) -> CoreResult<OrganizeSummary> {
+        let mut c = self.catalog();
+        c.set_camera_offsets(offsets)?;
+        let mut s = OrganizeSummary {
+            selection: crate::analysis::recompute_selection(&mut c)?,
+            ..Default::default()
+        };
+        let (cl, un) = crate::organize::refresh_moments(&mut c)?;
+        s.classified = cl;
+        s.unclassified = un;
+        Ok(s)
     }
 
     /// Fecha o projeto: suspende a importação (retomada na próxima abertura) e para as

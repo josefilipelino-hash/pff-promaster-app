@@ -278,3 +278,81 @@ export interface AnalysisDetails {
   groupId: number | null;
   error: string | null;
 }
+
+// --- Organização do casamento (Fase 4) ---------------------------------------------------
+
+export const ROLES = ["bride", "groom", "bride_mother", "bride_father", "groom_mother", "groom_father", "sibling", "best_man", "maid_of_honor", "important", "other"] as const;
+export type Role = (typeof ROLES)[number];
+
+export interface FaceRef {
+  faceId: number;
+  asset: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** 0 automático, 1 confirmado */
+  source: number;
+}
+
+export interface PersonRow {
+  id: number;
+  name: string | null;
+  role: Role | null;
+  hidden: boolean;
+  faceCount: number;
+  photoCount: number;
+  cover: FaceRef | null;
+}
+
+export interface MomentRow {
+  id: number;
+  /** Chave predefinida; null = personalizado */
+  kind: string | null;
+  name: string | null;
+  sort: number;
+  custom: boolean;
+  count: number;
+}
+
+export interface AssetMoment {
+  asset: number;
+  /** null = “Por classificar” escolhido pelo utilizador */
+  momentId: number | null;
+  confidence: number | null;
+  source: "auto" | "user";
+  reasons: string | null;
+}
+
+export interface CameraRow {
+  key: string;
+  make: string | null;
+  model: string | null;
+  serial: string | null;
+  photos: number;
+  firstTime: string | null;
+  lastTime: string | null;
+  offsetMs: number;
+  reference: boolean;
+}
+
+export interface CameraOffset {
+  key: string;
+  offsetMs: number;
+  reference: boolean;
+}
+
+export interface OffsetSuggestion {
+  camera: string;
+  offsetMs: number;
+  votes: number;
+  agreement: number;
+}
+
+export interface OrganizeSummary {
+  selection: SelectionSummary;
+  persons: number;
+  classified: number;
+  unclassified: number;
+  durationMs: number;
+}

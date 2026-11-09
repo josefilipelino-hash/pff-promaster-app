@@ -120,6 +120,13 @@ por `scripts/prepare-models.py` (URLs e SHA-256 fixados) e incluídos no instala
 | Face landmarks 478 (`face_landmarks_detector`) | idem | Apache-2.0 | 4,9 MB | pontos faciais, presença |
 | Face blendshapes (`face_blendshapes`) | idem | Apache-2.0 | 1,9 MB | olhos fechados, sorriso, boca |
 | MobileNetV3-small image embedder (`image_embedder`) | Google MediaPipe | Apache-2.0 | 4,2 MB | semelhança visual |
+| EfficientNet-Lite2 image classifier (`scene_classifier`) | Google MediaPipe | Apache-2.0 | 23,8 MB | cena/objetos (momentos) |
+| SFace (`face_identity`) | OpenCV Zoo (`face_recognition_sface_2021dec`) | Apache-2.0 | 37,8 MB | identidade facial (pessoas) |
+
+O SFace é descarregado do objeto Git LFS oficial; se o LFS não estiver acessível, usa-se a
+cópia incluída no pacote npm `maystar-facecompare@1.0.2` **apenas** porque os bytes são
+idênticos ao oficial (SHA-256 `0ba9fbfa…4e79`, verificado pelo script). As etiquetas
+ImageNet (`imagenet_labels.txt`) vêm do próprio modelo do MediaPipe.
 
 Licença confirmada no *model card* do MediaPipe Face Landmarker e do Image Embedder
 (Apache-2.0). A conversão (tf2onnx 1.17, só no momento da preparação, não incluído na

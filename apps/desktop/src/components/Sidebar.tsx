@@ -2,16 +2,14 @@ import { useTranslation } from "react-i18next";
 import type { Collection } from "../logic/filters";
 import type { View } from "../store";
 import type { Label } from "../types";
+import { MomentsPanel } from "./MomentsPanel";
+import { PeoplePanel } from "./PeoplePanel";
 import { SelectionPanel } from "./SelectionPanel";
 
 const COLLECTIONS: Collection[] = ["all", "picks", "rejects", "unrated"];
 
 /** Secções futuras: visíveis mas desativadas e identificadas com a fase em que chegam. */
-const UPCOMING: [string, number][] = [
-  ["moments", 5],
-  ["people", 5],
-  ["export", 6],
-];
+const UPCOMING: [string, number][] = [["export", 6]];
 
 export function Sidebar({
   active,
@@ -20,8 +18,13 @@ export function Sidebar({
   labelCounts,
   activeLabel,
   onLabel,
-  view,
+    view,
   onView,
+  activeMoment,
+  onMoment,
+  onDropMoment,
+  activePersons,
+  onPersons,
 }: {
   active: Collection;
   counts: Record<Collection, number>;
@@ -29,8 +32,13 @@ export function Sidebar({
   labelCounts: Record<Label, number>;
   activeLabel: Label | null;
   onLabel: (l: Label | null) => void;
-  view: View;
+    view: View;
   onView: (v: View) => void;
+  activeMoment: number | "unclassified" | null;
+  onMoment: (m: number | "unclassified" | null) => void;
+  onDropMoment: (ids: number[], moment: number | null) => void;
+  activePersons: number[];
+  onPersons: (ids: number[]) => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -39,13 +47,15 @@ export function Sidebar({
       <ul>
         {COLLECTIONS.map((c) => (
           <li key={c}>
-            <button type="button" className={`side-item${active === c && view === "grid" && !activeLabel ? " active" : ""}`} aria-current={active === c} onClick={() => onSelect(c)}>
+            <button type="button" className={`side-item${active === c && view === "grid" && !activeLabel && activeMoment == null && activePersons.length === 0 ? " active" : ""}`} aria-current={active === c} onClick={() => onSelect(c)}>
               <span>{t(`collection.${c}`)}</span>
               <span className="count">{counts[c].toLocaleString()}</span>
             </button>
           </li>
         ))}
       </ul>
+            <MomentsPanel active={activeMoment} onSelect={onMoment} onDrop={onDropMoment} />
+      <PeoplePanel active={activePersons} onPersons={onPersons} view={view} onView={onView} />
       <SelectionPanel labelCounts={labelCounts} activeLabel={activeLabel} onLabel={onLabel} view={view} onView={onView} />
       <h3 className="sidebar-title">{t("sidebar.upcoming")}</h3>
       <ul>

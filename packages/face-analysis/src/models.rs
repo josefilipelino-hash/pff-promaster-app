@@ -16,6 +16,12 @@ pub const MODEL_FILES: [&str; 4] = [
     "face_blendshapes.onnx",
     "image_embedder.onnx",
 ];
+/// Modelos opcionais (Fase 4): sem eles, não há agrupamento de pessoas nem pistas de cena.
+pub const OPTIONAL_MODEL_FILES: [&str; 2] = ["face_identity.onnx", "scene_classifier.onnx"];
+/// Largura mínima de um rosto (px) para calcular a identidade (abaixo disso é pouco fiável).
+pub const MIN_FACE_PX_FOR_IDENTITY: f32 = 40.0;
+/// No máximo, identidade para os N maiores rostos de cada fotografia.
+pub const MAX_IDENTITIES_PER_PHOTO: usize = 12;
 
 /// Procura a pasta dos modelos: `MOMENTO_MODELS_DIR`, recursos da aplicação, pasta `models/`
 /// do repositório (desenvolvimento).
@@ -27,6 +33,14 @@ pub fn find_models_dir(extra: &[PathBuf]) -> Option<PathBuf> {
     candidates.extend_from_slice(extra);
     candidates.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../models"));
     candidates.into_iter().find(|d| MODEL_FILES.iter().all(|f| d.join(f).is_file()))
+}
+
+fn optional(path: &Path) -> CoreResult<Option<crate::Plan>> {
+    if path.is_file() {
+        load(path).map(Some)
+    } else {
+        Ok(None)
+    }
 }
 
 fn load(path: &Path) -> CoreResult<crate::Plan> {
@@ -51,6 +65,8 @@ pub struct VisionModels {
     mesh: crate::Plan,
     blend: crate::Plan,
     embedder: crate::Plan,
+    identity: Option<crate::Plan>,
+    scene: Option<crate::Plan>,
 }
 
 impl VisionModels {
@@ -60,7 +76,42 @@ impl VisionModels {
             mesh: load(&dir.join(MODEL_FILES[1]))?,
             blend: load(&dir.join(MODEL_FILES[2]))?,
             embedder: load(&dir.join(MODEL_FILES[3]))?,
+            identity: optional(&dir.join(OPTIONAL_MODEL_FILES[0]))?,
+            scene: optional(&dir.join(OPTIONAL_MODEL_FILES[1]))?,
         })
+    }
+
+    pub fn has_identity(&self) -> bool {
+        self.identity.is_some()
+    }
+
+    pub fn has_scene(&self) -> bool {
+        self.scene.is_some()
+    }
+
+    /// Probabilidades ImageNet (cena/objetos), se o classificador existir.
+    pub fn classify_scene(&self, img: &RgbImage) -> CoreResult<Option<Vec<f32>>> {
+        match &self.scene {
+            Some(p) => crate::scene::classify(p, img)
+                .map(Some)
+                .map_err(|e| CoreError::Other(format!("cena: {e:#}"))),
+            None => Ok(None),
+        }
+    }
+
+    /// Identidade de um rosto a partir dos seus pontos faciais.
+    pub fn face_identity(
+        &self,
+        img: &RgbImage,
+        landmarks: &[(f32, f32)],
+    ) -> CoreResult<Option<Vec<f32>>> {
+        let (Some(p), Some(pts)) = (&self.identity, crate::identity::five_points(landmarks)) else {
+            return Ok(None);
+        };
+        let aligned = crate::identity::align(img, &pts);
+        crate::identity::embed(p, &aligned)
+            .map(Some)
+            .map_err(|e| CoreError::Other(format!("identidade: {e:#}")))
     }
 
     pub fn detect_faces(&self, img: &RgbImage, multiscale: bool) -> CoreResult<Vec<FaceDetection>> {
@@ -85,7 +136,18 @@ impl VisionModels {
                 presence: mesh.presence,
                 blendshapes,
                 landmarks: mesh.points.iter().map(|p| (p.0, p.1)).collect(),
+                identity: None,
             });
+        }
+        // Identidade só para os maiores rostos com tamanho suficiente.
+        if self.identity.is_some() {
+            let mut order: Vec<usize> = (0..out.len()).collect();
+            order.sort_by(|&a, &b| out[b].detection.w.total_cmp(&out[a].detection.w));
+            for &i in order.iter().take(MAX_IDENTITIES_PER_PHOTO) {
+                if out[i].detection.w >= MIN_FACE_PX_FOR_IDENTITY {
+                    out[i].identity = self.face_identity(img, &out[i].landmarks)?;
+                }
+            }
         }
         Ok(out)
     }

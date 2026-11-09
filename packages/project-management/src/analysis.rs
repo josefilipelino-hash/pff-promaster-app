@@ -164,6 +164,8 @@ fn face_row(img: &RgbImage, f: &FaceResult) -> FaceRow {
         eye_sharpness,
         cut,
         blendshapes: f.blendshapes.clone(),
+        identity: f.identity.clone().unwrap_or_default(),
+        ..Default::default()
     }
 }
 
@@ -178,18 +180,31 @@ pub fn analyze_one(
     let t0 = Instant::now();
     let img = work_image(paths, catalog, registry, id)?;
     let m = metrics::technical(&img);
-    let (faces, embedding) = match models {
+    let (faces, embedding, scene) = match models {
         Some(models) => {
             let faces = models.analyze_faces(&img, true)?;
             let faces: Vec<FaceRow> = faces.iter().map(|f| face_row(&img, f)).collect();
-            (faces, Some((EMBEDDING_MODEL.to_string(), models.embed(&img)?)))
+            let scene = models
+                .classify_scene(&img)?
+                .map(|p| momento_face_analysis::scene::top_k(&p, 25))
+                .unwrap_or_default();
+            (faces, Some((EMBEDDING_MODEL.to_string(), models.embed(&img)?)), scene)
         }
-        None => (Vec::new(), None),
+        None => (Vec::new(), None, Vec::new()),
     };
     Ok(AnalysisResult {
         asset: id,
         row: AnalysisRow {
-            models: models.map(|_| "mediapipe-face-landmarker+mobilenet_v3_small".to_string()),
+            models: models.map(|m| {
+                let mut s = "mediapipe-face-landmarker+mobilenet_v3_small".to_string();
+                if m.has_identity() {
+                    s.push_str("+sface");
+                }
+                if m.has_scene() {
+                    s.push_str("+efficientnet_lite2");
+                }
+                s
+            }),
             width: img.width(),
             height: img.height(),
             sharpness: m.sharpness,
@@ -208,6 +223,7 @@ pub fn analyze_one(
         },
         faces,
         embedding,
+        scene,
     })
 }
 
@@ -494,10 +510,9 @@ impl AnalysisService {
                         break;
                     }
                 }
-                // Recalcula a seleção mesmo após cancelamento (com o que já foi analisado).
-                if let Err(e) = recompute_selection(&mut catalog) {
-                    tracing::error!(erro = %e, "falha ao calcular a seleção");
-                }
+                // Recalcula seleção, pessoas e momentos mesmo após cancelamento (com o que já
+                // foi analisado).
+                crate::organize::rebuild(&mut catalog);
                 on_progress(AnalysisProgress {
                     done,
                     failed,

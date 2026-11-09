@@ -40,7 +40,10 @@ export function Toolbar({
           {t("view.grid")}
         </button>
         <button type="button" className={`btn small${view === "sequences" ? " active" : ""}`} aria-pressed={view === "sequences"} onClick={() => onView("sequences")}>
-          {t("view.sequences")}
+                    {t("view.sequences")}
+        </button>
+        <button type="button" className={`btn small${view === "people" ? " active" : ""}`} aria-pressed={view === "people"} onClick={() => onView("people")}>
+          {t("view.people")}
         </button>
       </span>
       <button type="button" className="btn" onClick={onCompare} title={`${t("compare.openHint")} (C)`}>

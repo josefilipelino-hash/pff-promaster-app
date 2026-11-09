@@ -1,90 +1,91 @@
 # Estado do projeto
 
-**Última atualização:** 2026-11-09 · **Fase atual:** 3 — Seleção automática · **Estado:** ✅ concluída
-**Versão:** 0.3.0 · **Branch:** `main` · **Plataformas-alvo:** macOS (Apple Silicon e Intel) e Windows 10/11
+**Última atualização:** 2026-11-09 · **Fase atual:** 4 — Organização do casamento · **Estado:** ✅ concluída
+**Versão:** 0.4.0 · **Branch:** `main` · **Plataformas-alvo:** macOS (Apple Silicon e Intel) e Windows 10/11
+
+> A pedido do utilizador, a organização do casamento (planeada como Fase 5) foi feita antes
+> da edição; a Edição passa a ser a Fase 5 (ver `ROADMAP.md`).
 
 ---
 
 ## Resumo
 
-A aplicação analisa as fotografias **neste computador** e recomenda, com explicação, as
-melhores de cada momento: **MELHOR / ALTERNATIVA / REVER / REJEITAR SUGERIDO /
-DUPLICADA**. A IA só recomenda: nunca apaga, nunca altera favoritas/rejeitadas; aceitar
-uma sugestão é sempre uma ação explícita e reversível.
+A aplicação organiza o casamento **neste computador**:
 
-- Métricas clássicas + IA local (modelos MediaPipe, Apache-2.0) executada com
-  **tract-onnx** (Rust puro, igual em macOS e Windows, sem serviços externos).
-- Grupos: RAW+JPEG, duplicados, sequências/rajadas (tempo, semelhança visual, rostos,
-  várias câmaras), com classificação dentro do grupo e piscadelas relativas a cada pessoa.
-- Modos conservador / equilibrado / rigoroso e objetivo de entrega aproximado, recalculados
-  em milissegundos sem reanalisar.
-- Interface: painel “Seleção automática”, etiquetas e “1/12” na grelha, vista
-  **Sequências**, **comparação lado a lado** (2–4) com zoom e deslocamento sincronizados,
-  explicação em frase e pontuações individuais no painel de informação.
+- **Pessoas:** deteta rostos, calcula a identidade facial (SFace) e agrupa as mesmas
+  pessoas. Identificas noiva, noivo, pais, irmãos, padrinhos, madrinhas e pessoas
+  importantes; pesquisas “todas as fotografias da noiva”, “noivos juntos”, “noiva + mãe”,
+  “noivo + pai” ou qualquer pessoa.
+- **Momentos:** 25 momentos de casamento, atribuídos **só quando há confiança suficiente**
+  (o resto fica em “Por classificar”). Momentos personalizados, arrastar fotografias para
+  um momento, e a classificação aprende com as tuas escolhas.
+- **Sincronização de câmaras:** desvio por câmara (“Sony +3min42s”), sugestão automática,
+  cronologia, sequências e momentos reconstruídos. A hora original nunca é alterada.
+
+Nenhum dado biométrico sai do computador: a identidade facial fica só no catálogo do
+projeto e pode ser apagada.
 
 ## Funcional (verificado)
 
 | Funcionalidade | Verificação |
 |---|---|
-| Nitidez global / pico de foco / centro, tremido, exposição, realces queimados, sombras bloqueadas, ruído, inclinação, pHash/dHash | 7 testes de métricas + teste de hash |
-| Rostos (deteção multiescala), 478 pontos, 52 blendshapes (olhos fechados, sorriso, boca), nitidez do rosto e dos olhos, rosto cortado | Teste contra os **resultados de referência publicados pela Google** (`portrait.jpg`): caixa a ±5 px, pontos a ±0,002, eyeBlink 0,28/0,27 vs 0,26/0,30, sorriso 0,94 vs 0,92; fotografias reais dlib/OpenCV com boa deteção |
-| Embedding visual (semelhança) | Teste: semelhante 0,91 vs diferente 0,18 |
-| Grupos: rajada de 14 (beijo), duas câmaras, RAW+JPEG, duplicados, momentos afastados não agrupados | 8 testes do motor |
-| Recomendação explicada (“Melhor fotografia desta sequência: maior nitidez facial e menos tremido.”) | Testes + aplicação real |
-| Pontuações individuais guardadas (foco, tremido, exposição, ruído, olhos, expressão, composição, técnica, pessoas, global) | Catálogo v4 + painel na aplicação real |
-| Modos e objetivo de entrega | Testes do motor, da sessão e da interface + aplicação real (objetivo 8 → 7 sugeridas + 1 favorita do utilizador) |
-| Comparação lado a lado: zoom/deslocamento sincronizados, estrelas, aceitar, rejeitar, “selecionar outra”, teclado no painel ativo | Testes de interface + **aplicação real** (4 painéis) |
-| Aceitar sugestões (fotografia ou grupo) sem tocar em decisões do utilizador | Testes da base de dados, da sessão e da interface |
-| Análise em segundo plano, retomável após fechar; sem modelos → só métricas técnicas com aviso | Teste de integração (fechar/reabrir) |
-| Aplicação real (release, Linux): rajada de 12 com desfocagens 0–4 px **ordenada exatamente** pela nitidez (1/12 = nítida, 12/12 = mais desfocada); rajada de 6 de grupo idem | Capturas no ecrã virtual |
+| Identidade facial SFace (alinhamento por 5 pontos) | tract = onnxruntime oficial (cos 1,000000); mesma pessoa 0,96–0,98, pessoas diferentes < 0,08 com fotografias reais |
+| Agrupamento de rostos | Testes (grupos puros, convidados isolados não viram pessoas, dois rostos da mesma fotografia nunca juntos) + **aplicação real**: 6 pessoas de fotografias diferentes agrupadas corretamente |
+| Identificar (nome + papel), juntar, “não é esta pessoa”, ocultar, reagrupar, apagar dados | Testes da base de dados, da sessão e da interface + aplicação real |
+| Decisões sobre pessoas sobrevivem à reanálise e ao reagrupamento | Teste da base de dados |
+| Pesquisas: noiva, noivo, noivos juntos, noiva + mãe, noivo + pai, uma pessoa | Testes + aplicação real (“Noivos juntos” = as 9 fotografias de grupo de 2 câmaras) |
+| Classificador de cena EfficientNet-Lite2 | tract = TFLite oficial (diferença máx. 5,5e-7) |
+| 25 momentos com confiança; “Por classificar” | Dia de casamento **sintético** todo correto; sem pistas nada é forçado (teste com fotografias reais e aplicação real) |
+| Momentos personalizados, arrastar para um momento, escolha no painel, voltar ao automático | Testes + aplicação real |
+| Aprendizagem com exemplos do utilizador (fotografias parecidas na mesma cena) | Testes + aplicação real (exemplos em conflito → “Por classificar”) |
+| Sincronização: desvio por câmara, sugestão automática, cronologia reconstruída | Testes (Canon certa, Sony +3min42s, DJI −1min15s) + teste real + **aplicação real** (sugestão exata “+3min42s”, 7 pares, 100 % de acordo) |
+| GPS do EXIF (separa cenas) | Testes |
 
 ## Não funcional / não validado
 
-- **Olhos fechados com fotografias reais:** sem acesso a imagens reais de olhos fechados
-  nesta sessão. Validado indiretamente (coeficientes iguais à referência da Google para
-  olhos abertos) e com valores sintéticos no motor. **É o primeiro ponto a testar com as
-  tuas fotografias.**
-- **Obstruções:** só detetadas como rosto cortado/oculto (presença baixa). Não há deteção
-  de objetos à frente das pessoas (ex.: convidado com telemóvel).
-- “Pessoas importantes fora de foco” é avaliado pelos rostos **maiores** da fotografia
-  (rostos principais); o reconhecimento de quem são os noivos chega na Fase 5 (Pessoas).
-- O tremido é estimado pela coerência dos gradientes e também sobe com desfocagem forte;
-  é usado como critério secundário.
-- Sem aceleração por Neural Engine/GPU (D-024); os modelos são pequenos e correm na CPU.
-- macOS/Windows: compilação verificada (Windows: workspace completo; macOS arm64: análise
-  e codecs, incluindo os kernels NEON do tract), **não executada** nesses sistemas.
-- HEIC/AVIF (Fase 2) continuam por validar em macOS/Windows reais.
+- **Precisão dos momentos num casamento real: não medida.** Não havia fotografias de
+  casamento nesta sessão; as regras foram afinadas num dia sintético. É o principal ponto
+  a validar com um casamento teu.
+- O ImageNet não tem classes como “anel”, “bolo de casamento”, “convite” ou “vestido de
+  noiva”: Alianças, Bolo, Convites e Vestido dependem de pistas aproximadas (colar,
+  sobremesas, envelope/menu, “gown”) e são mais fracos. A aprendizagem com exemplos ajuda.
+  Um modelo tipo CLIP melhoraria isto, mas não havia um com proveniência verificável.
+- Sub-momentos da cerimónia (Entrada, Troca de alianças, Beijo) dependem de a cerimónia ser
+  detetada (igreja/altar). Cerimónias ao ar livre podem não ser detetadas → ficam por
+  classificar.
+- A sugestão de sincronização tem a precisão do par de fotografias mais parecido
+  (segundos); não funciona sem fotografias parecidas tiradas por várias câmaras, nem para
+  desvios maiores que ±2 h (introduz-se à mão).
+- Foto-colagens com a mesma pessoa duas vezes ficam em dois grupos (regra “dois rostos da
+  mesma fotografia nunca são a mesma pessoa”); juntam-se com “Juntar”.
+- macOS/Windows: compilação verificada, **não executada** nesses sistemas.
 
-## Desempenho medido (Linux x86_64, **4 núcleos**, release)
+## Desempenho medido (Linux x86_64, 4 núcleos, release)
 
 | Operação | Resultado |
 |---|---|
-| Motor de seleção (grupos + pontuações + etiquetas) para **15 000 fotografias** | ≈ 32 ms (2 668 grupos) |
-| Mudar modo/objetivo (recalcular a partir do catálogo) | instantâneo na aplicação |
-| Análise completa por fotografia (JPEG 24 MP, rostos multiescala, embedding), 2 threads de análise com as miniaturas a correr em paralelo | **≈ 330 ms/foto** → 15 000 fotografias ≈ 80 min nesta máquina |
-| Análise de fotografias pequenas (≤ 2 MP) | ≈ 120–200 ms/foto |
-| Inferência por modelo | deteção 5,6 ms · pontos 23 ms · blendshapes 1,5 ms · embedding 7 ms |
+| Agrupamento de **30 000 rostos** | ≈ 7–9 s |
+| Classificação de momentos, **15 000 fotografias** | ≈ 0,2 s |
+| Seleção (Fase 3), 15 000 fotografias | ≈ 25 ms |
+| Análise com identidade facial e cena (24 fotografias pequenas com rostos) | ≈ 6 s (inclui carregar os modelos) |
+| Mudar desvios de câmara (reconstruir cronologia, sequências, momentos) | instantâneo na aplicação |
 
-Num Mac/PC com 8–12 núcleos espera-se 2–3× mais rápido (mais threads de análise), **não
-medido**. Os RAW usam a preview já gerada na importação (sem nova revelação).
+A análise por fotografia ficou mais pesada (identidade: até 12 rostos por fotografia;
+classificador de cena ~40 ms). **Não medido** ainda num conjunto grande de 24 MP com estes
+modelos; estimativa: +20–40 % em relação aos ≈ 330 ms/foto da Fase 3.
 
 ## Arquitetura
 
-Novas decisões D-024 a D-028 em `ARCHITECTURE.md` (§11 reescrita): tract-onnx em vez de
-ONNX Runtime; modelos MediaPipe convertidos por `scripts/prepare-models.py` e incluídos no
-instalador; imagem de trabalho ≤ 2048 px; recomendações calculadas a partir das métricas
-gravadas; a IA só recomenda.
-
-**Desvio ao plano da Fase 0:** o plano previa ONNX Runtime (`ort`). Não foi usado porque
-o `ort` 2.0 só existe em versões RC e depende de binários nativos descarregados no build
-(macOS Intel incerto). Impacto: sem Neural Engine/GPU por agora; ganho: o mesmo código
-puro Rust em todas as plataformas.
+Novas decisões D-029 a D-033 em `ARCHITECTURE.md`: SFace com verificação de proveniência
+por SHA-256; EfficientNet-Lite2 em vez de CLIP; momentos por regras explicáveis + linha
+temporal + exemplos; correção de hora aplicada na leitura (EXIF intacto); arrastar com
+eventos do rato (compatível com o WebView2 do Windows). Catálogo v5.
 
 ## Dependências novas
 
-tract-onnx 0.23.9 (MIT/Apache-2.0), anyhow 1. Modelos (não versionados): BlazeFace, Face
-landmarks, Face blendshapes, MobileNetV3-small — Google MediaPipe, Apache-2.0, ≈ 11 MB no
-total. Ver `LICENSES.md`.
+Nenhum crate novo. Modelos novos (não versionados, incluídos no instalador): SFace
+(OpenCV Zoo, Apache-2.0, 37,8 MB) e EfficientNet-Lite2 (MediaPipe, Apache-2.0, 23,8 MB).
+Total de modelos: ≈ 73 MB. Ver `LICENSES.md`.
 
 ## Comandos exatos
 
@@ -116,25 +117,21 @@ pnpm dev
 ./scripts/check.sh
 ```
 
-Testar a seleção com as tuas fotografias (nada é copiado para o repositório):
+Testar pessoas, momentos e sincronização com fotografias reais (nada é copiado para o
+repositório; a pasta tem de ter `portrait.jpg` e `lena.jpg` ou outras duas pessoas):
 
 ```bash
-MOMENTO_FACES_DIR=/caminho/para/fotos cargo test -p momento-project-management --release --test analysis_flow -- --nocapture
-```
-
-```bash
-MOMENTO_PERF_N=300 cargo test -p momento-project-management --release --test analysis_flow -- --ignored --nocapture
+MOMENTO_FACES_DIR=/caminho/para/fotos cargo test -p momento-project-management --release --test organize_flow -- --nocapture
 ```
 
 ## Testes realizados (2026-11-09)
 
 | Verificação | Resultado |
 |---|---|
-| `cargo test --workspace` (com `MOMENTO_MP_PORTRAIT` e `MOMENTO_FACES_DIR`) | ✅ 109 passados, 1 ignorado (débito 24 MP, executado à parte) |
-| `pnpm -r test` | ✅ 44/44 (38 da aplicação, 6 de traduções) |
+| `cargo test --workspace` (com `MOMENTO_REF_DIR`, `MOMENTO_MP_PORTRAIT`, `MOMENTO_FACES_DIR`) | ✅ 131 passados, 1 ignorado (débito 24 MP, à parte) |
+| `pnpm -r test` | ✅ 51 (45 da aplicação, 6 de traduções) |
 | `pnpm -r typecheck`, `cargo fmt --check`, `cargo clippy -D warnings` | ✅ |
-| Débito 24 MP (200 fotografias) | ✅ 328 ms/foto |
-| Aplicação real (release, Linux): analisar, etiquetas, painel, comparação com zoom/deslocamento sincronizados, teclado, sequências, objetivo | ✅ |
+| Aplicação real (release, Linux): analisar, pessoas, identificar, pesquisas, sincronizar câmaras, momentos, arrastar | ✅ (3 bugs encontrados e corrigidos, com testes de regressão) |
 | `cargo check --workspace --target x86_64-pc-windows-gnu` | ✅ |
 | `cargo check` análise + codecs `--target aarch64-apple-darwin` | ✅ |
 | macOS / Windows reais | ⏳ não executado |
@@ -143,10 +140,10 @@ MOMENTO_PERF_N=300 cargo test -p momento-project-management --release --test ana
 
 | Risco | Impacto | Mitigação |
 |---|---|---|
-| Olhos fechados não validados com fotografias reais | Alto | Testar com uma rajada real; limiares ajustáveis no motor (`selection.rs`) |
-| 15 000 fotografias ≈ 80 min numa máquina de 4 núcleos | Médio | Análise em segundo plano e retomável; usa a preview já existente; aceleração (Core ML/DirectML) se necessário |
-| tensorflow-cpu necessário para preparar modelos (só CI/desenvolvimento) | Baixo | Feito num único trabalho Linux do CI, com cache; SHA-256 fixados em `models.lock.json` |
-| HEIC/AVIF e a aplicação inteira não executados em macOS/Windows | Alto | Primeira verificação manual |
+| Momentos imprecisos num casamento real | Alto | Nunca força; “Por classificar”; aprende com exemplos; afinar regras com um casamento real |
+| Classes ImageNet não cobrem objetos de casamento | Médio | Pistas aproximadas + exemplos; avaliar um modelo zero-shot com licença verificável |
+| Dados biométricos | Alto (RGPD) | Só locais, apagáveis, nunca em registos; documentado em `PRIVACY.md` |
+| Instalador maior (+62 MB de modelos) | Baixo | Aceitável; modelos opcionais (a aplicação funciona sem eles) |
 
 ## Histórico de fases
 
@@ -156,16 +153,16 @@ MOMENTO_PERF_N=300 cargo test -p momento-project-management --release --test ana
 | 1 — Aplicação utilizável | ✅ | 2026-11-08 |
 | 2 — Formatos e RAW | ✅ | 2026-11-08 |
 | 3 — Seleção automática | ✅ | 2026-11-09 |
-| 4 — Edição | ⏸ próxima | — |
+| 4 — Organização do casamento | ✅ | 2026-11-09 |
+| 5 — Edição | ⏸ próxima | — |
 
 ## Próximo passo
 
-**Recomendado antes da Fase 4:** no teu Mac/PC, preparar os modelos, `pnpm dev`, importar
-um casamento real (incluindo rajadas com piscadelas) e analisar. Confirmar: olhos fechados
-assinalados, rajadas bem agrupadas, a melhor de cada sequência, tempo de análise.
+**Recomendado:** importar um casamento real teu (com 2+ câmaras), analisar, identificar
+noiva/noivo/pais, sincronizar as câmaras e ver quantas fotografias ficam em cada momento e
+em “Por classificar”. Essa medição define o afinamento das regras dos momentos.
 
-**Fase 4 — Edição:** revelação RAW não destrutiva (exposição, balanço de brancos, tons,
-cor), presets, cópia de ajustes entre fotografias.
+**Fase 5 — Edição:** revelação RAW não destrutiva, presets, sincronizar ajustes.
 
 **Pendente do utilizador:** repositório GitHub (CI em macOS/Windows); fotografias de teste
-(rajadas com olhos fechados, RAW das tuas câmaras, HEIC do iPhone); nome definitivo.
+(casamento real, rajadas com olhos fechados, HEIC do iPhone); nome definitivo.
