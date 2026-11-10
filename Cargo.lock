@@ -2865,6 +2865,7 @@ dependencies = [
  "momento-gallery",
  "momento-import-engine",
  "momento-project-management",
+ "rayon",
  "serde",
  "serde_json",
  "tauri",

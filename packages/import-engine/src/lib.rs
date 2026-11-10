@@ -34,6 +34,11 @@ const BATCH: usize = 32;
 /// Intervalo máximo entre gravações (progresso fluido com ficheiros grandes).
 const FLUSH_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
 
+/// Pilha das threads de trabalho (rayon): uma thread à espera executa tarefas paralelas de
+/// outras operações na própria pilha; com descodificadores e revelação em simultâneo, 2 MB
+/// (o valor por omissão) chegava a esgotar-se.
+pub const WORKER_STACK: usize = 16 * 1024 * 1024;
+
 #[derive(Debug, Clone)]
 pub struct ImportOptions {
     pub mode: ImportMode,
@@ -571,6 +576,7 @@ pub fn run_session(
     let pool = rayon::ThreadPoolBuilder::new()
         .num_threads(options.threads.max(1))
         .thread_name(|i| format!("import-{i}"))
+        .stack_size(crate::WORKER_STACK)
         .build()
         .map_err(|e| CoreError::Other(e.to_string()))?;
 

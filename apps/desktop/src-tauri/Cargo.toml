@@ -16,6 +16,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build.workspace = true
 
 [dependencies]
+rayon.workspace = true
 momento-export-engine.workspace = true
 momento-gallery.workspace = true
 momento-album.workspace = true

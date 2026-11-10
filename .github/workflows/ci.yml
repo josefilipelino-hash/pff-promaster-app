@@ -88,6 +88,9 @@ jobs:
         env:
           # Sem informação de depuração nos testes: o disco dos executores é limitado.
           CARGO_PROFILE_DEV_DEBUG: "0"
+          # Testes correm em paralelo no pool global do rayon (sem a configuração da
+          # aplicação, que usa 16 MB): em debug, 2 MB por thread esgotava (macOS).
+          RUST_MIN_STACK: "8388608"
 
   # Aplicação instalável para macOS e Windows (artefactos descarregáveis do CI).
   # Não depende dos testes: macOS e Windows nunca foram executados antes, por isso quer-se o

@@ -42,6 +42,12 @@ fn init_logging(app: &tauri::App) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     commands::mark_process_start();
+    // Pool global do rayon com pilhas de 16 MB: uma thread à espera executa tarefas paralelas
+    // de outras operações (miniaturas, revelação, exportação) na própria pilha, e os 2 MB por
+    // omissão chegaram a esgotar-se (testes em macOS). Antes de qualquer trabalho paralelo.
+    let _ = rayon::ThreadPoolBuilder::new()
+        .stack_size(momento_import_engine::WORKER_STACK)
+        .build_global();
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .register_asynchronous_uri_scheme_protocol("momento", protocol::handle)
