@@ -194,6 +194,11 @@ pub fn match_reference(
         t = ref_settings.clone();
         t.geometry = keep.geometry;
         t.retouch = keep.retouch;
+        // Máscaras (pinceladas, IA de sujeito/céu) e regiões de retrato são da fotografia:
+        // copiá-las punha a máscara e o alisar de pele da referência no sítio errado das
+        // outras, e apagava as suas (Fase 15).
+        t.masks = keep.masks;
+        t.portrait = keep.portrait;
         t.lens = keep.lens;
         t.detail.noise_luminance = keep.detail.noise_luminance;
         t.detail.noise_color = keep.detail.noise_color;
@@ -424,6 +429,28 @@ mod tests {
         let (out, _) = match_reference(&rs, &reference, &rf, &ts, &target, &tf, &only_exp);
         assert!(out.light.exposure > 0.6);
         assert_eq!((out.wb, out.light.contrast), (target.wb, 0.0));
+        // Fase 15: o aspeto da referência não traz as suas máscaras nem regiões de retrato.
+        let mut reference2 = reference.clone();
+        reference2.masks.push(super::super::LocalMask {
+            id: "ref".into(),
+            name: "Sujeito".into(),
+            enabled: true,
+            density: 100.0,
+            ..Default::default()
+        });
+        reference2.portrait.skin = 40.0;
+        let mut target2 = target.clone();
+        target2.masks.push(super::super::LocalMask {
+            id: "alvo".into(),
+            name: "Céu".into(),
+            enabled: true,
+            density: 100.0,
+            ..Default::default()
+        });
+        let (out3, _) =
+            match_reference(&rs, &reference2, &rf, &ts, &target2, &tf, &MatchOptions::default());
+        assert_eq!(out3.masks, target2.masks, "máscaras da própria fotografia");
+        assert_eq!(out3.portrait, target2.portrait, "retrato da própria fotografia");
         // Sem rostos: usa a chave da cena.
         let (out2, rep2) =
             match_reference(&rs, &reference, &[], &ts, &target, &[], &MatchOptions::default());

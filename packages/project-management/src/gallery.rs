@@ -254,6 +254,17 @@ impl ProjectSession {
         if !cfg.settings.logo_path.is_empty() && !Path::new(&cfg.settings.logo_path).is_file() {
             problems.push("gallery.problem.logo".into());
         }
+        // Fotografia de destaque/capa oculta ou rejeitada: nunca é publicada (antes entrava
+        // na galeria com download em alta resolução — Fase 15).
+        let excluded = |k: i64| {
+            cfg.settings.hidden.contains(&k)
+                || self
+                    .list_photos()
+                    .is_ok_and(|all| all.iter().any(|r| r.id.0 == k && r.flag == -1))
+        };
+        if [cfg.settings.hero, cfg.settings.cover].into_iter().flatten().any(excluded) {
+            problems.push("gallery.problem.heroHidden".into());
+        }
         // Estimativa: miniatura + ecrã + download (+ ZIP).
         let per: u64 = recipes(cfg)
             .iter()
@@ -341,6 +352,7 @@ impl ProjectSession {
             moment_names,
             gallery: Some(Box::new(GalleryJob { config: cfg, folder, chapters, tokens, names })),
             album: None,
+            seq_offset: 0,
         };
         self.start_export(req)
     }

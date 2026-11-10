@@ -352,6 +352,26 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
     (id: number, e: React.MouseEvent) => {
       const st = useStore.getState();
       const toggle = mac ? e.metaKey : e.ctrlKey;
+      const inSelection = st.selection.ids.has(id);
+      // Botão direito sobre a seleção: o menu age sobre TODAS as selecionadas (antes a
+      // seleção encolhia para uma e "Rejeitar" só rejeitava essa — Fase 15).
+      if (e.button === 2 && inSelection) return;
+      // Clique simples numa fotografia de uma seleção múltipla: pode ser o início de um
+      // arrastar (ex.: para um momento) — a seleção só encolhe ao largar sem arrastar.
+      if (e.button === 0 && inSelection && st.selection.ids.size > 1 && !toggle && !e.shiftKey) {
+        st.setSelection({ ...st.selection, focus: id });
+        const x0 = e.clientX;
+        const y0 = e.clientY;
+        const up = (u: MouseEvent) => {
+          window.removeEventListener("mouseup", up, true);
+          if (Math.abs(u.clientX - x0) < 4 && Math.abs(u.clientY - y0) < 4) {
+            const s2 = useStore.getState();
+            s2.setSelection(clickSelect(s2.selection, order, id, { toggle: false, range: false }));
+          }
+        };
+        window.addEventListener("mouseup", up, true);
+        return;
+      }
       st.setSelection(clickSelect(st.selection, order, id, { toggle, range: e.shiftKey }));
     },
     [order, mac],
@@ -401,7 +421,10 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
             const st = useStore.getState();
       // No editor: classificar, navegar e sair; o resto dos atalhos é do próprio editor.
       if (st.view === "develop") {
-        const cur = st.selection.focus ?? order[0];
+        // A fotografia MOSTRADA no editor (a mesma regra de `developKey`): se a seleção
+        // ficou fora do filtro, as teclas classificavam uma fotografia escondida (Fase 15).
+        const f = st.selection.focus;
+        const cur = f !== null && order.includes(f) ? f : order[0];
         switch (a.type) {
           case "stars":
           case "flag":
@@ -444,7 +467,12 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
             return;
         }
       }
-            switch (a.type) {
+      // Pessoas, sequências e consistência mostram outras coisas que não a grelha: teclas
+      // que agem sobre a seleção da grelha (invisível aqui) não fazem nada (Fase 15).
+      if ((st.view === "people" || st.view === "sequences" || st.view === "consistency") && st.viewerId === null) {
+        if (["stars", "flag", "color", "selectAll", "delete", "move", "open", "toggleZoom", "menu"].includes(a.type)) return;
+      }
+      switch (a.type) {
         case "develop":
           if (st.selection.focus === null && order.length > 0) st.setSelection({ ids: new Set([order[0]!]), focus: order[0]!, anchor: order[0]! });
           st.openViewer(null);

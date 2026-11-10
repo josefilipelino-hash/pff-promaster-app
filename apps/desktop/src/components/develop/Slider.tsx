@@ -45,6 +45,9 @@ export function Slider({
           onChange={(e) => onChange(Number(e.target.value), false)}
           onPointerUp={done}
           onKeyUp={done}
+          // Largar o rato fora do controlo nem sempre dá `pointerup` no próprio controlo:
+          // a perda da captura também grava (Fase 15).
+          onLostPointerCapture={done}
         />
       </label>
             <input

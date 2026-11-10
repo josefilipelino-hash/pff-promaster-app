@@ -5,6 +5,55 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [0.15.0] — 2026-11-10 — Fase 15: estabilização
+
+Sem funcionalidades grandes novas: auditoria dos 18 módulos, casamento completo como
+teste de ponta a ponta, condições adversas com discos reais. Relatório completo em
+`docs/reports/fase15-auditoria.md`; lista de lançamento em `RELEASE_CHECKLIST.md`.
+
+### Corrigido — podia perder fotografias, edições ou entregar ficheiros errados
+- **Importação:** um segundo cartão (ou o mesmo formatado) no mesmo caminho, com os mesmos
+  nomes, era ignorado como "já importado" → agora decide-se pelo conteúdo; no modo "manter
+  no local" é um erro explicado (encontrado na aplicação real).
+- **Original substituído** por outra fotografia no mesmo caminho: marcado "em falta" e
+  recusado na exportação (antes saía a fotografia nova com as edições da antiga).
+- **Exportação:** "Substituir" podia escrever por cima dos originais (Windows `\\?\`,
+  ligações simbólicas no macOS).
+- **Develop:** resultados assíncronos (máscara IA, retrato, Auto, desfazer…) depois de mudar
+  de fotografia escreviam ajustes de uma fotografia noutra; o último ajuste podia não ser
+  gravado.
+- **Sincronizar aspeto** copiava máscaras e regiões de retrato da referência.
+- **Pessoas:** reanalisar sem modelos apagava nomes e exclusões confirmados.
+- **Recuperação:** abrir um catálogo de uma versão mais recente (ou com disco cheio) trocava-o
+  por uma cópia antiga.
+- **Álbum:** fotografia indisponível dava molduras vazias com o trabalho "Concluído".
+- **Auto em lote** revertia edições feitas ao mesmo tempo pelo utilizador.
+- **Aceitar sugestões** rejeitava fotografias com estrelas.
+
+### Corrigido — bloqueios
+- Exportação para destino só de leitura/sem permissões ficava em pausa "sem espaço" para sempre.
+- Erro de gravação durante a importação prendia a importação e o fecho do projeto.
+- AI Denoise que falhasse deixava a fotografia "em curso" para sempre.
+- Trabalho de exportação acrescentado no instante em que a fila terminava ficava "Na fila".
+- Vídeos grandes no cartão eram lidos inteiros para a memória.
+
+### Corrigido — outros
+- Retoma de exportação: {seq} continua; receitas em falta de uma fotografia interrompida refeitas.
+- LUT/máscara em falta: a fotografia falha com o motivo em vez de sair com outras cores.
+- Marca de água grande demais é reduzida (antes desaparecia nos retratos).
+- Galeria: destaque/capa oculto ou rejeitado bloqueia a geração.
+- Álbum: resolução por moldura pelo pior caso; reexportação para pasta com páginas antigas recusada.
+- Pastas ilegíveis e caminhos inexistentes aparecem no relatório de importação.
+- Contagem de miniaturas inclui as que estão a ser descodificadas; fotografias ilegíveis já
+  não ficam "por analisar".
+- Teclas no editor e noutras vistas só agem sobre a fotografia mostrada; clique direito
+  numa seleção múltipla mantém-na.
+- Preset a 50/150 % mantém a cor da tonalização.
+
+### Testes
+- `wedding_e2e` (casamento completo com reinício), `adverse` (disco cheio ×4, só de leitura,
+  permissões, fugas, LUT em falta), testes de regressão em cada correção.
+
 ## [0.14.0] — 2026-11-10 — Fase 14: UX/UI profissional
 
 ### Adicionado

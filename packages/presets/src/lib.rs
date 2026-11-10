@@ -185,8 +185,23 @@ fn blend_num(base: f64, preset: f64, neutral: f64, a: f64) -> f64 {
     }
 }
 
+fn is_hue_angle(key: &str) -> bool {
+    matches!(
+        key,
+        "shadowsHue"
+            | "highlightsHue"
+            | "midtonesHue"
+            | "shadows_hue"
+            | "highlights_hue"
+            | "midtones_hue"
+    )
+}
+
 fn blend(base: &Value, preset: &Value, neutral: &Value, a: f64, key: &str) -> Value {
     match (base, preset) {
+        // Matizes de tonalização são ângulos: interpolar 220° → 30° a 50 % dava 125° (verde)
+        // e a 150 % um magenta. A cor é a do preset; a intensidade escala a saturação (Fase 15).
+        (Value::Number(_), Value::Number(_)) if is_hue_angle(key) => preset.clone(),
         (Value::Number(b), Value::Number(p)) => {
             let n = neutral.as_f64().unwrap_or(0.0);
             let v = blend_num(b.as_f64().unwrap_or(0.0), p.as_f64().unwrap_or(0.0), n, a);

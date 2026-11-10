@@ -59,3 +59,23 @@ mod tests;
 
 #[cfg(test)]
 mod local_tests;
+
+/// Recursos externos de uma edição que não estão disponíveis (LUT, máscaras calculadas).
+/// O render ignora-os sem erro — no ecrã é aceitável, numa exportação não: a fotografia
+/// sairia com outras cores ou sem os ajustes locais (Fase 15). Vazio = tudo disponível.
+pub fn missing_resources(s: &Settings) -> Vec<String> {
+    let mut out = Vec::new();
+    if !s.lut.id.is_empty() && s.lut.amount > 0.0 && lut::get(&s.lut.id).is_none() {
+        out.push(format!("LUT «{}»", if s.lut.name.is_empty() { &s.lut.id } else { &s.lut.name }));
+    }
+    for m in s.masks.iter().filter(|m| m.enabled) {
+        for c in &m.components {
+            if let MaskShape::Raster { raster, .. } = &c.shape {
+                if local::get_raster(raster).is_none() {
+                    out.push(format!("máscara «{}»", m.name));
+                }
+            }
+        }
+    }
+    out
+}

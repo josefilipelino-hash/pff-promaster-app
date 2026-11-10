@@ -106,7 +106,9 @@ fn imports_folder_recursively_with_duplicates_and_unsupported() {
     // Reimportar a mesma pasta: tudo “já importado”, nada novo.
     let (c2, added2) = run(&e, &[src], &opts(ImportMode::Reference, true, &e));
     assert_eq!(c2.imported, 0);
-    assert_eq!(c2.already_imported, 22);
+    // 22 + COPIA.jpg (o mesmo conteúdo de IMG_0000, que já está no catálogo): decide-se
+    // pelo conteúdo (Fase 15).
+    assert_eq!(c2.already_imported, 23);
     assert!(added2.is_empty());
 }
 
@@ -307,4 +309,86 @@ fn states_for_new_formats_missing_codec_and_corrupt() {
     let d = cat.photo_details(gif.id).unwrap().unwrap();
     assert_eq!(d.codec.as_deref(), Some("raster"));
     assert_eq!(d.bit_depth, Some(8));
+}
+
+/// Fase 15 (crítico): um segundo cartão montado no mesmo caminho, com os mesmos nomes
+/// (a câmara recomeça em IMG_0001), tem fotografias DIFERENTES — têm de entrar.
+/// Antes eram ignoradas como "já importadas" só pelo caminho.
+#[test]
+fn second_card_at_same_path_with_same_names_is_imported() {
+    let e = env();
+    let card = e.root.join("cartao");
+    let shoot = |seed: u32| {
+        for i in 0..4 {
+            write(
+                &card.join(format!("DCIM/100CANON/IMG_{i:04}.jpg")),
+                &jpeg_bytes(&test_image(120, 80, seed + i, 1), Some(&spec_for(i, 1)), 80),
+            )
+            .unwrap();
+        }
+    };
+    shoot(0);
+    let o = opts(ImportMode::Copy, true, &e);
+    let (c1, _) = run(&e, std::slice::from_ref(&card), &o);
+    assert_eq!(c1.imported, 4);
+    // Cartão formatado / segundo fotógrafo: mesmos caminhos, outro conteúdo.
+    std::fs::remove_dir_all(&card).unwrap();
+    shoot(100);
+    let (c2, _) = run(&e, std::slice::from_ref(&card), &o);
+    assert_eq!((c2.imported, c2.already_imported), (4, 0), "{c2:?}");
+    // O mesmo cartão outra vez: agora sim, já importadas (pelo conteúdo).
+    let (c3, _) = run(&e, std::slice::from_ref(&card), &o);
+    assert_eq!((c3.imported, c3.already_imported), (0, 4), "{c3:?}");
+    let copies = walkdir::WalkDir::new(e.root.join("originais"))
+        .into_iter()
+        .flatten()
+        .filter(|x| x.file_type().is_file())
+        .count();
+    assert_eq!(copies, 8, "as 8 fotografias diferentes têm cópia própria");
+}
+
+/// Fase 15: caminho inexistente e nomes de câmara perigosos ("..") não se perdem nem
+/// escapam da pasta dos originais.
+#[test]
+fn missing_paths_are_reported_and_camera_names_cannot_escape() {
+    let e = env();
+    let src = e.root.join("fonte");
+    let spec = ExifSpec { model: Some("..".into()), make: Some("..".into()), ..spec_for(1, 1) };
+    write(&src.join("IMG_1.jpg"), &jpeg_bytes(&test_image(120, 80, 1, 1), Some(&spec), 80))
+        .unwrap();
+    let o = opts(ImportMode::Copy, true, &e);
+    let (c, _) = run(&e, &[src.clone(), e.root.join("nao-existe")], &o);
+    assert_eq!((c.imported, c.error), (1, 1), "{c:?}");
+    let copied: Vec<PathBuf> = walkdir::WalkDir::new(&e.root)
+        .into_iter()
+        .flatten()
+        .filter(|x| x.file_type().is_file() && x.file_name() == "IMG_1.jpg")
+        .map(|x| x.into_path())
+        .collect();
+    assert!(copied.iter().any(|p| p.starts_with(e.root.join("originais"))), "{copied:?}");
+    assert_eq!(copied.len(), 2, "original + cópia dentro de originais: {copied:?}");
+}
+
+/// Fase 15 (encontrado na aplicação real): no modo "manter no local", o MESMO caminho com
+/// OUTRO conteúdo (cartão reutilizado) não é "já importada" — é um erro explicado.
+#[test]
+fn reference_mode_same_path_new_content_is_reported() {
+    let e = env();
+    let card = e.root.join("cartao");
+    let shoot = |seed: u32| {
+        for i in 0..3 {
+            write(
+                &card.join(format!("IMG_{i:04}.jpg")),
+                &jpeg_bytes(&test_image(120, 80, seed + i, 1), Some(&spec_for(i, 1)), 80),
+            )
+            .unwrap();
+        }
+    };
+    shoot(0);
+    let o = opts(ImportMode::Reference, true, &e);
+    let (c1, _) = run(&e, std::slice::from_ref(&card), &o);
+    assert_eq!(c1.imported, 3);
+    shoot(500);
+    let (c2, _) = run(&e, std::slice::from_ref(&card), &o);
+    assert_eq!((c2.imported, c2.already_imported, c2.error), (0, 0, 3), "{c2:?}");
 }

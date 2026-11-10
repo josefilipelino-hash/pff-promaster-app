@@ -47,11 +47,18 @@ pub fn compose(
         let tw = ((sl.w * ppm).round() as i64).max(1);
         let th = ((sl.h * ppm).round() as i64).max(1);
         // Resolução necessária da fotografia para este recorte.
-        let need = {
-            let w0 = crop_window(3.0, 2.0, sl.w, sl.h, &sl.crop);
-            let frac = (w0[2] - w0[0]).min(w0[3] - w0[1]).max(0.05);
-            ((tw.max(th) as f32 / frac) * 1.05) as u32
-        };
+        // A proporção real da fotografia não se conhece aqui: usa-se o pior caso entre
+        // horizontal, vertical e quadrada — antes assumia sempre 3:2 e um retrato numa
+        // moldura horizontal saía com ~70 % dos píxeis necessários, ampliado (Fase 15).
+        let need = [(3.0, 2.0), (2.0, 3.0), (1.0, 1.0)]
+            .iter()
+            .map(|&(aw, ah)| {
+                let w0 = crop_window(aw, ah, sl.w, sl.h, &sl.crop);
+                let frac = (w0[2] - w0[0]).min(w0[3] - w0[1]).max(0.05);
+                ((tw.max(th) as f32 / frac) * 1.05) as u32
+            })
+            .max()
+            .unwrap_or(64);
         let Some(img) = photos(key, need.clamp(64, 20_000)) else { continue };
         let (pw, ph) = (img.width as usize, img.height as usize);
         let [u0, v0, u1, v1] = crop_window(pw as f32, ph as f32, sl.w, sl.h, &sl.crop);

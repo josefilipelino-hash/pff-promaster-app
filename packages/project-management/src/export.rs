@@ -35,6 +35,11 @@ pub struct ExportRequest {
     pub name: String,
     /// Nomes (traduzidos) dos momentos, para o campo {momento}.
     pub moment_names: HashMap<i64, String>,
+    /// Fotografias já exportadas antes de uma retoma: {seq} continua a numeração em vez de
+    /// recomeçar (antes, a retoma voltava a 0001 — numeração repetida ou ficheiros já
+    /// entregues substituídos com "Substituir").
+    #[serde(default)]
+    pub seq_offset: u32,
     /// Geração de uma galeria (definida pela sessão, nunca pela interface).
     #[serde(skip)]
     pub gallery: Option<Box<crate::gallery::GalleryJob>>,
@@ -155,6 +160,15 @@ pub struct ExportQueue {
     next_id: AtomicU64,
 }
 
+/// Confirma que se pode escrever em `dir` (cria a pasta se preciso e um ficheiro de teste).
+fn writable(dir: &Path) -> CoreResult<()> {
+    std::fs::create_dir_all(dir)?;
+    let probe = dir.join(format!(".momento-escrita-{}.tmp", std::process::id()));
+    std::fs::write(&probe, b"")?;
+    let _ = std::fs::remove_file(&probe);
+    Ok(())
+}
+
 /// Espaço livre no volume de `p` (sobe até uma pasta existente).
 pub fn free_space(p: &Path) -> Option<u64> {
     let mut d = p.to_path_buf();
@@ -197,7 +211,10 @@ impl ExportQueue {
             j.suspended.store(true, Ordering::SeqCst);
             j.cancelled.store(true, Ordering::SeqCst);
         }
-        if let Some(h) = self.worker.lock().unwrap_or_else(|e| e.into_inner()).take() {
+        // Tirar o trabalhador e LARGAR o cadeado antes de esperar: o trabalhador, ao
+        // terminar, pega no mesmo cadeado para decidir sair (senão: bloqueio no fecho).
+        let h = self.worker.lock().unwrap_or_else(|e| e.into_inner()).take();
+        if let Some(h) = h {
             let _ = h.join();
         }
     }
@@ -394,7 +411,9 @@ impl ProjectSession {
             serde_json::from_str(&json).map_err(|e| CoreError::Other(e.to_string()))?;
         // Temporários de escritas interrompidas no destino (só o padrão da aplicação).
         crate::safety::remove_temp_files(Path::new(&req.destination), 4);
-        req.keys = req.keys.split_off(next.min(req.keys.len()));
+        let next = next.min(req.keys.len());
+        req.keys = req.keys.split_off(next);
+        req.seq_offset += next as u32;
         if req.keys.is_empty() {
             self.drop_journal(Some(jid));
             return Err(CoreError::Other("esta exportação já estava completa".into()));
@@ -453,9 +472,8 @@ impl ProjectSession {
     }
 
     fn export_worker(self: Arc<Self>) {
-        loop {
-            let next = self
-                .exports
+        let queued = |s: &Self| {
+            s.exports
                 .jobs
                 .lock()
                 .unwrap_or_else(|e| e.into_inner())
@@ -463,8 +481,25 @@ impl ProjectSession {
                 .find(|j| {
                     j.progress.lock().unwrap_or_else(|e| e.into_inner()).state == JobState::Queued
                 })
-                .cloned();
-            let Some(job) = next else { return };
+                .cloned()
+        };
+        loop {
+            let job = match queued(&self) {
+                Some(j) => j,
+                None => {
+                    // Decidir sair sob o mesmo cadeado com que `start_export` decide criar um
+                    // trabalhador: um trabalho que chegue neste instante nunca fica "Na
+                    // fila" para sempre (Fase 15).
+                    let mut w = self.exports.worker.lock().unwrap_or_else(|e| e.into_inner());
+                    match queued(&self) {
+                        Some(j) => j,
+                        None => {
+                            *w = None;
+                            return;
+                        }
+                    }
+                }
+            };
             if let Err(e) = self.run_export(&job) {
                 let mut p = job.progress.lock().unwrap_or_else(|e| e.into_inner());
                 p.state = JobState::Failed;
@@ -624,6 +659,24 @@ impl ProjectSession {
          -> CoreResult<_> {
             let (variant, asset) = cat.resolve_key(key)?;
             let settings = Settings::from_recipe(&cat.recipe_of(variant)?);
+            // O original ainda é a fotografia catalogada? (mesmo conteúdo, BLAKE3). Se foi
+            // substituído, exportar aplicaria as edições de uma fotografia a OUTRA (Fase 15).
+            if let Some(o) = cat.original(asset)? {
+                if let Ok(data) = std::fs::read(&o.path) {
+                    if <[u8; 32]>::from(blake3::hash(&data)) != o.content_hash {
+                        return Err(CoreError::Other(
+                            "o ficheiro original foi substituído por outro (conteúdo diferente do importado): não foi exportado — use \"Localizar original\"".into(),
+                        ));
+                    }
+                }
+            }
+            let missing = develop::missing_resources(&settings);
+            if !missing.is_empty() {
+                return Err(CoreError::Other(format!(
+                    "a edição usa recursos que não estão neste computador ({}): a fotografia não foi exportada para não sair com outras cores",
+                    missing.join(", ")
+                )));
+            }
             // Sempre o original em resolução total (+ AI Denoise da receita).
             let (src, _) = self.source_for(cat, asset, &settings, true, true, key)?;
             // Resolução nativa do recorte (nunca ampliada).
@@ -717,6 +770,10 @@ impl ProjectSession {
                 };
                 let (lw, lh) = (lin.width, lin.height);
                 let mut lin = Some(lin);
+                // Fotografia interrompida a meio (cancelada/projeto fechado entre receitas):
+                // o registo NÃO avança — a retoma refaz-a (antes perdiam-se as receitas que
+                // faltavam, sem erro).
+                let mut interrupted = false;
                 for (ri, prep) in prepared.iter().enumerate() {
                     // Pausa (pedida ou por falta de espaço) e cancelamento entre ficheiros.
                     if job.paused.load(Ordering::SeqCst) {
@@ -734,6 +791,7 @@ impl ProjectSession {
                         self.emit_export(job);
                     }
                     if job.cancelled.load(Ordering::SeqCst) {
+                        interrupted = true;
                         break;
                     }
                     let r = &prep.recipe;
@@ -741,7 +799,7 @@ impl ProjectSession {
                     let date = meta.capture_time.clone().unwrap_or_default();
                     let vars = Vars {
                         stem: meta.file_stem.clone(),
-                        seq: r.naming.seq_start + pi as u32,
+                        seq: r.naming.seq_start + req.seq_offset + pi as u32,
                         date: date.get(0..10).unwrap_or("").to_string(),
                         time: date.get(11..19).unwrap_or("").replace(':', ""),
                         project: project.0.clone(),
@@ -777,6 +835,10 @@ impl ProjectSession {
                         }
                     };
                     let result = produced.and_then(|out| {
+                        // Destino gravável? (só de leitura, sem permissões, disco retirado):
+                        // erro já, com o motivo — antes um volume só de leitura parecia "sem
+                        // espaço" e a exportação ficava em pausa para sempre (Fase 15).
+                        writable(&dir)?;
                         // Espaço: pausa em vez de falhar a meio de um ficheiro.
                         loop {
                             let free = free_space(&dir);
@@ -817,6 +879,7 @@ impl ProjectSession {
                         }
                         Err(e) if job.cancelled.load(Ordering::SeqCst) => {
                             tracing::info!(erro = %e, "exportação cancelada");
+                            interrupted = true;
                             break;
                         }
                         Err(e) => update(&mut |p| {
@@ -846,7 +909,7 @@ impl ProjectSession {
                     })
                     .sum();
                 let elapsed = started.elapsed().as_secs_f64();
-                if let Some(j) = &job.journal {
+                if let Some(j) = job.journal.as_ref().filter(|_| !interrupted) {
                     // Fotografia completa: uma retoma começa na seguinte.
                     let _ = cat.save_value(&format!("{JOURNAL_NEXT}{j}"), &(pi + 1).to_string());
                 }
@@ -886,7 +949,8 @@ impl ProjectSession {
             };
             p.state = if job.cancelled.load(Ordering::SeqCst) {
                 JobState::Cancelled
-            } else if failed {
+            } else if failed || (p.files_done == 0 && p.files_failed > 0) {
+                // Nenhum ficheiro escrito: não é "concluída" (Fase 15).
                 JobState::Failed
             } else {
                 JobState::Done

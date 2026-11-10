@@ -97,16 +97,18 @@ pub fn resolve(
     protected: &HashSet<String>,
 ) -> Option<PathBuf> {
     let first = dir.join(name);
+    // Um original nunca é sobrescrito. A lista protegida está em forma canónica
+    // (`path_key`): o candidato é comparado na MESMA forma — no Windows `canonicalize`
+    // acrescenta `\\?\`, no macOS resolve `/var` → `/private/var`; comparar só a forma
+    // simples deixava "Substituir" escrever por cima dos originais (Fase 15).
+    let is_protected =
+        |p: &Path| protected.contains(&key(p)) || protected.contains(&candidate_key(p));
     let taken = |p: &Path, reserved: &HashSet<String>| {
-        reserved.contains(&key(p)) || protected.contains(&key(p)) || p.exists()
+        reserved.contains(&key(p)) || is_protected(p) || p.exists()
     };
     let chosen = match conflict {
         Conflict::Skip if taken(&first, reserved) => return None,
-        Conflict::Overwrite
-            if !reserved.contains(&key(&first)) && !protected.contains(&key(&first)) =>
-        {
-            first
-        }
+        Conflict::Overwrite if !reserved.contains(&key(&first)) && !is_protected(&first) => first,
         _ => {
             if !taken(&first, reserved) {
                 first
@@ -131,9 +133,40 @@ pub fn path_key(p: &Path) -> String {
     key(&std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf()))
 }
 
+/// Chave canónica de um caminho que pode ainda não existir: pasta canónica + nome.
+fn candidate_key(p: &Path) -> String {
+    if let Ok(c) = std::fs::canonicalize(p) {
+        return key(&c);
+    }
+    match (p.parent().and_then(|d| std::fs::canonicalize(d).ok()), p.file_name()) {
+        (Some(d), Some(n)) => key(&d.join(n)),
+        _ => key(p),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Fase 15 (crítico): "Substituir" na pasta dos originais, chegando lá por outro
+    /// caminho (ligação simbólica, como /var → /private/var no macOS; no Windows o prefixo
+    /// \\?\ tem o mesmo efeito): o original nunca é escolhido.
+    #[cfg(unix)]
+    #[test]
+    fn overwrite_never_targets_an_original_reached_through_another_path() {
+        let t = tempfile::tempdir().unwrap();
+        let real = t.path().join("originais");
+        std::fs::create_dir_all(&real).unwrap();
+        std::fs::write(real.join("IMG_0001.jpg"), b"original").unwrap();
+        let link = t.path().join("atalho");
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+        let protected: HashSet<String> = [path_key(&real.join("IMG_0001.jpg"))].into();
+        let mut reserved = HashSet::new();
+        let p =
+            resolve(&link, "IMG_0001.jpg", Conflict::Overwrite, &mut reserved, &protected).unwrap();
+        assert_ne!(p.file_name().unwrap(), "IMG_0001.jpg", "escolheu o original: {}", p.display());
+        assert_eq!(std::fs::read(real.join("IMG_0001.jpg")).unwrap(), b"original");
+    }
 
     fn vars() -> Vars {
         Vars {

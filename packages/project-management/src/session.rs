@@ -235,6 +235,11 @@ pub struct ProjectSession {
     pub(crate) events: Arc<dyn SessionEvents>,
     import: Mutex<Option<RunningImport>>,
     analysis: Mutex<Option<AnalysisService>>,
+    /// Serializa o início da análise (clique do utilizador vs retoma automática no fim da
+    /// importação — antes podiam começar duas e uma era descartada a meio).
+    analysis_start: Mutex<()>,
+    /// O projeto está a fechar: nada novo começa em segundo plano (Fase 15).
+    closing: std::sync::atomic::AtomicBool,
     pub(crate) edits: crate::edit::EditService,
     /// Modelo do AI Denoise (carregado na primeira utilização).
     pub(crate) denoiser: std::sync::OnceLock<Option<Arc<momento_face_analysis::Denoiser>>>,
@@ -356,6 +361,8 @@ impl ProjectSession {
             events,
             import: Mutex::new(None),
             analysis: Mutex::new(None),
+            analysis_start: Mutex::new(()),
+            closing: std::sync::atomic::AtomicBool::new(false),
             edits: crate::edit::EditService::new(),
             denoiser: std::sync::OnceLock::new(),
             ai_next: Mutex::new(None),
@@ -713,6 +720,20 @@ impl ProjectSession {
     ) -> CoreResult<i64> {
         if let Some(b) = safety.backup_dir.as_deref() {
             let b = Path::new(b);
+            // A cópia de segurança tem de ser OUTRA pasta (idealmente outro disco): na mesma
+            // pasta dos originais não protege nada (Fase 15).
+            let originals =
+                self.catalog().project()?.and_then(|p| p.originals_dir).map(PathBuf::from);
+            let same = |x: &Path, y: &Path| {
+                let c = |p: &Path| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_path_buf());
+                c(x) == c(y) || c(x).starts_with(c(y)) || c(y).starts_with(c(x))
+            };
+            if originals.as_deref().is_some_and(|o| same(o, b)) || same(&self.paths.root, b) {
+                return Err(CoreError::Other(
+                    "o disco de segurança não pode ser a pasta dos originais nem a do projeto"
+                        .into(),
+                ));
+            }
             if !b.is_dir() {
                 return Err(CoreError::Unavailable(
                     b.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
@@ -860,6 +881,10 @@ impl ProjectSession {
 
     /// Analisa as fotografias por analisar (ou todas, com `reanalyze`). Não bloqueia.
     pub fn start_analysis(&self, reanalyze: bool) -> CoreResult<u64> {
+        let _gate = self.analysis_start.lock().unwrap_or_else(|e| e.into_inner());
+        if self.closing.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(CoreError::Other("o projeto está a fechar".into()));
+        }
         if self.analysis_running() {
             return Err(CoreError::Other("já existe uma análise em curso".into()));
         }
@@ -1125,6 +1150,9 @@ impl ProjectSession {
     /// Fecha o projeto: suspende a importação (retomada na próxima abertura) e para as
     /// miniaturas (as pendentes ficam registadas no catálogo).
     pub fn close(&self) {
+        // Nada novo começa a partir daqui (ex.: a importação, ao terminar, retomava a
+        // análise automática — que ficava a escrever no catálogo depois do fecho).
+        self.closing.store(true, std::sync::atomic::Ordering::SeqCst);
         // Exportação: para entre ficheiros (os ficheiros completos ficam; nunca meio escritos).
         self.exports.cancel_all();
         // Edição automática: para (o que já foi editado fica; o resto não é tocado).
@@ -1139,6 +1167,12 @@ impl ProjectSession {
             r.control.suspend();
         }
         self.wait_import();
+        // Uma análise que tenha começado entretanto (antes do sinal acima) também para.
+        let a = self.analysis.lock().unwrap_or_else(|e| e.into_inner()).take();
+        if let Some(a) = a {
+            a.cancel();
+            a.wait();
+        }
         let t = self.thumbs.lock().unwrap_or_else(|e| e.into_inner()).take();
         if let Some(t) = t {
             t.shutdown();

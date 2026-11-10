@@ -131,10 +131,16 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> CoreResult<()> {
         path.file_name().and_then(|n| n.to_str()).unwrap_or("f"),
         std::process::id()
     ));
-    {
+    // Qualquer erro (disco cheio a meio, por exemplo) remove o temporário: nunca fica um
+    // ficheiro parcial escondido na pasta de entrega (Fase 15).
+    let written = (|| -> std::io::Result<()> {
         let mut f = std::fs::File::create(&tmp)?;
         f.write_all(bytes)?;
-        f.sync_data().ok();
+        f.sync_data()
+    })();
+    if let Err(e) = written {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e.into());
     }
     // No Windows e no macOS, `rename` substitui o destino existente de forma atómica.
     if let Err(e) = std::fs::rename(&tmp, path) {

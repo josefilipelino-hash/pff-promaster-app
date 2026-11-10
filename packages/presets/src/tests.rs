@@ -214,3 +214,18 @@ fn xmp_import_is_approximate_and_reports_what_is_ignored() {
     assert!(rep.interpreted.contains(&"Contrast2012".to_string()));
     assert!(xmp::import("<x/>", "x").is_err());
 }
+
+/// Fase 15: tonalização laranja (30°) a 50 % ou 150 % continua laranja — a matiz não é
+/// interpolada a partir da neutra (220°), só a intensidade escala.
+#[test]
+fn grading_hue_keeps_the_preset_colour_at_any_amount() {
+    let base = Settings::default();
+    let mut p = Settings::default();
+    p.grading.shadows_hue = 30.0;
+    p.grading.shadows_sat = 40.0;
+    for amount in [50.0, 100.0, 150.0] {
+        let s = apply(&base, &p, &[Component::Grading], amount);
+        assert_eq!(s.grading.shadows_hue, 30.0, "a {amount}%");
+    }
+    assert!(apply(&base, &p, &[Component::Grading], 50.0).grading.shadows_sat < 40.0);
+}

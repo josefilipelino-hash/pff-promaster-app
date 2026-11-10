@@ -239,7 +239,9 @@ impl Catalog {
             params![name, role, hidden as i64, id],
         )
         .map_err(db_err)?;
-        if name.is_some() || role.is_some() {
+        // Ocultar também é uma decisão: sem confirmar os rostos, o próximo reagrupamento
+        // refazia a pessoa visível (Fase 15).
+        if name.is_some() || role.is_some() || hidden {
             tx.execute(
                 "UPDATE face SET person_source = 1 WHERE person_id = ?1 AND person_source = 0",
                 [id],

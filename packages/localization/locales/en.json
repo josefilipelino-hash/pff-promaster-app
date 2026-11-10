@@ -729,7 +729,8 @@
       "sync": "Synced with reference",
       "masks": "Masks",
       "portrait": "Portrait",
-      "retouch": "Retouch"
+      "retouch": "Retouch",
+      "adjust": "Adjustment"
     },
     "copyNote": "Geometry (crop, rotation) is not copied by default.",
     "loading": "Loading the photo…",
@@ -1517,7 +1518,8 @@
       "empty": "No photos for the gallery",
       "blocked": "The destination folder exists and is not a Momento gallery",
       "logo": "Logo not found",
-      "exists": "A gallery already exists in this folder"
+      "exists": "A gallery already exists in this folder",
+      "heroHidden": "The hero or cover photo is hidden or rejected — choose another"
     }
   },
   "album": {

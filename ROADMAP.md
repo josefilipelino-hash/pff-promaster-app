@@ -150,7 +150,15 @@ HiDPI verificado a 2×, auditoria de acessibilidade automática; desempenho sem 
 **Por fazer:** verificar em Retina (macOS) e Windows 150/200 %; leitores de ecrã reais
 (VoiceOver, Narrador/NVDA); alternativa por teclado ao arrastar no álbum.
 
-## Fase 15 — Distribuição
+## Fase 15 — Estabilização ✅ *(concluída 2026-11-10, ver docs/reports/fase15-auditoria.md)*
+
+Auditoria dos 18 módulos (40 achados analisados; todos os críticos e altos confirmados no código e corrigidos com
+testes), casamento completo de ponta a ponta com reinício, disco cheio, volumes só de
+leitura, permissões, Unicode, nomes longos, ficheiros corrompidos, fugas de recursos.
+`RELEASE_CHECKLIST.md`.
+**Por fazer:** CI e verificação em macOS/Windows; discos de rede; leitores de ecrã.
+
+## Fase 16 — Distribuição
 
 GPU (wgpu), otimização Apple Silicon, assinatura de instaladores.
 

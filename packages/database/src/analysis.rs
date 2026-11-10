@@ -196,7 +196,7 @@ pub(crate) fn blob_to_scene(b: &[u8]) -> Vec<(u16, f32)> {
 }
 
 /// Rosto anterior com decisão do utilizador: (caixa, pessoa, origem).
-type KeptFace = ((f32, f32, f32, f32), Option<i64>, i64);
+type KeptFace = ((f32, f32, f32, f32), Option<i64>, i64, i64);
 
 fn iou(a: (f32, f32, f32, f32), b: (f32, f32, f32, f32)) -> f32 {
     let x1 = a.0.max(b.0);
@@ -255,7 +255,13 @@ impl Catalog {
     pub fn analysis_counts(&self) -> CoreResult<AnalysisCounts> {
         self.connection()
             .query_row(
-                "SELECT count(*), sum(analysis_state = 1), sum(analysis_state = 2), sum(analysis_state = 0) FROM asset",
+                // Fotografias ilegíveis (miniatura falhada) não entram na análise
+                // (`pending_analysis_ids`): contam como falhadas, não como pendentes — senão a
+                // interface oferecia "Analisar 1" para sempre (Fase 15).
+                "SELECT count(*), sum(analysis_state = 1),
+                        sum(analysis_state = 2 OR (analysis_state = 0 AND thumb_state = 2)),
+                        sum(analysis_state = 0 AND thumb_state != 2)
+                 FROM asset",
                 [],
                 |r| {
                     Ok(AnalysisCounts {
@@ -278,11 +284,18 @@ impl Catalog {
         let now = now_unix();
         let tx = self.connection_mut().transaction().map_err(db_err)?;
         {
-            let mut del_f = tx.prepare("DELETE FROM face WHERE asset_id = ?1").map_err(db_err)?;
+            // Só os rostos automáticos são substituídos. As decisões do utilizador
+            // (confirmar/excluir) passam para o novo rosto na mesma posição; se nenhum
+            // coincidir, FICAM — antes eram apagadas (reanálise sem modelos, ou caixa
+            // deslocada), perdendo nomes e exclusões (Fase 15).
+            let mut del_f = tx
+                .prepare("DELETE FROM face WHERE asset_id = ?1 AND person_source = 0")
+                .map_err(db_err)?;
+            let mut del_one = tx.prepare("DELETE FROM face WHERE id = ?1").map_err(db_err)?;
             // Decisões do utilizador sobre pessoas (confirmar/excluir) sobrevivem à reanálise:
             // passam para o novo rosto na mesma posição (IoU ≥ 0,5).
             let mut old_f = tx
-                .prepare("SELECT x, y, w, h, person_id, person_source FROM face WHERE asset_id = ?1 AND person_source != 0")
+                .prepare("SELECT x, y, w, h, person_id, person_source, id FROM face WHERE asset_id = ?1 AND person_source != 0")
                 .map_err(db_err)?;
             let mut ins_s = tx
                 .prepare("INSERT OR REPLACE INTO scene(asset_id, top) VALUES(?1, ?2)")
@@ -310,12 +323,21 @@ impl Catalog {
                 let a = &res.row;
                 let kept: Vec<KeptFace> = old_f
                     .query_map([res.asset.0], |r| {
-                        Ok(((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?), r.get(4)?, r.get(5)?))
+                        Ok((
+                            (r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?),
+                            r.get(4)?,
+                            r.get(5)?,
+                            r.get(6)?,
+                        ))
                     })
                     .map_err(db_err)?
                     .collect::<Result<_, _>>()
                     .map_err(db_err)?;
-                del_f.execute([res.asset.0]).map_err(db_err)?;
+                // Sem modelos de rostos (pasta em falta), os rostos existentes não mudam.
+                let faces_analysed = a.models.is_some() || !res.faces.is_empty();
+                if faces_analysed {
+                    del_f.execute([res.asset.0]).map_err(db_err)?;
+                }
                 if !res.scene.is_empty() {
                     ins_s
                         .execute(params![res.asset.0, scene_to_blob(&res.scene)])
@@ -345,14 +367,17 @@ impl Catalog {
                         a.duration_ms
                     ])
                     .map_err(db_err)?;
-                for f in &res.faces {
+                for f in res.faces.iter().filter(|_| faces_analysed) {
                     let carried = kept
                         .iter()
                         .map(|k| (iou(k.0, (f.x, f.y, f.w, f.h)), k))
                         .filter(|(o, _)| *o >= 0.5)
                         .max_by(|a, b| a.0.total_cmp(&b.0))
-                        .map(|(_, k)| (k.1, k.2));
-                    let (pid, src) = carried.unwrap_or((None, 0));
+                        .map(|(_, k)| (k.1, k.2, k.3));
+                    if let Some((_, _, old)) = carried {
+                        del_one.execute([old]).map_err(db_err)?;
+                    }
+                    let (pid, src) = carried.map(|c| (c.0, c.1)).unwrap_or((None, 0));
                     ins_f
                         .execute(params![
                             res.asset.0,
@@ -683,8 +708,18 @@ impl Catalog {
             for id in picks {
                 n += st.execute(params![1, now, id.0]).map_err(db_err)?;
             }
+            // Rejeitar só o que o utilizador não avaliou de nenhuma forma: uma fotografia com
+            // estrelas ou cor foi escolhida por ele (ex.: a primeira dança escura com 4★)
+            // — nunca vai para as rejeitadas (e daí para "Remover…") por sugestão (Fase 15).
+            let mut rej = tx
+                .prepare(
+                    "UPDATE rating SET flag = -1, updated_at = ?1
+                     WHERE flag = 0 AND stars = 0 AND color IS NULL
+                       AND variant_id = (SELECT id FROM variant WHERE asset_id = ?2 AND is_master = 1)",
+                )
+                .map_err(db_err)?;
             for id in rejects {
-                n += st.execute(params![-1, now, id.0]).map_err(db_err)?;
+                n += rej.execute(params![now, id.0]).map_err(db_err)?;
             }
         }
         tx.commit().map_err(db_err)?;
@@ -818,6 +853,10 @@ mod tests {
             1,
             "decisão do utilizador mantida"
         );
+        // Fase 15: uma fotografia com estrelas (sem bandeira) não é rejeitada por sugestão.
+        c.set_stars(&[ids[2]], 4).unwrap();
+        assert_eq!(c.accept_recommendations(&[], &[ids[2]]).unwrap(), 0);
+        assert_eq!(c.list_photos().unwrap().iter().find(|p| p.id == ids[2]).unwrap().flag, 0);
 
         c.clear_analysis().unwrap();
         assert_eq!(c.analysis_counts().unwrap().pending, 3);

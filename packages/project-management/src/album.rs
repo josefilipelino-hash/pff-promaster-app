@@ -231,6 +231,20 @@ impl ProjectSession {
         if destination.trim().is_empty() {
             return Err(CoreError::Other("escolha a pasta de destino".into()));
         }
+        // Erros da verificação (fotografia em falta, fora do catálogo…): não se envia ao
+        // laboratório um álbum com molduras vazias (Fase 15).
+        let errors: Vec<_> = self
+            .album_preflight(&album)?
+            .into_iter()
+            .filter(|i| i.severity == momento_album::preflight::Severity::Error)
+            .collect();
+        if !errors.is_empty() {
+            return Err(CoreError::Other(format!(
+                "o álbum tem {} erro(s) na verificação (ex.: {}); corrija antes de exportar",
+                errors.len(),
+                errors[0].code
+            )));
+        }
         let name = format!(
             "{} · {}",
             album.name,
@@ -285,6 +299,9 @@ impl ProjectSession {
         // Cache das revelações (as mesmas fotografias aparecem em spreads seguidos raramente,
         // mas um spread pede-as várias vezes ao recompor).
         let cache: Mutex<Vec<(i64, u32, Arc<LinearImage>)>> = Mutex::new(Vec::new());
+        // Fotografias que não foi possível revelar (disco retirado a meio, ficheiro
+        // danificado): a exportação falha e diz quais — nunca "concluída" com vazios.
+        let failed: Mutex<Vec<String>> = Mutex::new(Vec::new());
         let me = self.clone();
         let provider = |key: i64, need: u32| -> Option<Arc<LinearImage>> {
             let mut c = cache.lock().unwrap_or_else(|e| e.into_inner());
@@ -295,6 +312,13 @@ impl ProjectSession {
                 Ok(i) => Arc::new(i),
                 Err(e) => {
                     tracing::warn!(chave = key, erro = %e, "fotografia do álbum não revelada");
+                    let name = cat
+                        .resolve_key(key)
+                        .ok()
+                        .and_then(|(_, a)| cat.photo_details(a).ok().flatten())
+                        .map(|d| d.file_name)
+                        .unwrap_or_else(|| key.to_string());
+                    failed.lock().unwrap_or_else(|e| e.into_inner()).push(format!("{name}: {e}"));
                     return None;
                 }
             };
@@ -304,6 +328,27 @@ impl ProjectSession {
             Some(img)
         };
         std::fs::create_dir_all(dest)?;
+        // Páginas de uma exportação anterior deste álbum na mesma pasta: com menos spreads,
+        // as antigas (ex.: -spread-26…30) ficariam misturadas com as novas e iam para o
+        // laboratório (Fase 15). Pede-se uma pasta limpa em vez de apagar ficheiros.
+        if matches!(a.kind, ExportKind::Jpeg | ExportKind::Tiff) {
+            let base = momento_album::slug(&a.album.name);
+            let old: Vec<String> = std::fs::read_dir(dest)?
+                .flatten()
+                .map(|e| e.file_name().to_string_lossy().into_owned())
+                .filter(|n| {
+                    n.starts_with(&format!("{base}-spread-"))
+                        || n.starts_with(&format!("{base}-pagina-"))
+                })
+                .collect();
+            if !old.is_empty() {
+                return Err(CoreError::Other(format!(
+                    "a pasta já tem {} página(s) de uma exportação anterior deste álbum (ex.: {}); escolha uma pasta vazia ou retire-as primeiro",
+                    old.len(),
+                    old[0]
+                )));
+            }
+        }
         let mut written = Vec::new();
         let mut bytes = 0u64;
         momento_album::export::export(
@@ -319,6 +364,14 @@ impl ProjectSession {
             },
             &|done, total| progress(done, total, 0),
         )?;
+        let failed = failed.into_inner().unwrap_or_else(|e| e.into_inner());
+        if !failed.is_empty() {
+            return Err(CoreError::Other(format!(
+                "{} fotografia(s) não puderam ser reveladas — o álbum ficaria com molduras vazias: {}",
+                failed.len(),
+                failed.join("; ")
+            )));
+        }
         progress(a.album.spreads.len(), a.album.spreads.len(), bytes);
         Ok(written)
     }

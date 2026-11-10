@@ -167,6 +167,30 @@ fn faces_and_eyes(models: &VisionModels, src: &Source) -> (Vec<FaceBox>, Vec<Red
     (faces, eyes)
 }
 
+/// Tempo máximo à espera de um AI Denoise igual já em curso.
+const AI_WAIT_LIMIT: std::time::Duration = std::time::Duration::from_secs(600);
+
+/// Marca "em curso" que se limpa sempre — mesmo se o cálculo entrar em pânico. Sem isto, um
+/// pânico deixava a marca para sempre e qualquer pedido seguinte da mesma fotografia
+/// (preview, exportação) ficava à espera indefinidamente (Fase 15).
+struct InflightGuard<'a> {
+    session: &'a ProjectSession,
+    ak: AiKey,
+}
+
+impl<'a> InflightGuard<'a> {
+    fn new(session: &'a ProjectSession, ak: AiKey) -> Self {
+        session.ai_inflight_set(ak, true);
+        InflightGuard { session, ak }
+    }
+}
+
+impl Drop for InflightGuard<'_> {
+    fn drop(&mut self) {
+        self.session.ai_inflight_set(self.ak, false);
+    }
+}
+
 impl ProjectSession {
     pub(crate) fn denoiser(&self) -> Option<Arc<Denoiser>> {
         self.denoiser
@@ -215,16 +239,20 @@ impl ProjectSession {
         }
         if blocking {
             // O mesmo cálculo já em curso (editor ou outra miniatura): espera por ele.
-            while self.ai_inflight_has(ak) {
+            // Com limite: se o outro cálculo nunca terminar, calcula-se aqui (Fase 15 —
+            // antes esperava para sempre, com a vez da preview ocupada).
+            let waited = std::time::Instant::now();
+            while self.ai_inflight_has(ak) && waited.elapsed() < AI_WAIT_LIMIT {
                 std::thread::sleep(std::time::Duration::from_millis(150));
             }
             if let Some(s) = self.edits.ai_cached(ak) {
                 return Ok((s, false));
             }
-            self.ai_inflight_set(ak, true);
             let t = std::time::Instant::now();
-            let res = edit::ai_denoised(&base, strength, &dn, &|_, _| true);
-            self.ai_inflight_set(ak, false);
+            let res = {
+                let _g = InflightGuard::new(self, ak);
+                edit::ai_denoised(&base, strength, &dn, &|_, _| true)
+            };
             let out = res?.map(Arc::new).unwrap_or(base);
             tracing::info!(asset = asset.0, total = full, tempo = ?t.elapsed(), "AI Denoise");
             self.edits.ai_store(ak, out.clone());
@@ -287,7 +315,7 @@ impl ProjectSession {
                     .as_ref()
                     .is_some_and(|n| n.1 != ak)
             };
-            me.ai_inflight_set(ak, true);
+            let _g = InflightGuard::new(&me, ak);
             let progress = |d: usize, t: usize| {
                 ev.ai_denoise(&AiDenoiseProgress {
                     key,
@@ -299,7 +327,7 @@ impl ProjectSession {
                 !newer()
             };
             let res = edit::ai_denoised(&base, ak.2 as f32, &dn, &progress);
-            me.ai_inflight_set(ak, false);
+            drop(_g);
             match res {
                 Ok(Some(s)) => {
                     me.edits.ai_store(ak, Arc::new(s));
@@ -359,6 +387,14 @@ impl ProjectSession {
             settings.detail.noise_luminance = (settings.detail.noise_luminance * 4.0).min(70.0);
         }
         let recipe = settings.to_recipe(&base_recipe);
+        // A análise demora segundos: se o utilizador editou esta fotografia entretanto, o
+        // resultado automático NÃO é gravado por cima (antes as edições dele eram
+        // revertidas em silêncio — Fase 15).
+        if cat.recipe_of(variant)? != base_recipe {
+            return Err(CoreError::Other(
+                "a fotografia foi editada durante a edição automática; não foi alterada".into(),
+            ));
+        }
         if recipe != base_recipe {
             cat.commit_edit(variant, AUTO_LABEL, &recipe)?;
         }

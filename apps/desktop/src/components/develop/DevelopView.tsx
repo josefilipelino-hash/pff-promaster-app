@@ -244,11 +244,36 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
     return () => ro.disconnect();
   }, []);
 
+  // Fase 15 — nunca escrever os ajustes de uma fotografia noutra. O editor não é recriado
+  // ao mudar de fotografia: um resultado assíncrono (máscara IA, retrato, Auto, conta-gotas,
+  // desfazer…) que chegue depois de o utilizador avançar pertencia à fotografia anterior.
+  // `photoKeyRef` é a fotografia mostrada agora; `viewKeyRef` aquela cujos ajustes estão
+  // em `settings`.
+  const photoKeyRef = useRef(photoKey);
+  photoKeyRef.current = photoKey;
+  const viewKeyRef = useRef<number | null>(null);
+  const commitChain = useRef<Promise<void>>(Promise.resolve());
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
   const applyView = useCallback((v: EditView) => {
+    if (v.key !== photoKeyRef.current) return; // resposta atrasada de outra fotografia
     setView(v);
     setSettings(v.settings);
     committed.current = v.settings;
+    viewKeyRef.current = v.key;
   }, []);
+  // Ao sair de uma fotografia (seguinte, outra vista, fechar): o último ajuste ainda por
+  // gravar (ex.: rato largado fora do controlo) é gravado NA SUA fotografia.
+  useEffect(() => {
+    const key = photoKey;
+    return () => {
+      if (viewKeyRef.current === key && !sameSettings(settingsRef.current, committed.current)) {
+        const s = settingsRef.current;
+        committed.current = s;
+        api.commitEdit(key, "adjust", s).catch(() => {});
+      }
+    };
+  }, [photoKey]);
 
   useEffect(() => {
     api.aiDenoiseAvailable().then(setAiAvailable).catch(() => setAiAvailable(false));
@@ -318,14 +343,24 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
 
   const commit = useCallback(
     async (label: string, s: DevelopSettings) => {
+      // Só para a fotografia mostrada e com os SEUS ajustes carregados.
+      if (photoKey !== photoKeyRef.current || viewKeyRef.current !== photoKey) return;
       if (sameSettings(s, committed.current)) return;
       committed.current = s;
+      // Gravações em série: duas seguidas (ex.: nova máscara + pincel) nunca chegam ao
+      // catálogo pela ordem inversa (Fase 15).
+      const prev = commitChain.current;
+      let release = () => {};
+      commitChain.current = new Promise<void>((r) => (release = r));
       try {
+        await prev;
         const v = await api.commitEdit(photoKey, label, s);
-        setView(v);
+        if (v.key === photoKeyRef.current) setView(v);
         void reloadPhotos();
       } catch (e) {
         fail(e);
+      } finally {
+        release();
       }
     },
     [photoKey, fail, reloadPhotos],
@@ -333,6 +368,9 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
 
     const set: SetField = useCallback(
     (label, mutate, done) => {
+      // Alteração vinda de uma operação começada noutra fotografia, ou antes de os ajustes
+      // desta estarem carregados: ignorada (antes misturava-se com a fotografia atual).
+      if (photoKey !== photoKeyRef.current || viewKeyRef.current !== photoKey) return;
       interactive.current = !done;
       setSettings((cur) => {
         const next = cloneSettings(cur);
@@ -341,7 +379,7 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
         return next;
       });
     },
-    [commit],
+    [commit, photoKey],
   );
   // Cada alteração dos ajustes pede um render (depois de o estado estar atualizado).
     // No modo de recorte a imagem mostrada não depende do retângulo: arrastá-lo não re-renderiza.
@@ -832,7 +870,7 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
             api
               .createSnapshot(photoKey, snapName)
               .then((v) => {
-                setView(v);
+                if (v.key === photoKeyRef.current) setView(v);
                 setSnapName("");
               })
               .catch(fail);

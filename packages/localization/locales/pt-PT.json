@@ -729,7 +729,8 @@
       "sync": "Sincronizado com referência",
       "masks": "Máscaras",
       "portrait": "Retrato",
-      "retouch": "Retoque"
+      "retouch": "Retoque",
+      "adjust": "Ajuste"
     },
     "copyNote": "A geometria (recorte, rotação) não é copiada por omissão.",
     "loading": "A carregar a fotografia…",
@@ -1517,7 +1518,8 @@
       "empty": "Nenhuma fotografia para a galeria",
       "blocked": "A pasta de destino já existe e não é uma galeria do Momento",
       "logo": "O logótipo não foi encontrado",
-      "exists": "Já existe uma galeria nesta pasta"
+      "exists": "Já existe uma galeria nesta pasta",
+      "heroHidden": "A fotografia de destaque ou de capa está oculta ou rejeitada — escolha outra"
     }
   },
   "album": {

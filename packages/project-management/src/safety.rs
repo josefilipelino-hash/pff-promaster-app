@@ -176,6 +176,14 @@ pub fn create_backup(
 
 /// Valida um ficheiro de catálogo sem o alterar (cópia, versão suportada, integridade).
 pub fn check_catalog_file(file: &Path) -> CoreResult<Validation> {
+    // Um catálogo copiado com o projeto aberto pode ter alterações só no `-wal` ao lado:
+    // copiar apenas o ficheiro principal perdia-as em silêncio (Fase 15).
+    let wal = PathBuf::from(format!("{}-wal", file.to_string_lossy()));
+    if std::fs::metadata(&wal).is_ok_and(|m| m.len() > 0) {
+        return Err(CoreError::Other(
+            "este catálogo tem alterações por consolidar (ficheiro -wal ao lado): abra o projeto original e feche-o, ou use \"Exportar catálogo\"".into(),
+        ));
+    }
     // Numa cópia temporária: abrir um catálogo antigo aplicaria migrações ao original.
     let dir = tempdir_near(file)?;
     let tmp = dir.join("verificar.db");
@@ -235,7 +243,7 @@ pub fn replace_catalog(paths: &ProjectPaths, file: &Path) -> CoreResult<Option<P
         )));
     }
     let tmp = paths.root.join(".catalogo-novo.tmp");
-    std::fs::copy(file, &tmp)?;
+    copy_synced(file, &tmp)?;
     let aside = set_aside(paths, "antes-do-restauro")?;
     std::fs::rename(&tmp, paths.catalog())?;
     Ok(aside)
@@ -274,6 +282,25 @@ pub struct OpenReport {
     pub temp_files_removed: u64,
 }
 
+/// Erro de abertura que indica dano no ficheiro (e não versão, espaço ou permissões).
+fn is_corruption(e: &CoreError) -> bool {
+    match e {
+        CoreError::Corrupt(_) => true,
+        CoreError::Database(m) => {
+            let m = m.to_lowercase();
+            m.contains("malformed") || m.contains("not a database") || m.contains("corrupt")
+        }
+        _ => false,
+    }
+}
+
+/// Copia e sincroniza com o disco (um corte de energia não deixa uma cópia a meio).
+fn copy_synced(from: &Path, to: &Path) -> CoreResult<()> {
+    std::fs::copy(from, to)?;
+    std::fs::File::open(to)?.sync_all()?;
+    Ok(())
+}
+
 /// Validação na abertura e recuperação automática a partir da versão válida mais recente.
 pub fn validate_or_recover(
     paths: &ProjectPaths,
@@ -287,13 +314,21 @@ pub fn validate_or_recover(
     let problem = match check {
         Ok(v) if v.ok() => return Ok(()),
         Ok(v) => format!("{:?} (chaves estrangeiras: {})", v.integrity, v.foreign_keys),
-        Err(e) => e.to_string(),
+        // Só dano real justifica trocar o catálogo. Versão mais recente da aplicação, disco
+        // cheio, permissões, ficheiro ocupado: o erro é mostrado tal como é e NADA é
+        // trocado — antes, um destes erros punha de lado o catálogo atual e restaurava uma
+        // versão antiga, perdendo o trabalho recente (Fase 15).
+        Err(e) if is_corruption(&e) => e.to_string(),
+        Err(e) => return Err(e),
     };
     tracing::error!(problema = %problem, "catálogo danificado; a procurar uma versão válida");
     for b in list_backups(paths).into_iter().filter(|b| b.kind == "auto" || b.kind == "manual") {
         if check_catalog_file(Path::new(&b.file)).is_ok_and(|v| v.ok()) {
+            // Cópia completa e sincronizada ANTES de mexer no atual; troca por `rename`.
+            let tmp = paths.root.join(".catalogo-recuperado.tmp");
+            copy_synced(Path::new(&b.file), &tmp)?;
             let damaged = set_aside(paths, "danificado")?;
-            std::fs::copy(&b.file, paths.catalog())?;
+            std::fs::rename(&tmp, paths.catalog())?;
             report.restored_from = Some(b.created);
             report.damaged_kept = damaged.map(|p| p.to_string_lossy().into_owned());
             tracing::warn!(versao = b.created, "catálogo restaurado de uma cópia de segurança");

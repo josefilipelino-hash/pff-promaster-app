@@ -92,6 +92,10 @@ export function PeopleView({ onShowPerson }: { onShowPerson: (id: number) => voi
   const reload = useStore((s) => s.reloadOrganization);
   const toast = useStore((s) => s.toast);
   const [sel, setSel] = useState<number[]>([]);
+  // A lista de pessoas foi recalculada (análise em fundo, reagrupar): os identificadores
+  // podem ter passado a outras pessoas — limpar as escolhas para "Juntar" nunca juntar as
+  // pessoas erradas (Fase 15).
+  useEffect(() => setSel([]), [persons]);
   const [showHidden, setShowHidden] = useState(false);
   const fail = (e: unknown) => toast("error", errorText(e, t));
     // Ordem estável enquanto a vista está aberta (identificar alguém não o faz saltar de sítio).

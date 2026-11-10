@@ -32,7 +32,13 @@ pub fn scan(originals: &[Original]) -> Vec<(AssetId, Availability)> {
         .map(|o| {
             let p = Path::new(&o.path);
             let a = if p.is_file() {
-                Availability::Ok
+                // O ficheiro existe mas com outro tamanho: foi substituído por outro (cartão
+                // reutilizado, edição externa por cima) — não é a fotografia catalogada
+                // (Fase 15). Tamanho 0 no registo = desconhecido.
+                match std::fs::metadata(p) {
+                    Ok(m) if o.file_size > 0 && m.len() != o.file_size => Availability::Missing,
+                    _ => Availability::Ok,
+                }
             } else {
                 let parent = p.parent().map(Path::to_path_buf).unwrap_or_default();
                 let parent_ok = *dirs.entry(parent.clone()).or_insert_with(|| parent.is_dir());

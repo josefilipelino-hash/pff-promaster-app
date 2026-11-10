@@ -431,3 +431,39 @@ fn corrupted_raw_and_damaged_catalog() {
     assert!(s.validate_catalog().unwrap().ok());
     s.close();
 }
+
+/// Fase 15: um catálogo de uma versão MAIS RECENTE da aplicação (aberto por engano com uma
+/// instalação antiga) não é "dano": a abertura recusa com a mensagem certa e NADA é
+/// trocado — antes, era posto de lado e substituído por uma cópia antiga (trabalho perdido).
+#[test]
+fn newer_catalog_is_refused_not_replaced_by_an_old_backup() {
+    let tmp = tempfile::tempdir().unwrap();
+    let work = tmp.path().join("trabalho");
+    std::fs::create_dir_all(&work).unwrap();
+    let src = tmp.path().join("f");
+    photos(&src, 2, 320, 213);
+    let root = project(&work, None);
+    let s = open(&root);
+    s.start_import(&ImportRequest {
+        paths: vec![src.to_string_lossy().into_owned()],
+        mode: ImportMode::Reference,
+        recursive: false,
+    })
+    .unwrap();
+    s.wait_import();
+    s.create_backup().unwrap();
+    s.close();
+    drop(s);
+    let cat = root.join("catalog.db");
+    rusqlite::Connection::open(&cat).unwrap().execute_batch("PRAGMA user_version = 999;").unwrap();
+    let before = std::fs::read(&cat).unwrap();
+    let err = ProjectSession::open(&root, Arc::new(Quiet)).err().expect("devia recusar");
+    assert!(matches!(err, momento_core_types::CoreError::CatalogTooNew { .. }), "{err}");
+    assert_eq!(std::fs::read(&cat).unwrap(), before, "o catálogo não pode ser trocado");
+    let aside: Vec<_> = std::fs::read_dir(root.join("backups"))
+        .unwrap()
+        .flatten()
+        .filter(|e| e.file_name().to_string_lossy().contains("danificado"))
+        .collect();
+    assert!(aside.is_empty(), "nada posto de lado");
+}

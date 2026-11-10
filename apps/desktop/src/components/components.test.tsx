@@ -733,6 +733,54 @@ describe("edição (Fase 5)", () => {
   }
   const slider = (name: string) => screen.getByRole("slider", { name }) as HTMLInputElement;
 
+  it("Fase 15: um Auto que termina depois de mudar de fotografia não passa para a seguinte", async () => {
+    let finish: (v: unknown) => void = () => {};
+    apiMock.autoEditPhoto.mockImplementation(
+      (key: number) =>
+        new Promise((res) => {
+          finish = () => {
+            const v = editViewOf(key);
+            v.settings.light.exposure = 1.5;
+            res({ view: { ...v, position: 1, canUndo: true }, report: null });
+          };
+        }),
+    );
+    const panel = await openDevelop();
+    fireEvent.click(within(panel).getByRole("button", { name: /✦ Auto/ }));
+    // Seguinte (→) antes de o Auto da fotografia 2 terminar.
+    act(() => useStore.getState().setSelection({ ids: new Set([3]), focus: 3, anchor: 3 }));
+    await act(async () => {});
+    await waitFor(() => expect(apiMock.editView).toHaveBeenCalledWith(3));
+    await act(async () => finish(null));
+    await act(async () => {});
+    apiMock.commitEdit.mockClear();
+    // Um ajuste na fotografia 3 grava a 3 com os SEUS ajustes (sem o +1,5 EV da 2).
+    fireEvent.change(slider("Contraste"), { target: { value: "10" } });
+    fireEvent.pointerUp(slider("Contraste"));
+    await act(async () => {});
+    const calls = apiMock.commitEdit.mock.calls;
+    expect(calls.length).toBe(1);
+    expect(calls[0]![0]).toBe(3);
+    expect((calls[0]![2] as { light: { exposure: number } }).light.exposure).toBe(0);
+  });
+
+  it("Fase 15: o último ajuste por gravar é gravado na sua fotografia ao mudar de fotografia", async () => {
+    await openDevelop();
+    await waitFor(() => expect(apiMock.editView).toHaveBeenCalledWith(2));
+    await act(async () => {});
+    apiMock.commitEdit.mockClear();
+    // Arrastar sem "largar" no próprio controlo (sem pointerup).
+    fireEvent.change(slider("Exposição"), { target: { value: "0.7" } });
+    await act(async () => {});
+    expect(apiMock.commitEdit).not.toHaveBeenCalled();
+    act(() => useStore.getState().setSelection({ ids: new Set([3]), focus: 3, anchor: 3 }));
+    await act(async () => {});
+    const c = apiMock.commitEdit.mock.calls.find((x) => x[0] === 2);
+    expect(c, "ajuste da fotografia 2 gravado").toBeTruthy();
+    expect((c![2] as { light: { exposure: number } }).light.exposure).toBe(0.7);
+    expect(apiMock.commitEdit.mock.calls.some((x) => x[0] === 3)).toBe(false);
+  });
+
   it("abrir o editor (D), arrastar a exposição: renders rápidos e, ao largar, final + gravação", async () => {
     await openDevelop();
     expect(apiMock.editView).toHaveBeenCalledWith(2);
@@ -1651,6 +1699,56 @@ describe("estados claros (Fase 14)", () => {
     expect(status.getAttribute("role")).toBe("status");
     expect(within(status as HTMLElement).getByText("2 offline (disco ausente)").className).toContain("state offline");
     expect(within(status as HTMLElement).getByText("1 em falta").className).toContain("state failed");
+  });
+});
+
+describe("culling seguro (Fase 15)", () => {
+  async function openProj(n = 6) {
+    apiMock.listPhotos.mockResolvedValue(rows(n).map((r) => ({ ...r, flag: 0, stars: 0 })));
+    act(() => useStore.getState().setProject(project));
+    render(<App />);
+    await screen.findByText("Casamento Ana & Pedro");
+    await act(async () => {});
+  }
+
+  it("no editor, as teclas classificam a fotografia mostrada (não uma escondida pelo filtro)", async () => {
+    await openProj();
+    // Seleção numa fotografia que o filtro esconde (ex.: escolhida noutra vista).
+    act(() => useStore.getState().setSelection({ ids: new Set([999]), focus: 999, anchor: 999 }));
+    fireEvent.keyDown(window, { key: "d" });
+    await act(async () => {});
+    apiMock.setFlag.mockClear();
+    fireEvent.keyDown(window, { key: "x" });
+    await act(async () => {});
+    expect(apiMock.setFlag).toHaveBeenCalledTimes(1);
+    const keys = (apiMock.setFlag.mock.calls[0] as unknown[])[0] as number[];
+    expect(keys).not.toContain(999);
+  });
+
+  it("clique direito numa seleção múltipla: o menu age sobre todas", async () => {
+    await openProj();
+    fireEvent.mouseDown(document.querySelector('[data-id="1"]')!);
+    fireEvent.mouseDown(document.querySelector('[data-id="3"]')!, { shiftKey: true });
+    expect(useStore.getState().selection.ids.size).toBe(3);
+    fireEvent.mouseDown(document.querySelector('[data-id="2"]')!, { button: 2 });
+    fireEvent.contextMenu(document.querySelector('[data-id="2"]')!, { clientX: 50, clientY: 50 });
+    fireEvent.click(within(screen.getByRole("menu")).getByRole("menuitem", { name: /Rejeitar/ }));
+    await act(async () => {});
+    expect(apiMock.setFlag).toHaveBeenCalledWith([1, 2, 3], -1);
+  });
+
+  it("em Pessoas, classificar/apagar não age sobre a seleção invisível da grelha", async () => {
+    await openProj();
+    fireEvent.mouseDown(document.querySelector('[data-id="2"]')!);
+    fireEvent.click(screen.getByRole("button", { name: "Pessoas" }));
+    await act(async () => {});
+    apiMock.setFlag.mockClear();
+    apiMock.setStars.mockClear();
+    for (const key of ["x", "p", "5", "Delete"]) fireEvent.keyDown(window, { key });
+    await act(async () => {});
+    expect(apiMock.setFlag).not.toHaveBeenCalled();
+    expect(apiMock.setStars).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });
 

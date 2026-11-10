@@ -93,8 +93,8 @@ impl ThumbnailService {
 
         let mut workers = Vec::new();
         for i in 0..threads.max(1) {
-            let (queue, paths, registry, tx) =
-                (queue.clone(), paths.clone(), registry.clone(), tx.clone());
+            let (queue, paths, registry, tx, skipped) =
+                (queue.clone(), paths.clone(), registry.clone(), tx.clone(), total.clone());
             let catalog = Catalog::open_existing(&paths.catalog())?;
             workers.push(
                 std::thread::Builder::new()
@@ -111,7 +111,11 @@ impl ThumbnailService {
                                 Ok(Ok(())) => Ok(()),
                                 // Original offline/em falta: a miniatura fica por fazer (não
                                 // "falhada") e é gerada quando o disco voltar.
-                                Ok(Err(CoreError::Unavailable(_))) => continue,
+                                // Sai da contagem (volta a entrar quando o disco voltar).
+                                Ok(Err(CoreError::Unavailable(_))) => {
+                                    skipped.fetch_sub(1, Ordering::SeqCst);
+                                    continue;
+                                }
                                 Ok(Err(e)) => Err(e.to_string()),
                                 Err(_) => Err("falha interna do descodificador".to_string()),
                             };
@@ -126,7 +130,7 @@ impl ThumbnailService {
         drop(tx);
 
         let mut catalog = Catalog::open_existing(&paths.catalog())?;
-        let (wq, wt, wd) = (queue.clone(), total.clone(), done.clone());
+        let (wt, wd) = (total.clone(), done.clone());
         let writer = std::thread::Builder::new()
             .name("thumb-writer".into())
             .spawn(move || {
@@ -153,7 +157,9 @@ impl ThumbnailService {
                         let n = pending.len() as u64;
                         let d = wd.fetch_add(n, Ordering::SeqCst) + n;
                         let mut batch = ThumbBatch {
-                            remaining: wq.len() as u64,
+                            // Por fazer = pedidas − concluídas (inclui as que estão a ser
+                            // descodificadas: um RAW lento já saiu da fila mas não está pronto).
+                            remaining: wt.load(Ordering::SeqCst).saturating_sub(d),
                             done: d,
                             total: wt.load(Ordering::SeqCst),
                             ..Default::default()
@@ -188,8 +194,10 @@ impl ThumbnailService {
         self.queue.prioritize(ids);
     }
 
+    /// Miniaturas por concluir: na fila **e** em curso (Fase 15: antes contava só a fila,
+    /// e "0" aparecia enquanto um RAW lento ainda estava a ser descodificado).
     pub fn remaining(&self) -> usize {
-        self.queue.len()
+        self.total.load(Ordering::SeqCst).saturating_sub(self.done.load(Ordering::SeqCst)) as usize
     }
 
     pub fn progress(&self) -> (u64, u64) {

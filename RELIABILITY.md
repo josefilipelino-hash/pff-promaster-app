@@ -97,3 +97,24 @@ Na aplicação real (Linux/Xvfb): ver `PROJECT_STATUS.md` (fase 13).
 - macOS e Windows: comportamentos testados em Linux; o código usa APIs portáveis
   (bloqueio de ficheiros da biblioteca padrão, lixo do sistema via `trash`), mas **não
   foram executados nesses sistemas**.
+
+## Fase 15 — comportamento em condições adversas (medido)
+
+| Situação | O que acontece |
+|---|---|
+| Segundo cartão com os mesmos nomes no mesmo caminho | Importado: "já importada" decide-se pelo **conteúdo** (BLAKE3), nunca pelo caminho |
+| Disco dos originais enche durante a importação | As que não cabem ficam com erro no relatório; nenhuma cópia parcial; repetir a importação depois de libertar espaço traz as restantes sem duplicados |
+| Disco de segurança enche | A fotografia sem segunda cópia **não entra** e é listada com "No space left on device"; repetir completa tudo |
+| Erro ao gravar no catálogo durante a importação | A importação termina com o erro (não fica presa); o projeto fecha normalmente |
+| Disco do catálogo cheio | Cada gravação recusada devolve um erro; o catálogo não se corrompe; com espaço volta a gravar |
+| Exportação para disco cheio | Aviso antes; pausa "sem espaço" entre ficheiros (nunca um ficheiro a meio); continuar ou cancelar |
+| Exportação para destino só de leitura / sem permissões | Falha imediata com o motivo do sistema |
+| Edição com LUT ou máscara em falta | Essa fotografia não é exportada (erro com o nome do recurso); as outras saem |
+| Álbum com fotografia indisponível | Exportação recusada (erros da verificação) ou falhada com a lista — nunca molduras vazias |
+| Catálogo de uma versão mais recente da aplicação | Recusado com a mensagem certa; **nada é trocado** (só dano real leva à recuperação automática) |
+| Original substituído por outra fotografia no mesmo caminho | Marcado "em falta" na verificação (tamanho diferente); a exportação confirma o conteúdo (BLAKE3) e recusa-o; reimportar esse cartão dá um erro explicado |
+| Cartão protegido contra escrita | Importa, mostra, edita e exporta; "mover para o lixo" recusado e a fotografia fica |
+| Mudar de fotografia a meio de uma operação do editor | O resultado é ignorado se pertencer a outra fotografia; o último ajuste por gravar é gravado na sua fotografia |
+
+Testes: `tests/wedding_e2e.rs`, `tests/adverse.rs`, `tests/resilience.rs`. Comandos para
+montar os discos de teste em `RELEASE_CHECKLIST.md`.

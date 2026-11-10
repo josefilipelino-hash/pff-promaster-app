@@ -281,27 +281,47 @@ pub fn watermark(px: &mut [[f32; 3]], w: usize, h: usize, wm: &Watermark, mark: 
     let size = (wm.size.clamp(0.5, 50.0) / 100.0 * short).max(4.0);
     let opacity = wm.opacity.clamp(0.0, 100.0) / 100.0;
     // (cobertura, cor) por píxel da marca.
-    let (cov, colors, mw, mh): (Vec<f32>, Option<Vec<[f32; 3]>>, usize, usize) = match mark {
-        Mark::Text { font, .. } => {
-            let (m, tw, th) = text_mask(font, &wm.text, size);
-            (m, None, tw, th)
-        }
-        Mark::Image(img) => {
-            let (iw, ih) = img.dimensions();
-            let k = size / iw.max(ih) as f32;
-            let (nw, nh) =
-                (((iw as f32 * k).round() as u32).max(1), ((ih as f32 * k).round() as u32).max(1));
-            let r = image::imageops::resize(img, nw, nh, image::imageops::FilterType::Lanczos3);
-            let cov = r.pixels().map(|p| p[3] as f32 / 255.0).collect();
-            let col = r
-                .pixels()
-                .map(|p| mul3(&SRGB_TO_REC2020, [p[0], p[1], p[2]].map(|c| eotf(c as f32 / 255.0))))
-                .collect();
-            (cov, Some(col), nw as usize, nh as usize)
+    let build = |size: f32| -> (Vec<f32>, Option<Vec<[f32; 3]>>, usize, usize) {
+        match mark {
+            Mark::Text { font, .. } => {
+                let (m, tw, th) = text_mask(font, &wm.text, size);
+                (m, None, tw, th)
+            }
+            Mark::Image(img) => {
+                let (iw, ih) = img.dimensions();
+                let k = size / iw.max(ih) as f32;
+                let (nw, nh) = (
+                    ((iw as f32 * k).round() as u32).max(1),
+                    ((ih as f32 * k).round() as u32).max(1),
+                );
+                let r = image::imageops::resize(img, nw, nh, image::imageops::FilterType::Lanczos3);
+                let cov = r.pixels().map(|p| p[3] as f32 / 255.0).collect();
+                let col = r
+                    .pixels()
+                    .map(|p| {
+                        mul3(&SRGB_TO_REC2020, [p[0], p[1], p[2]].map(|c| eotf(c as f32 / 255.0)))
+                    })
+                    .collect();
+                (cov, Some(col), nw as usize, nh as usize)
+            }
         }
     };
-    if mw >= w || mh >= h {
-        return;
+    let (mut cov, mut colors, mut mw, mut mh) = build(size);
+    // Marca maior do que a fotografia (texto longo num retrato, por exemplo): reduz-se para
+    // caber — antes era omitida em silêncio e a prova saía sem marca de água (Fase 15).
+    let limit = |total: usize| (total as f32 * 0.9).max(1.0);
+    if mw as f32 > limit(w) || mh as f32 > limit(h) {
+        let mut cur = size * (limit(w) / mw as f32).min(limit(h) / mh as f32);
+        for _ in 0..8 {
+            (cov, colors, mw, mh) = build(cur.max(1.0));
+            if (mw as f32) <= limit(w) && (mh as f32) <= limit(h) {
+                break;
+            }
+            cur *= 0.8; // o texto não escala exatamente em proporção: ajustar
+        }
+        if mw >= w || mh >= h {
+            return; // imagem minúscula (alguns píxeis): não há onde pôr a marca
+        }
     }
     let margin = (wm.margin.clamp(0.0, 40.0) / 100.0 * short).round() as usize;
     let (fx, fy) = match wm.anchor {
@@ -344,6 +364,27 @@ mod tests {
 
     fn size(mode: SizeMode, a: f32, b: f32) -> Size {
         Size { mode, a, b, ..Default::default() }
+    }
+
+    /// Fase 15: marca de água maior do que a fotografia (texto longo num retrato) é
+    /// reduzida e aplicada — nunca omitida em silêncio.
+    #[test]
+    fn oversized_watermark_is_scaled_not_dropped() {
+        let (w, h) = (300usize, 450usize);
+        let mut px = vec![[0.0f32; 3]; w * h];
+        let wm = Watermark {
+            enabled: true,
+            text: "© Estúdio Fotográfico Inês & João — Casamento 2026".into(),
+            size: 40.0,
+            opacity: 100.0,
+            ..Default::default()
+        };
+        let mark = Mark::Text {
+            font: ab_glyph::FontVec::try_from_vec(INTER.to_vec()).unwrap(),
+            color: [1.0; 3],
+        };
+        watermark(&mut px, w, h, &wm, &mark);
+        assert!(px.iter().any(|p| p[0] > 0.1), "a marca de água desapareceu");
     }
 
     #[test]

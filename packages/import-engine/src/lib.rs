@@ -137,6 +137,11 @@ pub fn collect_files(
             continue;
         }
         if !p.is_dir() {
+            // Caminho inexistente/inacessível: entra na lista e aparece no relatório com o
+            // erro real (Fase 15 — antes era ignorado em silêncio).
+            if seen.insert(p.clone()) {
+                out.push(p.clone());
+            }
             continue;
         }
         let mut walker = walkdir::WalkDir::new(p).follow_links(false).sort_by_file_name();
@@ -158,9 +163,22 @@ pub fn collect_files(
             }
             true
         });
-        for e in iter.flatten() {
-            if e.file_type().is_file() && seen.insert(e.path().to_path_buf()) {
-                out.push(e.path().to_path_buf());
+        for e in iter {
+            match e {
+                Ok(e) => {
+                    if e.file_type().is_file() && seen.insert(e.path().to_path_buf()) {
+                        out.push(e.path().to_path_buf());
+                    }
+                }
+                // Pasta ilegível (permissões, cartão com erros): registada como item com erro
+                // para o relatório — nunca um "concluído" com fotografias em falta.
+                Err(err) => {
+                    if let Some(path) = err.path() {
+                        if seen.insert(path.to_path_buf()) {
+                            out.push(path.to_path_buf());
+                        }
+                    }
+                }
             }
         }
     }
@@ -192,7 +210,8 @@ struct Shared<'a> {
     registry: &'a CodecRegistry,
     options: &'a ImportOptions,
     session: ImportSessionId,
-    known_paths: HashSet<String>,
+    /// Hashes das fotografias já no catálogo (antes desta importação).
+    catalog_hashes: HashSet<[u8; 32]>,
     /// Hashes já no catálogo ou reclamados por um ficheiro desta importação.
     hashes: Mutex<HashSet<[u8; 32]>>,
     /// Destinos reservados no modo cópia (evita colisões entre threads).
@@ -208,7 +227,8 @@ fn sanitize(s: &str) -> String {
         .chars()
         .map(|c| if c.is_alphanumeric() || c == '-' || c == '.' { c } else { '_' })
         .collect();
-    let t = t.trim_matches('_').to_string();
+    // Nunca "." nem ".." (EXIF corrompido não pode tirar a cópia da pasta dos originais).
+    let t = t.trim_start_matches('.').trim_matches('_').to_string();
     if t.is_empty() {
         "Sem_camara".into()
     } else {
@@ -235,16 +255,19 @@ fn copy_destination(
     let mut reserved = shared.reserved.lock().unwrap_or_else(|e| e.into_inner());
     for n in 0..10_000 {
         let name = if n == 0 { format!("{stem}{ext}") } else { format!("{stem}_{n}{ext}") };
-        let candidate = dir.join(name);
-        if reserved.contains(&candidate) {
+        let candidate = dir.join(&name);
+        // Sem distinguir maiúsculas: em macOS/Windows IMG_0001.JPG e img_0001.jpg são o
+        // mesmo ficheiro — reservar só por bytes deixava uma cópia substituir a outra.
+        let key = dir.join(name.to_lowercase());
+        if reserved.contains(&key) {
             continue;
         }
         if !candidate.exists() {
-            reserved.insert(candidate.clone());
+            reserved.insert(key);
             return Ok((candidate, false));
         }
         if std::fs::read(&candidate).is_ok_and(|d| <[u8; 32]>::from(blake3::hash(&d)) == *hash) {
-            reserved.insert(candidate.clone());
+            reserved.insert(key);
             return Ok((candidate, true));
         }
     }
@@ -287,6 +310,10 @@ fn copy_verified(
                 return Err(CoreError::Corrupt("a cópia não coincide com o original".into()));
             }
         }
+        // Nunca substituir um ficheiro que entretanto apareceu com este nome.
+        if dest.exists() {
+            return Err(CoreError::Other(format!("{} já existe no destino", dest.display())));
+        }
         std::fs::rename(&tmp, &dest)?;
         Ok(())
     })();
@@ -297,6 +324,16 @@ fn copy_verified(
     Ok(dest)
 }
 
+/// Limite de segurança por ficheiro (as maiores fotografias — RAW de 150–200 MP, TIFF de
+/// 16 bits — ficam muito abaixo; vídeos de vários GB não).
+const MAX_PHOTO_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+
+/// Liberta o hash reclamado quando a fotografia afinal não entra (cópia falhou): um
+/// ficheiro idêntico noutra pasta do cartão pode ainda entrar.
+fn release(shared: &Shared, hash: &[u8; 32]) {
+    shared.hashes.lock().unwrap_or_else(|e| e.into_inner()).remove(hash);
+}
+
 fn process_file(path_str: &str, shared: &Shared) -> Processed {
     match process_file_inner(path_str, shared) {
         Ok(p) => p,
@@ -305,14 +342,26 @@ fn process_file(path_str: &str, shared: &Shared) -> Processed {
 }
 
 fn process_file_inner(path_str: &str, shared: &Shared) -> CoreResult<Processed> {
-    if shared.known_paths.contains(path_str) {
-        return Ok(Processed::Skip(ItemState::AlreadyImported, None));
-    }
+    // "Já importada" decide-se pelo CONTEÚDO, nunca só pelo caminho (Fase 15): o cartão de
+    // um segundo fotógrafo, ou o mesmo cartão formatado, monta no mesmo sítio e a câmara
+    // recomeça em IMG_0001 — o caminho repete-se com fotografias diferentes.
     let path = Path::new(path_str);
     let meta = std::fs::metadata(path)?;
-    let data = std::fs::read(path)?;
+    if meta.is_dir() {
+        // Só chega aqui uma pasta que não foi possível percorrer.
+        std::fs::read_dir(path)?;
+        return Err(CoreError::Other("não foi possível ler o conteúdo desta pasta".into()));
+    }
     let ext = path.extension().and_then(|e| e.to_str());
-    let Some(det) = detect(&data[..data.len().min(SNIFF_LEN)], ext) else {
+    // Formato pelo cabeçalho ANTES de ler o ficheiro inteiro: vídeos de vários GB no cartão
+    // não são carregados para a memória.
+    let head = {
+        use std::io::Read;
+        let mut buf = Vec::with_capacity(SNIFF_LEN);
+        std::fs::File::open(path)?.take(SNIFF_LEN as u64).read_to_end(&mut buf)?;
+        buf
+    };
+    let Some(det) = detect(&head, ext) else {
         return Ok(Processed::Skip(
             ItemState::Unsupported,
             Some("formato desconhecido ou não é uma imagem".into()),
@@ -336,7 +385,20 @@ fn process_file_inner(path_str: &str, shared: &Shared) -> CoreResult<Processed> 
             )),
         ));
     }
+    if meta.len() > MAX_PHOTO_BYTES {
+        return Ok(Processed::Skip(
+            ItemState::Unsupported,
+            Some(format!(
+                "ficheiro com {} MB: grande demais para uma fotografia",
+                meta.len() / 1_048_576
+            )),
+        ));
+    }
+    let data = std::fs::read(path)?;
     let hash: [u8; 32] = blake3::hash(&data).into();
+    if shared.catalog_hashes.contains(&hash) {
+        return Ok(Processed::Skip(ItemState::AlreadyImported, None));
+    }
     {
         let mut hashes = shared.hashes.lock().unwrap_or_else(|e| e.into_inner());
         if !hashes.insert(hash) {
@@ -371,14 +433,16 @@ fn process_file_inner(path_str: &str, shared: &Shared) -> CoreResult<Processed> 
                 .originals_dir
                 .as_ref()
                 .ok_or_else(|| CoreError::Other("sem pasta dos originais".into()))?;
-            let dest = copy_verified(shared, base, &file_name, camera, &data, &hash)?;
+            let dest = copy_verified(shared, base, &file_name, camera, &data, &hash)
+                .inspect_err(|_| release(shared, &hash))?;
             (dest.to_string_lossy().into_owned(), Some(path_str.to_string()))
         }
     };
     // Segunda cópia (disco de segurança), com a mesma verificação.
     let backup_path = match &shared.options.backup_dir {
         Some(b) => Some(
-            copy_verified(shared, b, &file_name, camera, &data, &hash)?
+            copy_verified(shared, b, &file_name, camera, &data, &hash)
+                .inspect_err(|_| release(shared, &hash))?
                 .to_string_lossy()
                 .into_owned(),
         ),
@@ -495,7 +559,7 @@ pub fn run_session(
         registry,
         options,
         session,
-        known_paths: catalog.known_paths()?,
+        catalog_hashes: catalog.content_hashes()?,
         hashes: Mutex::new(catalog.content_hashes()?),
         reserved: Mutex::new(HashSet::new()),
     };
@@ -511,13 +575,19 @@ pub fn run_session(
         .map_err(|e| CoreError::Other(e.to_string()))?;
 
     let (tx, rx) = mpsc::sync_channel::<(String, Processed)>(BATCH);
+    // Erro ao gravar no catálogo (disco cheio, catálogo ocupado): os produtores param e o
+    // canal fecha — antes ficavam bloqueados em `send` e a importação (e o fecho do
+    // projeto, que espera por ela) nunca terminava (Fase 15).
+    let abort = std::sync::atomic::AtomicBool::new(false);
     let result = std::thread::scope(|scope| -> CoreResult<()> {
+        let rx = rx;
         let shared_ref = &shared;
         let pending_ref = &pending;
+        let abort_ref = &abort;
         scope.spawn(move || {
             pool.install(|| {
                 pending_ref.par_iter().for_each_with(tx, |tx, p| {
-                    if control.stopped() {
+                    if control.stopped() || abort_ref.load(Ordering::SeqCst) {
                         return;
                     }
                     let r = process_file(p, shared_ref);
@@ -561,8 +631,20 @@ pub fn run_session(
                             (ItemState::Imported, Some(id), None)
                         }
                         InsertResult::DuplicateContent(id) => {
-                            if asset.source_path.is_some() {
-                                let _ = std::fs::remove_file(&asset.path); // cópia nossa, redundante
+                            // Cópia nossa, redundante — mas só se NÃO for o ficheiro da
+                            // fotografia que já está no catálogo (a cópia pode ter reutilizado
+                            // um ficheiro idêntico existente): nunca apagar esse (Fase 15).
+                            let theirs: Option<String> = catalog
+                                .connection()
+                                .query_row("SELECT path FROM asset WHERE id = ?1", [id.0], |r| {
+                                    r.get(0)
+                                })
+                                .ok();
+                            if asset.source_path.is_some()
+                                && theirs.as_deref() != Some(asset.path.as_str())
+                                && asset.backup_path.as_deref() != Some(asset.path.as_str())
+                            {
+                                let _ = std::fs::remove_file(&asset.path);
                             }
                             (
                                 ItemState::Duplicate,
@@ -571,7 +653,28 @@ pub fn run_session(
                             )
                         }
                         InsertResult::DuplicatePath(id) => {
-                            (ItemState::AlreadyImported, Some(id), None)
+                            // O mesmo caminho já está no catálogo. Se o conteúdo é OUTRO (cartão
+                            // reutilizado/formatado, ficheiro substituído), não é "já importada":
+                            // a fotografia nova não entrou e a catalogada já não está neste
+                            // ficheiro — o utilizador tem de saber (Fase 15).
+                            let theirs: Option<Vec<u8>> = catalog
+                                .connection()
+                                .query_row(
+                                    "SELECT content_hash FROM asset WHERE id = ?1",
+                                    [id.0],
+                                    |r| r.get(0),
+                                )
+                                .ok();
+                            if theirs.as_deref().is_some_and(|h| h != asset.content_hash.as_slice())
+                            {
+                                (
+                                    ItemState::Error,
+                                    Some(id),
+                                    Some("já existe no projeto uma fotografia DIFERENTE com este caminho (o ficheiro foi substituído — p. ex. cartão reutilizado); copie estes ficheiros para outra pasta e importe-os de lá".into()),
+                                )
+                            } else {
+                                (ItemState::AlreadyImported, Some(id), None)
+                            }
                         }
                     };
                     outcomes.push(ItemOutcome {
@@ -601,7 +704,11 @@ pub fn run_session(
             }
             if batch.len() >= BATCH || (!batch.is_empty() && last_flush.elapsed() >= FLUSH_INTERVAL)
             {
-                flush(&mut batch, &mut catalog)?;
+                if let Err(e) = flush(&mut batch, &mut catalog) {
+                    abort.store(true, Ordering::SeqCst);
+                    drop(rx);
+                    return Err(e);
+                }
                 last_flush = std::time::Instant::now();
             }
         }

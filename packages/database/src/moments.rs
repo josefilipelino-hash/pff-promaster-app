@@ -354,8 +354,22 @@ mod tests {
         c.save_analyses(&[res(a[1], &[0.1])], &[]).unwrap();
         let again = c.face_identities().unwrap().into_iter().find(|x| x.asset == a[1]).unwrap();
         assert_eq!(again.person_id, Some(bride), "confirmação preservada");
+        // Fase 15: reanálise sem modelos (nenhum rosto no resultado) não apaga a decisão; e
+        // um rosto detetado noutra posição (IoU < 0,5) também não a apaga.
+        c.save_analyses(&[AnalysisResult { faces: vec![], ..res(a[1], &[]) }], &[]).unwrap();
+        let kept = c.face_identities().unwrap().into_iter().find(|x| x.asset == a[1]).unwrap();
+        assert_eq!(kept.person_id, Some(bride), "sem modelos: decisão mantida");
+        c.save_analyses(&[res(a[1], &[0.8])], &[]).unwrap();
+        let faces_a1: Vec<_> =
+            c.face_identities().unwrap().into_iter().filter(|x| x.asset == a[1]).collect();
+        assert!(
+            faces_a1.iter().any(|x| x.person_id == Some(bride)),
+            "caixa deslocada: decisão mantida {faces_a1:?}"
+        );
+        assert_eq!(faces_a1.len(), 2, "rosto novo + decisão antiga");
         // Juntar e limpar.
         let extra = c.create_person(None, None).unwrap();
+        let again = faces_a1.iter().find(|x| x.person_id == Some(bride)).unwrap();
         c.assign_faces(&[again.face_id], extra).unwrap();
         c.merge_persons(extra, bride).unwrap();
         assert_eq!(c.photo_persons().unwrap().iter().filter(|x| x.1 == bride).count(), 2);
