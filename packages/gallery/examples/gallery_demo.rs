@@ -82,6 +82,7 @@ fn main() {
             hero: Some(&hero),
             cover: Some(&hero),
             logo: None,
+            gallery_id: "0123456789abcdef0123456789abcdef",
         },
     )
     .unwrap();

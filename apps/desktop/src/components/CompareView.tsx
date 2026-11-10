@@ -119,7 +119,7 @@ function Pane({
         <span className="compare-name" title={photo.fileName}>
           {photo.fileName}
         </span>
-        {rec && <LabelChip label={rec.label} />}
+        {rec && <LabelChip label={rec.label} protectedByUser={photo.flag === 1 || photo.stars > 0} />}
         {rec && rec.groupSize > 1 && <span className="muted small">{t("compare.rank", { rank: rec.rank + 1, total: rec.groupSize })}</span>}
       </header>
       <div

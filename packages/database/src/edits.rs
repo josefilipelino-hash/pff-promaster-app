@@ -267,9 +267,12 @@ impl Catalog {
         let recipe = self.recipe_of(variant)?;
         let now = now_unix();
         let tx = self.connection_mut().transaction().map_err(db_err)?;
+        // Número seguinte ao maior existente (não a contagem: depois de apagar a cópia 1,
+        // a contagem repetia o nome da cópia 2).
         let n: i64 = tx
             .query_row(
-                "SELECT count(*) FROM variant WHERE asset_id = ?1 AND is_master = 0",
+                "SELECT COALESCE(MAX(CAST(name AS INTEGER)), 0) FROM variant
+                 WHERE asset_id = ?1 AND is_master = 0",
                 [asset.0],
                 |r| r.get(0),
             )
@@ -366,6 +369,22 @@ mod tests {
         assert!(c.delete_virtual_copy(a.0).is_err(), "a principal não se apaga");
         c.delete_virtual_copy(key).unwrap();
         assert_eq!(c.list_photos().unwrap().len(), 1);
+        // Auditoria final: nomes nunca se repetem depois de apagar uma cópia.
+        let k1 = c.create_virtual_copy(a.0).unwrap();
+        let k2 = c.create_virtual_copy(a.0).unwrap();
+        c.delete_virtual_copy(k1).unwrap();
+        let k3 = c.create_virtual_copy(a.0).unwrap();
+        let names: Vec<Option<String>> = c
+            .list_photos()
+            .unwrap()
+            .into_iter()
+            .filter(|p| [k2, k3].contains(&p.id.0))
+            .map(|p| p.virtual_copy)
+            .collect();
+        assert_eq!(names.len(), 2);
+        assert_ne!(names[0], names[1], "{names:?}");
+        c.delete_virtual_copy(k2).unwrap();
+        c.delete_virtual_copy(k3).unwrap();
         c.delete_snapshot(snap).unwrap();
         delete_noop(&c);
     }

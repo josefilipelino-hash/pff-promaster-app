@@ -68,7 +68,7 @@ impl OutMeta {
     }
 }
 
-const SOFTWARE: &str = "Momento Studio";
+const SOFTWARE: &str = "PFF ProMaster";
 
 /// Tipos TIFF.
 const ASCII: u16 = 2;

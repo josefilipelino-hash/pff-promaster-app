@@ -214,6 +214,16 @@ fn preflight_finds_the_problems() {
             photo: None,
             ..Default::default()
         },
+        // Zoom 3× com o enquadramento a cortar a testa do rosto (≈17 % fora).
+        Slot {
+            id: "e".into(),
+            x: 350.0,
+            y: 20.0,
+            w: 30.0,
+            h: 20.0,
+            photo: Some(2),
+            crop: Crop { zoom: 3.0, cx: 0.4, cy: 0.5 },
+        },
     ];
     let issues = check(&a, &infos);
     let has = |code: &str, slot: Option<&str>| {
@@ -224,6 +234,8 @@ fn preflight_finds_the_problems() {
         && i.severity == Severity::Error
         && i.slot.as_deref() == Some("a")));
     assert!(has("album.issue.faceInGutter", Some("b")));
+    assert!(has("album.issue.faceCropped", Some("e")));
+    assert!(!has("album.issue.faceCropped", Some("b")), "rosto inteiro não é cortado");
     assert!(has("album.issue.edgeNearTrim", Some("c")));
     assert!(has("album.issue.empty", Some("d")));
     assert!(has("album.issue.repeated", None));

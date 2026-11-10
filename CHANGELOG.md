@@ -5,9 +5,37 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
-## [1.0.0-personal] — 2026-11-10 — Fase 16: versão instalável para uso pessoal
+## [1.0.0-personal] — 2026-11-10 — Fase 16 + auditoria final
 
-Sem funcionalidades novas. Ver `RELEASE_NOTES.md`.
+Sem funcionalidades novas além das prometidas na documentação que não existiam. Ver
+`RELEASE_NOTES.md`, `FINAL_AUDIT.md` e `KNOWN_LIMITATIONS.md`.
+
+### Auditoria final — corrigido
+- Realces e Sombras **locais** (máscaras) não tinham efeito no render.
+- Perfil ICC embutido (Adobe RGB, Display P3, ProPhoto) ignorado na edição e exportação
+  de ficheiros não-RAW (cores dessaturadas/erradas).
+- Restaurar ou importar um catálogo deixava miniaturas de outras fotografias.
+- Relatórios de falha sem o fim do registo (nome dos ficheiros de registo mudado na Fase 16).
+- Registos com caminhos de projeto (nomes de clientes): agora anonimizados linha a linha.
+- Galeria: favoritas do cliente perdidas ao regenerar; a anterior era apagada antes de a
+  nova existir.
+- Álbum: rosto cortado pelo enquadramento sem aviso.
+- Favoritas com "Rejeitar?" sugerido (agora "Protegida"); pesquisas por papel com duas
+  pessoas no mesmo papel escondiam fotografias.
+- Cópias virtuais com nomes repetidos; "Mover para o Lixo" ignorava cópias virtuais.
+- Edições em cache sem a versão do motor.
+
+### Auditoria final — adicionado (prometido em PRIVACY.md e inexistente)
+- Segurança e cópias → **Privacidade**: Limpar cache, Apagar dados de pessoas, Eliminar
+  projeto (para o Lixo; nunca toca nos originais).
+- Captura dos erros da interface (mensagem em vez de janela em branco; registo local).
+
+### Alterado
+- Nome **PFF ProMaster**, ícone próprio, identificador `pt.pffpromaster.desktop`.
+- Removidos: código morto "Brevemente" da barra lateral e a lista de fornecedores de
+  publicação com "Fase futura".
+- Documentação alinhada com o comportamento real (SECURITY, ARCHITECTURE, ROADMAP,
+  README, PRIVACY, RELEASE_NOTES, INSTALLATION, `.env.example`, `models/manifest.json`).
 
 ### Adicionado
 - **Atualização segura:** cópia completa do catálogo em `backups/` antes de qualquer

@@ -83,7 +83,7 @@ const Cell = memo(function Cell({ photo, size, token, version, selected, focused
         {photo.color && <span className={`cell-color c-${photo.color}`} />}
         {rec && (
           <span className="cell-rec">
-            <LabelChip label={rec.label} compact />
+            <LabelChip label={rec.label} compact protectedByUser={photo.flag === 1 || photo.stars > 0} />
             {rec.groupSize > 1 && rec.label !== "duplicate" && <span className="cell-group">{`${rec.rank + 1}/${rec.groupSize}`}</span>}
           </span>
         )}

@@ -46,7 +46,7 @@ pub fn write(pages: &[PdfPage], icc: &[u8], title: &str) -> Vec<u8> {
         ]
         .concat(),
     );
-    objs.push(format!("<< /Producer (Momento Studio) /Title {} >>", text(title)).into_bytes());
+    objs.push(format!("<< /Producer (PFF ProMaster) /Title {} >>", text(title)).into_bytes());
     for (i, p) in pages.iter().enumerate() {
         let (pid, cid, iid) = (page_ids[i], page_ids[i] + 1, page_ids[i] + 2);
         let (w, h, b) = (p.width_pt, p.height_pt, p.bleed_pt);

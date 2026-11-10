@@ -82,8 +82,15 @@ impl ProjectSession {
         if !confirmed {
             return Err(CoreError::Other("envio para o lixo não confirmado".into()));
         }
-        let (assets, _virtuals) = self.split_keys(keys);
+        let (assets, virtuals) = self.split_keys(keys);
         let mut report = RemoveReport::default();
+        // Uma cópia virtual não tem ficheiro próprio: o original é partilhado com a versão
+        // principal, por isso só a cópia sai do catálogo (o ficheiro nunca vai para o lixo
+        // por causa de uma cópia).
+        for k in &virtuals {
+            self.catalog().delete_virtual_copy(*k)?;
+        }
+        report.removed += virtuals.len() as u64;
         let mut gone = Vec::new();
         for id in assets {
             let Some(o) = self.catalog().original(id)? else { continue };
@@ -103,7 +110,7 @@ impl ProjectSession {
                 Err(e) => report.failed.push((o.file_name.clone(), e.to_string())),
             }
         }
-        report.removed = self.catalog().remove_assets(&gone)? as u64;
+        report.removed += self.catalog().remove_assets(&gone)? as u64;
         self.forget_caches(&gone);
         let _ = self.catalog().log_event(
             "enviadas_para_o_lixo",

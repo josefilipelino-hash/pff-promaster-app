@@ -9,7 +9,6 @@ import { SelectionPanel } from "./SelectionPanel";
 const COLLECTIONS: Collection[] = ["all", "picks", "rejects", "unrated", "unavailable"];
 
 /** Secções futuras: visíveis mas desativadas e identificadas com a fase em que chegam. */
-const UPCOMING: [string, number][] = [];
 
 export function Sidebar({
   active,
@@ -82,17 +81,6 @@ export function Sidebar({
           </ul>
         </>
       )}
-      {UPCOMING.length > 0 && <h3 className="sidebar-title">{t("sidebar.upcoming")}</h3>}
-      <ul>
-        {UPCOMING.map(([k, phase]) => (
-          <li key={k}>
-            <button type="button" className="side-item" disabled title={t("sidebar.availableIn", { phase })}>
-              <span>{t(`sidebar.${k}`)}</span>
-              <span className="badge">{t("sidebar.phase", { phase })}</span>
-            </button>
-          </li>
-        ))}
-      </ul>
     </nav>
   );
 }

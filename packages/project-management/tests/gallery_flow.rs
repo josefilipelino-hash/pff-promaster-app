@@ -160,10 +160,32 @@ fn wedding_gallery_end_to_end() {
     let done = wait(&s, s.start_gallery(pin, names.clone(), true).unwrap());
     assert_eq!(done.state, JobState::Done, "{:?}", done.errors);
     assert!(read_manifest(&folder, None).is_err(), "cifrada");
-    let m = read_manifest(&folder, Some("2468")).unwrap();
-    assert_eq!(m["photos"].as_array().unwrap().len(), 4);
-    assert!(m["zips"].as_array().unwrap().is_empty());
+    let m2 = read_manifest(&folder, Some("2468")).unwrap();
+    assert_eq!(m2["photos"].as_array().unwrap().len(), 4);
+    assert!(m2["zips"].as_array().unwrap().is_empty());
     assert!(!folder.join("download").exists(), "a geração anterior foi substituída");
+    // Auditoria final: mesmo id e mesmos tokens → as favoritas do cliente (guardadas no
+    // browser por id + token) sobrevivem a uma nova geração.
+    assert_eq!(m2["id"], m["id"], "id da galeria estável");
+    let ids = |m: &serde_json::Value| {
+        let mut v: Vec<String> = m["photos"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| p["id"].as_str().unwrap().to_string())
+            .collect();
+        v.sort();
+        v
+    };
+    assert_eq!(ids(&m2), ids(&m), "tokens das fotografias estáveis");
+    // Nada fica ao lado (pasta temporária ou anterior).
+    let leftovers: Vec<String> = std::fs::read_dir(&dest)
+        .unwrap()
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|n| n.starts_with('.'))
+        .collect();
+    assert!(leftovers.is_empty(), "{leftovers:?}");
 
     // Uma pasta que não é do Momento nunca é tocada.
     let mut other = cfg.clone();

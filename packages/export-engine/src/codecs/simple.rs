@@ -79,7 +79,7 @@ fn tiff_tags<W: std::io::Write + std::io::Seek, K: tiff::encoder::TiffKind>(
     ctx: &Ctx,
 ) -> tiff::TiffResult<()> {
     use tiff::tags::Tag;
-    d.write_tag(Tag::Software, "Momento Studio")?;
+    d.write_tag(Tag::Software, "PFF ProMaster")?;
     d.write_tag(Tag::Unknown(34675), ctx.icc)?;
     let m = ctx.meta;
     if !m.creator.is_empty() {
@@ -388,7 +388,7 @@ pub fn pdf(p: &Pixels, ctx: &Ctx) -> CoreResult<Vec<u8>> {
         .concat(),
     );
     let m = ctx.meta;
-    let mut info = String::from("<< /Producer (Momento Studio)");
+    let mut info = String::from("<< /Producer (PFF ProMaster)");
     if !m.creator.is_empty() {
         info += &format!(" /Author {}", pdf_text(&m.creator));
     }
@@ -437,7 +437,7 @@ pub fn exr(p: &Pixels, ctx: &Ctx) -> CoreResult<Vec<u8>> {
     use exr::prelude::*;
     let (w, h) = (p.w as usize, p.h as usize);
     let mut la =
-        LayerAttributes { software_name: Some(Text::from("Momento Studio")), ..Default::default() };
+        LayerAttributes { software_name: Some(Text::from("PFF ProMaster")), ..Default::default() };
     let m = ctx.meta;
     if !m.copyright.is_empty() || !m.creator.is_empty() {
         // Texto ASCII: o exr guarda carateres em Latin-1 e o OpenEXR lê UTF-8.

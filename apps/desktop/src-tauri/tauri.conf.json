@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Momento Studio",
+  "productName": "PFF ProMaster",
   "version": "1.0.0",
-  "identifier": "pt.momentostudio.desktop",
+  "identifier": "pt.pffpromaster.desktop",
   "build": {
     "beforeDevCommand": "pnpm dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Momento Studio",
+        "title": "PFF ProMaster",
         "width": 1440,
         "height": 900,
         "minWidth": 1024,
@@ -62,8 +62,8 @@
         }
       }
     },
-    "publisher": "Momento Studio (uso pessoal)",
-    "copyright": "© 2026 Momento Studio — uso pessoal",
+    "publisher": "PFF ProMaster (uso pessoal)",
+    "copyright": "© 2026 PFF ProMaster — uso pessoal",
     "shortDescription": "Gestão, seleção, edição e entrega de fotografia de casamentos",
     "longDescription": "Aplicação local para fotógrafos de casamentos e eventos: importação segura de cartões, seleção assistida, edição RAW não destrutiva, exportação, galeria do cliente e álbum para o laboratório. Funciona sem internet; nada é enviado sem pedido."
   }

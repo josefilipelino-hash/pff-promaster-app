@@ -14,13 +14,15 @@ function when(secs: number, lang: string): string {
 }
 
 /** Segurança e cópias (Fase 13): estado, versões do catálogo, exportar/importar, registo. */
-export function SafetyDialog({ onClose, onReopened }: { onClose: () => void; onReopened: (p: ProjectInfo) => void }) {
+export function SafetyDialog({ onClose, onReopened, onDeleted }: { onClose: () => void; onReopened: (p: ProjectInfo) => void; onDeleted: () => void }) {
   const { t, i18n } = useTranslation();
   const toast = useStore((s) => s.toast);
   const reloadPhotos = useStore((s) => s.reloadPhotos);
   const upsert = useStore((s) => s.upsertExportJob);
   const fail = useCallback((e: unknown) => toast("error", errorText(e, t)), [toast, t]);
-  const [tab, setTab] = useState<"status" | "versions" | "catalog" | "log">("status");
+  const project = useStore((s) => s.project);
+  const [tab, setTab] = useState<"status" | "versions" | "catalog" | "privacy" | "log">("status");
+  const [privacyConfirm, setPrivacyConfirm] = useState<"people" | "project" | null>(null);
   const [st, setSt] = useState<SafetyStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState<{ kind: "restore" | "import"; file: string } | null>(null);
@@ -55,7 +57,7 @@ export function SafetyDialog({ onClose, onReopened }: { onClose: () => void; onR
   return (
     <Modal title={t("safety.title")} onClose={onClose} wide footer={<button type="button" className="btn" data-close onClick={onClose}>{t("common.close")}</button>}>
       <div className="gallery-tabs" role="tablist" aria-label={t("safety.title")}>
-        {(["status", "versions", "catalog", "log"] as const).map((k) => (
+        {(["status", "versions", "catalog", "privacy", "log"] as const).map((k) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "active" : ""} onClick={() => setTab(k)}>
             {t(`safety.tab.${k}`)}
           </button>
@@ -211,6 +213,72 @@ export function SafetyDialog({ onClose, onReopened }: { onClose: () => void; onR
               {t("safety.importCatalog")}
             </button>
           </div>
+        </div>
+      )}
+      {tab === "privacy" && (
+        <div className="safety-section">
+          <p className="small muted">{t("privacy.hint")}</p>
+          <h4>{t("privacy.cacheTitle")}</h4>
+          <p className="small muted">{t("privacy.cacheHint")}</p>
+          <div className="dev-row">
+            <button
+              type="button"
+              className="btn small"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  const c = await api.clearCache();
+                  toast("info", t("privacy.cacheCleared", { count: c.files, size: formatBytes(c.bytes) }));
+                })
+              }
+            >
+              {t("privacy.clearCache")}
+            </button>
+          </div>
+          <h4>{t("privacy.peopleTitle")}</h4>
+          <p className="small muted">{t("privacy.peopleHint")}</p>
+          <div className="dev-row">
+            <button type="button" className="btn small" disabled={busy} onClick={() => setPrivacyConfirm("people")}>
+              {t("privacy.clearPeople")}
+            </button>
+          </div>
+          <h4>{t("privacy.projectTitle")}</h4>
+          <p className="small muted">{t("privacy.projectHint")}</p>
+          <div className="dev-row">
+            <button type="button" className="btn small danger" disabled={busy || !project} onClick={() => setPrivacyConfirm("project")}>
+              {t("privacy.deleteProject")}
+            </button>
+          </div>
+          {privacyConfirm && (
+            <div className="notice warn" role="alertdialog" aria-label={t("safety.confirmTitle")}>
+              <p>{t(privacyConfirm === "people" ? "privacy.confirmPeople" : "privacy.confirmProject", { name: project?.name ?? "" })}</p>
+              <div className="dev-row">
+                <button type="button" className="btn small" onClick={() => setPrivacyConfirm(null)}>
+                  {t("common.cancel")}
+                </button>
+                <button
+                  type="button"
+                  className="btn small primary"
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      if (privacyConfirm === "people") {
+                        await api.clearPeople();
+                        setPrivacyConfirm(null);
+                        toast("info", t("privacy.peopleCleared"));
+                      } else if (project) {
+                        await api.deleteProject(project.path);
+                        toast("info", t("privacy.projectDeleted", { name: project.name }));
+                        onDeleted();
+                      }
+                    })
+                  }
+                >
+                  {t(privacyConfirm === "people" ? "privacy.clearPeople" : "privacy.deleteProject")}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
       {tab === "log" && (

@@ -75,14 +75,39 @@ fn local_adjustments_stay_inside_the_mask() {
     );
     let d = mean(&desat, 400, 180, 440, 220);
     assert!((d[0] - d[2]).abs() < 3.0, "saturação −100 na faixa colorida: {d:?}");
+    // Realces e sombras locais, cada um SOZINHO (antes o teste juntava "brancos", que
+    // escondia que realces/sombras não mudavam a imagem — auditoria final).
+    let everywhere = MaskShape::Luminance { min: 0.0, max: 1.0, smooth: 0.0 };
+    let block = |img: &RgbImage, x0: u32, y0: u32| mean(img, x0, y0, x0 + 30, y0 + 30)[1];
+    let (mut bright, mut dark) = ((0, 0, -1.0f32), (0, 0, 1e9f32));
+    for y0 in (0..base.height() - 30).step_by(30) {
+        for x0 in (0..base.width() - 30).step_by(30) {
+            let v = block(&base, x0, y0);
+            if v > bright.2 {
+                bright = (x0, y0, v);
+            }
+            if v < dark.2 && v > 8.0 {
+                dark = (x0, y0, v);
+            }
+        }
+    }
     let hl = out(
         &src,
-        &local(
-            LocalAdjust { highlights: -100.0, whites: -50.0, ..Default::default() },
-            MaskShape::Luminance { min: 0.0, max: 1.0, smooth: 0.0 },
-        ),
+        &local(LocalAdjust { highlights: -100.0, ..Default::default() }, everywhere.clone()),
     );
-    assert!(mean(&hl, 560, 20, 590, 60)[1] < mean(&base, 560, 20, 590, 60)[1] - 3.0);
+    assert!(
+        block(&hl, bright.0, bright.1) < bright.2 - 3.0,
+        "realces −100 escurecem as altas luzes: {} → {}",
+        bright.2,
+        block(&hl, bright.0, bright.1)
+    );
+    let sh = out(&src, &local(LocalAdjust { shadows: 100.0, ..Default::default() }, everywhere));
+    assert!(
+        block(&sh, dark.0, dark.1) > dark.2 + 3.0,
+        "sombras +100 abrem as sombras: {} → {}",
+        dark.2,
+        block(&sh, dark.0, dark.1)
+    );
     let _ = band;
     // Textura/nitidez locais aumentam o detalhe fino só onde há máscara.
     let detail = |img: &RgbImage, x0: u32, y0: u32| {

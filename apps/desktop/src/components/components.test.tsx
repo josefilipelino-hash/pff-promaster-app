@@ -1361,7 +1361,7 @@ describe("exportação (Fase 9)", () => {
 });
 
 describe("galeria (Fase 10)", () => {
-  it("diálogo: conteúdo, ocultar, tema, PIN, fornecedores futuros e gerar com confirmação", async () => {
+  it("diálogo: conteúdo, ocultar, tema, PIN, publicação indisponível e gerar com confirmação", async () => {
     apiMock.listPhotos.mockResolvedValue(rows(4));
     act(() => useStore.getState().setProject(project));
     render(<App />);
@@ -1387,9 +1387,10 @@ describe("galeria (Fase 10)", () => {
     fireEvent.change(within(dlg).getByRole("textbox", { name: "PIN (4–8 dígitos)" }), { target: { value: "24a68" } });
     expect((within(dlg).getByRole("textbox", { name: "PIN (4–8 dígitos)" }) as HTMLInputElement).value).toBe("2468");
     expect(within(dlg).getByText(/barreira ligeira/)).toBeTruthy();
-    // Publicar: fornecedores apresentados como fase futura (sem botões).
+    // Publicar: a publicação direta não existe e a interface di-lo em texto (sem "Fase futura").
     fireEvent.click(within(dlg).getByRole("tab", { name: "Publicar" }));
-    expect(within(dlg).getByText("Cloudflare R2")).toBeTruthy();
+    expect(within(dlg).getByText(/não está disponível nesta versão/)).toBeTruthy();
+    expect(within(dlg).queryByText("Fase futura")).toBeNull();
     expect(within(dlg).queryByRole("button", { name: /R2|S3|SFTP|B2/ })).toBeNull();
     fireEvent.change(within(dlg).getByRole("textbox", { name: "Favoritas do cliente" }), { target: { value: "IMG_0001\nx" } });
     fireEvent.click(within(dlg).getByRole("button", { name: "Marcar favoritas" }));
@@ -1912,5 +1913,43 @@ describe("cálculos de layout", () => {
     expect(stepZoom(0.4, 1)).toBe(0.5);
     expect(stepZoom(1, 1)).toBe(2);
     expect(stepZoom(1, -1)).toBe(0.5);
+  });
+});
+
+describe("auditoria final: sugestões e pessoas", () => {
+  it("uma favorita ou com estrelas aparece como protegida, nunca como rejeição sugerida", async () => {
+    const { LabelChip } = await import("./LabelChip");
+    const { unmount } = render(<LabelChip label="reject" compact protectedByUser />);
+    expect(screen.getByText("Protegida")).toBeTruthy();
+    expect(screen.queryByText("Rejeitar?")).toBeNull();
+    unmount();
+    render(<LabelChip label="reject" compact />);
+    expect(screen.getByText("Rejeitar?")).toBeTruthy();
+  });
+
+  it("papéis com mais do que uma pessoa não escondem fotografias", async () => {
+    const { personsForRoles } = await import("./PeoplePanel");
+    const p = (id: number, role: string | null) => ({ id, name: null, role, hidden: false, photoCount: 1, faceCount: 1, cover: null }) as never;
+    expect(personsForRoles([p(1, "bride"), p(2, "groom")], ["bride", "groom"])).toEqual([1, 2]);
+    expect(personsForRoles([p(1, "bride")], ["bride", "groom"])).toBeNull();
+    expect(personsForRoles([p(1, "bride"), p(3, "bride"), p(2, "groom")], ["bride", "groom"])).toBe("ambiguous");
+  });
+});
+
+describe("auditoria final: erros da interface", () => {
+  it("uma falha num componente mostra a mensagem e não deixa a janela em branco", async () => {
+    const { ErrorBoundary } = await import("./ErrorBoundary");
+    const Boom = () => {
+      throw new Error("falhou de propósito");
+    };
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    render(
+      <ErrorBoundary>
+        <Boom />
+      </ErrorBoundary>,
+    );
+    spy.mockRestore();
+    expect(screen.getByRole("alert").textContent).toContain("falhou de propósito");
+    expect(screen.getByRole("button", { name: "Recarregar a interface" })).toBeTruthy();
   });
 });

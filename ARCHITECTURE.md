@@ -1,4 +1,4 @@
-# Arquitetura — Momento Studio
+# Arquitetura — PFF ProMaster
 
 > Documento de referência técnica. Qualquer alteração à arquitetura principal tem de ser
 > registada em §21 (Registo de decisões) com a necessidade e o impacto.
@@ -31,8 +31,8 @@ Versão do documento: Fase 2 · 2026-11-08
 │  │                ├─ adaptador raw-engine (LibRaw, FFI C++)                            │ │
 │  │                ├─ adaptador ImageIO (macOS) · libheif (Windows/Linux)               │ │
 │  │                └─ …                                                                 │ │
-│  │  image-processing (CPU f32 → GPU wgpu) · color-management (LittleCMS 2)             │ │
-│  │  ai-analysis · face-analysis (ONNX Runtime · Core ML/Vision no macOS)              │ │
+│  │  image-processing (CPU f32; GPU não implementada) · color-management (LittleCMS 2)  │ │
+│  │  ai-analysis · face-analysis (tract-onnx em CPU; sem Core ML/Neural Engine)        │ │
 │  │  presets · export-engine · gallery · album                                         │ │
 │  └─────────────────────────────────────────────────────────────────────────────────────┘ │
 │        │ SQLite (catálogo por projeto)     │ cache de previews (ficheiros)               │
@@ -336,15 +336,24 @@ câmaras do que a LibRaw. Fica como possível segundo adaptador.
 ### 6.4 Isolamento de falhas
 
 Código C/C++ pode falhar com ficheiros malformados de formas que o Rust não consegue
-apanhar (segfault). Estratégia: descodificação de ficheiros de origem desconhecida com
-LibRaw corre **num processo auxiliar** (`momento-worker`, o mesmo binário com outro modo
-de arranque) quando executada em massa (importação). Uma falha termina só o auxiliar; o
-ficheiro é marcado como corrompido e o trabalho continua. **[a validar na Fase 2]**: medir
-o custo e decidir entre processo auxiliar permanente (pool) ou só para a primeira leitura.
+apanhar (segfault). **Estado real (auditoria final):** a LibRaw corre **no mesmo processo**;
+o processo auxiliar (`momento-worker`) planeado aqui **não foi implementado**. O que existe:
+pânicos em Rust apanhados por ficheiro (`catch_unwind` nos workers de miniaturas, análise e
+exportação), limites de dimensões antes de descodificar, catálogo SQLite com WAL e
+`synchronous=FULL` e recuperação da sessão ao reabrir. Uma falha nativa num RAW malformado
+fecha a aplicação sem perder o catálogo. Limitação registada em `KNOWN_LIMITATIONS.md`.
 
 ---
 
-## 7. Gestão de cor **[definido]**
+## 7. Gestão de cor **[parcialmente implementado — ver estado real abaixo]**
+
+> **Estado real (auditoria final):** implementado — conversão de entrada pelo perfil ICC
+> embutido (JPEG/TIFF/PNG/WebP… em Adobe RGB, P3, ProPhoto; sRGB e sem perfil → sRGB),
+> espaço de trabalho Rec. 2020 linear, saída por matriz para os 6 espaços normalizados e
+> por LittleCMS para ICC personalizados (intents percetual e relativo + ponto negro).
+> **Não implementado:** soft proofing, aviso de gamut, perfil do monitor (a pré-visualização
+> é sRGB), intents de saturação/absoluto, OpenColorIO/ACES, transformações em cache por
+> thread. O texto seguinte é o plano original.
 
 - **LittleCMS 2** (crate `lcms2`, MIT, que compila a lcms2 em C, também MIT): leitura de
   perfis ICC, conversões, rendering intent (perceptual, relativo colorimétrico com
@@ -560,11 +569,12 @@ D-024 a D-028.
 - **Máscaras:** cada máscara é geométrica (pincel como lista de traços vetoriais,
   gradientes) ou gerada por IA (referência a um mapa guardado na cache + parâmetros que o
   regeneram). Nunca se guardam bitmaps no catálogo.
-- **Sidecars XMP:** exportação opcional de um subconjunto mapeável para `crs:` (Adobe
-  Camera Raw) — aproximação documentada, não equivalência. O formato próprio (JSON) é a
-  fonte de verdade sem perdas.
-- **Versão do pipeline** incluída no `recipe_hash`: uma alteração ao algoritmo invalida as
-  previews antigas, sem alterar receitas.
+- **Sidecars XMP: não implementados.** A receita vive só no catálogo (JSON, fonte de
+  verdade sem perdas). Os presets XMP do Lightroom/Camera Raw podem ser **importados**
+  (aproximação documentada em `docs/COMPATIBILIDADE-PRESETS.md`); não há escrita de `.xmp`.
+- **Versão do pipeline** (`develop::PIPELINE_VERSION`) incluída na chave das edições em
+  cache (auditoria final): uma alteração ao algoritmo invalida as imagens antigas, sem
+  alterar receitas.
 
 ---
 
@@ -752,7 +762,7 @@ ficheiros a partir do frontend (caminhos sempre resolvidos e verificados no núc
 | D-007 | 2026-11-08 | ONNX Runtime + backends Apple opcionais | Só Core ML, só ORT | Mantém o Windows; aproveita o Neural Engine |
 | D-008 | 2026-11-08 | Previews via protocolo URI próprio | base64/JSON, servidor HTTP local | Desempenho; sem porta de rede aberta |
 | D-009 | 2026-11-08 | pnpm com `minimumReleaseAge` de 7 dias | Sem restrição | Proteção contra pacotes comprometidos recém-publicados |
-| D-010 | 2026-11-08 | Nome provisório “Momento Studio”, identificador `pt.momentostudio.desktop` | — | Mudar o identificador depois altera a pasta de dados da aplicação; continua por confirmar pelo utilizador |
+| D-010 | 2026-11-08 | Nome provisório “Momento Studio”, identificador `pt.momentostudio.desktop` | — | Mudar o identificador depois altera a pasta de dados da aplicação; substituída por D-109 |
 | D-011 | 2026-11-08 | **Windows e macOS são plataformas-alvo desde já** (pedido do utilizador), não na Fase 9 | Windows só na Fase 9 | CI em Windows a partir da Fase 1; preferência por bibliotecas Rust puras; caminhos sempre `PathBuf`; URL de imagens por plataforma; atalhos Cmd/Ctrl |
 | D-012 | 2026-11-08 | Persistência dos trabalhos em segundo plano no próprio domínio (`import_item.state`, `asset.thumb_state`) em vez de uma tabela genérica `job` | Tabela `job` genérica | Retoma após falha sem infraestrutura extra; a tabela `job` só será criada se surgir trabalho sem estado de domínio próprio |
 | D-013 | 2026-11-08 | Miniaturas JPEG 640 px (q82); previews 2560 px a pedido; resolução total: original para JPEG/PNG, JPEG em cache para TIFF | Gerar sempre previews | Importação rápida; disco usado só quando necessário |
@@ -851,3 +861,4 @@ ficheiros a partir do frontend (caminhos sempre resolvidos e verificados no núc
 | D-106 | 2026-11-10 | Sem sandbox do macOS; explicações TCC no `Info.plist` | App Sandbox com bookmarks | Acesso direto a cartões, discos e pastas escolhidas; menos complexidade para uso pessoal |
 | D-107 | 2026-11-10 | Símbolos mantidos no binário (só a debug info removida) | `strip = "symbols"` (−9 MB) | Relatórios de falhas legíveis (nomes de funções) |
 | D-108 | 2026-11-10 | Modelos de IA em precisão total (102 MB) | Quantizar para FP16/INT8 | Resultados iguais aos validados nos testes de referência |
+| D-109 | 2026-11-10 | Nome final **PFF ProMaster**, identificador `pt.pffpromaster.desktop`, ícone próprio (diafragma com “Photo”, fonte em `icons/icon-source.svg`) | Manter o nome provisório | Pedido do utilizador; nenhuma instalação anterior em macOS, por isso mudar o identificador não perde dados. Mantidos por compatibilidade: nomes internos `momento-*` (crates/pacotes), extensões `.momento` (projetos), `.momentopreset` e marcador `.momento-gallery` |

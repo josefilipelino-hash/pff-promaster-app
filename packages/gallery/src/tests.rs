@@ -78,6 +78,7 @@ fn builds_a_complete_static_site() {
             hero: Some(&hero),
             cover: Some(&hero),
             logo: Some(&logo),
+            gallery_id: "0123456789abcdef0123456789abcdef",
         },
     )
     .unwrap();
@@ -148,6 +149,7 @@ fn protected_gallery_reveals_nothing_without_the_code() {
             hero: None,
             cover: None,
             logo: Some(&logo),
+            gallery_id: "0123456789abcdef0123456789abcdef",
         },
     )
     .unwrap();
@@ -190,6 +192,7 @@ fn downloads_off_and_web_size() {
             hero: None,
             cover: None,
             logo: None,
+            gallery_id: "0123456789abcdef0123456789abcdef",
         },
     )
     .unwrap();
@@ -212,6 +215,7 @@ fn downloads_off_and_web_size() {
             hero: None,
             cover: None,
             logo: None,
+            gallery_id: "0123456789abcdef0123456789abcdef",
         },
     )
     .unwrap();

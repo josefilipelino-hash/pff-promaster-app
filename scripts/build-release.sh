@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build de produção reproduzível do Momento Studio (Fase 16).
+# Build de produção reproduzível do PFF ProMaster (Fase 16).
 #
 #   ./scripts/build-release.sh            # macOS → .app + .dmg ; Linux → .deb + AppImage
 #   ./scripts/build-release.sh --universal  # macOS: binário universal (Apple Silicon + Intel)
@@ -101,7 +101,7 @@ else
   BUNDLE="target/release/bundle"
 fi
 {
-  echo "Momento Studio $VERSION"
+  echo "PFF ProMaster $VERSION"
   echo "commit: $COMMIT$DIRTY"
   echo "data do commit (SOURCE_DATE_EPOCH): $SOURCE_DATE_EPOCH"
   echo "sistema: $OS $(uname -m)"

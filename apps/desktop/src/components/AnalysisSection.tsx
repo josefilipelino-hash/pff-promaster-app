@@ -72,7 +72,7 @@ export function AnalysisSection({ photo, onCompareGroup, onAccept }: { photo: Ph
       {r && (
         <>
           <div className="analysis-head">
-            <LabelChip label={r.label} />
+            <LabelChip label={r.label} protectedByUser={photo.flag === 1 || photo.stars > 0} />
             {group && <span className="muted small">{t(`analysis.group.${group.kind}`, { rank: r.rank + 1, count: group.members.length })}</span>}
           </div>
           <p className="analysis-why">{explain(r.summary, reasons, t, i18n.language)}</p>

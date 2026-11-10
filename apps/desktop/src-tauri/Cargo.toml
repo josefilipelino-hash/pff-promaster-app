@@ -1,6 +1,6 @@
 [package]
 name = "momento-desktop"
-description = "Aplicação desktop Momento Studio (shell Tauri)."
+description = "Aplicação desktop PFF ProMaster (shell Tauri)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

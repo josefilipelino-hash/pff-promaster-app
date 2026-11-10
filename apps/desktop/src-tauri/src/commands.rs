@@ -280,6 +280,43 @@ pub async fn clear_people(state: State<'_, AppState>) -> CmdResult<()> {
     state.session().and_then(|s| s.clear_people()).map_err(err)
 }
 
+/// Erro da interface (exceção JavaScript, promessa rejeitada sem tratamento, falha de um
+/// componente React) → registo da aplicação (anonimizado pelo escritor dos registos).
+#[tauri::command]
+pub fn log_ui_error(kind: String, message: String, stack: Option<String>) {
+    let cut = |s: &str, n: usize| s.chars().take(n).collect::<String>();
+    tracing::error!(
+        tipo = %cut(&kind, 40),
+        pilha = %cut(stack.as_deref().unwrap_or(""), 2000),
+        "erro na interface: {}",
+        cut(&message, 500)
+    );
+}
+
+/// Privacidade/espaço: apaga a cache regenerável do projeto aberto.
+#[tauri::command]
+pub async fn clear_cache(
+    state: State<'_, AppState>,
+) -> CmdResult<momento_project_management::cache::Cleared> {
+    state.session().and_then(|s| s.clear_cache()).map_err(err)
+}
+
+/// Privacidade: fecha o projeto (se for o aberto), move a pasta do projeto para o Lixo e
+/// retira-o dos recentes. Os originais nunca são tocados (ver `safety::delete_project`).
+#[tauri::command]
+pub async fn delete_project(state: State<'_, AppState>, path: String) -> CmdResult<()> {
+    let target = Path::new(&path);
+    let is_open = state.session().ok().is_some_and(|s| {
+        s.paths.root == target || s.paths.root.canonicalize().ok() == target.canonicalize().ok()
+    });
+    if is_open {
+        state.close_project();
+    }
+    momento_project_management::safety::delete_project(target).map_err(err)?;
+    let _ = state.library().forget(&path);
+    Ok(())
+}
+
 #[tauri::command]
 pub async fn list_moments(state: State<'_, AppState>) -> CmdResult<Vec<MomentRow>> {
     state.session().and_then(|s| s.list_moments()).map_err(err)

@@ -539,10 +539,22 @@ impl PreparedMask {
         if m <= 0.0 {
             return d;
         }
-        if self.gain != 1.0 || self.wbm.is_some() {
+        let (hl, sh) = (self.adjust.highlights / 100.0, self.adjust.shadows / 100.0);
+        if self.gain != 1.0 || self.wbm.is_some() || hl != 0.0 || sh != 0.0 {
             let mut lin = d.map(|c| tr.to_linear.get(c));
             let g = 1.0 + (self.gain - 1.0) * m;
             lin = lin.map(|c| c * g);
+            // Realces e sombras locais: a mesma resposta que os controlos globais (ganho em
+            // EV ponderado pela luminância), aqui pela luminância do próprio píxel. Antes
+            // estes dois controlos eram gravados mas não mudavam a imagem (Fase 16, auditoria).
+            if hl != 0.0 || sh != 0.0 {
+                let y = (0.2627 * lin[0] + 0.6780 * lin[1] + 0.0593 * lin[2]).max(1e-5);
+                let ev = (y / 0.18).log2();
+                let w_sh = 1.0 - super::curves::smoothstep(-4.5, 0.0, ev);
+                let w_hl = super::curves::smoothstep(-0.5, 2.6, ev);
+                let k = 2f32.powf((sh * 1.6 * w_sh + hl * 1.6 * w_hl) * m);
+                lin = lin.map(|c| c * k);
+            }
             if let Some(w) = &self.wbm {
                 let t = mul3(w, lin);
                 lin = std::array::from_fn(|i| lin[i] + (t[i] - lin[i]) * m);

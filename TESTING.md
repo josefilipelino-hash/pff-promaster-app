@@ -69,6 +69,21 @@ plataforma, ecrã inicial, validação do formulário, grelha virtualizada com 3
 secções futuras desativadas, classificação por teclado e em seleção múltipla, filtro
 Favoritas + visualizador, reversão quando o núcleo recusa, paridade de traduções.
 
+## Auditoria final (1.0)
+
+| Teste | O que verifica |
+|---|---|
+| `image-processing` `local_adjustments_stay_inside_the_mask` | Realces e sombras locais escurecem/levantam dentro da máscara (antes não faziam nada) |
+| `color-management` `embedded_input_profiles_round_trip` | Exportar em Adobe RGB/P3/ProPhoto e voltar a ler pelo perfil embutido devolve as cores originais; sRGB usa o caminho rápido |
+| `edit_flow` `embedded_icc_profile_is_honoured` | Um JPEG Adobe RGB é revelado com as cores do perfil (≠ do mesmo ficheiro sem perfil) |
+| `privacy_flow` `privacy_and_cleanup_actions` | Limpar cache (regenera miniaturas), apagar pessoas, cópia virtual no Lixo, restauro de catálogo com cache limpa, eliminar projeto (recusado aberto; Lixo; originais intactos; recusado com originais dentro) |
+| `cache` `clear_all_only_touches_the_cache` | Só `cache/` é apagada (catálogo, máscaras intactos) |
+| `gallery_flow` (alargado) | Regenerar mantém id e tokens (favoritas do cliente) e não deixa pastas temporárias |
+| `album` `preflight_finds_the_problems` (alargado) | Rosto cortado pelo enquadramento gera aviso; rosto inteiro não |
+| `database` `history…virtual_copies` (alargado) | Nomes de cópias virtuais nunca se repetem |
+| `desktop` `log_lines_never_carry_paths_or_emails`, `reports_are_written…` | Registos anonimizados; relatório de falha com o registo diário mais recente |
+| Vitest "auditoria final" | "Protegida" em vez de "Rejeitar?"; papéis ambíguos; ErrorBoundary |
+
 ## Fase 16 — versão instalável
 
 | Teste | O que verifica |

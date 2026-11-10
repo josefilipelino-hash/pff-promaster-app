@@ -4,7 +4,7 @@
 
 | Ameaça | Mitigação |
 |---|---|
-| Ficheiro de imagem malicioso/corrompido explora um descodificador | Descodificadores em Rust sempre que possível; código C/C++ (LibRaw) em processo auxiliar para leituras em massa (Fase 2); limites de dimensões e memória antes de descodificar |
+| Ficheiro de imagem malicioso/corrompido explora um descodificador | Descodificadores em Rust sempre que possível; código C/C++ (LibRaw, LittleCMS) corre **no mesmo processo** (o processo auxiliar previsto não foi implementado — ver `KNOWN_LIMITATIONS.md`); pânicos em Rust são apanhados por ficheiro (`catch_unwind`), mas uma falha nativa grave num ficheiro RAW malformado pode fechar a aplicação (o catálogo fica íntegro e a sessão é recuperada ao reabrir); limites de dimensões e memória antes de descodificar |
 | Conteúdo web (galerias, SVG) executa código na aplicação | CSP restritiva; SVG renderizado pelo `resvg` no núcleo (sem scripts), nunca injetado como HTML |
 | Frontend comprometido acede ao sistema | Tauri capabilities mínimas (`core:default`); sem plugin genérico de sistema de ficheiros; caminhos resolvidos e validados no núcleo; comandos com argumentos tipados |
 | Escrita acidental sobre originais | Módulos de escrita só escrevem dentro das pastas do projeto/exportação; teste automático de integridade (Fase 1) |

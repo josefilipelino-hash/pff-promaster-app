@@ -304,7 +304,7 @@ pub fn builtin_profile(space: ColorSpace, linear: bool) -> CoreResult<lcms2::Pro
     prof.write_tag(lcms2::TagSignature::ProfileDescriptionTag, lcms2::Tag::MLU(&mlu(&desc)));
     prof.write_tag(
         lcms2::TagSignature::CopyrightTag,
-        lcms2::Tag::MLU(&mlu("No copyright, use freely (Momento Studio)")),
+        lcms2::Tag::MLU(&mlu("No copyright, use freely (PFF ProMaster)")),
     );
     // v2: compatível com todos os programas e laboratórios (os v4 ainda falham nalguns).
     prof.set_version(2.1);
@@ -330,6 +330,59 @@ pub fn inspect_icc(icc: &[u8]) -> CoreResult<String> {
         ));
     }
     Ok(p.info(lcms2::InfoType::Description, lcms2::Locale::none()).unwrap_or_default())
+}
+
+/// Perfil ICC embutido num ficheiro de entrada (JPEG/TIFF/PNG/WebP… em Adobe RGB, Display P3,
+/// ProPhoto, perfis de câmara/scanner): converte os valores codificados [0, 1] para Rec. 2020
+/// linear, o espaço de trabalho da revelação. `None` quando o perfil é sRGB (o caminho
+/// rápido sem LittleCMS dá o mesmo resultado) ou não é RGB (o descodificador já entregou RGB
+/// e o perfil não se aplica).
+pub struct InputColor {
+    pub description: String,
+    t: lcms2::Transform<[f32; 3], [f32; 3], lcms2::GlobalContext, lcms2::DisallowCache>,
+}
+
+impl InputColor {
+    pub fn new(icc: &[u8]) -> CoreResult<Option<Self>> {
+        let src = lcms2::Profile::new_icc(icc)
+            .map_err(|_| CoreError::Corrupt("perfil ICC embutido inválido".into()))?;
+        if src.color_space() != lcms2::ColorSpaceSignature::RgbData {
+            return Ok(None);
+        }
+        let description =
+            src.info(lcms2::InfoType::Description, lcms2::Locale::none()).unwrap_or_default();
+        if is_srgb_description(&description) {
+            return Ok(None);
+        }
+        let dst = builtin_profile(ColorSpace::Rec2020, true)?;
+        let t = lcms2::Transform::new_flags_context(
+            lcms2::GlobalContext::new(),
+            &src,
+            lcms2::PixelFormat::RGB_FLT,
+            &dst,
+            lcms2::PixelFormat::RGB_FLT,
+            lcms2::Intent::RelativeColorimetric,
+            lcms2::Flags::NO_CACHE,
+        )
+        .map_err(lcms_err)?;
+        Ok(Some(InputColor { description, t }))
+    }
+
+    /// Converte em paralelo, no lugar, valores codificados do perfil para Rec. 2020 linear.
+    pub fn to_linear_rec2020(&self, px: &mut [[f32; 3]]) {
+        px.par_chunks_mut(4096).for_each(|chunk| {
+            let src = chunk.to_vec();
+            self.t.transform_pixels(&src, chunk);
+            for q in chunk.iter_mut() {
+                *q = q.map(|c| if c.is_finite() { c.max(0.0) } else { 0.0 });
+            }
+        });
+    }
+}
+
+fn is_srgb_description(d: &str) -> bool {
+    let d = d.to_ascii_lowercase();
+    d.starts_with("srgb") || d.contains("iec61966-2.1") || d.contains("iec 61966-2-1")
 }
 
 enum Kind {
@@ -442,6 +495,34 @@ impl OutputColor {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Um ficheiro em Adobe RGB / ProPhoto / P3 é lido com as cores certas: exportar em
+    /// cada espaço e voltar a ler pelo perfil embutido devolve o Rec. 2020 linear original.
+    #[test]
+    fn embedded_input_profiles_round_trip() {
+        let orig: Vec<[f32; 3]> = vec![
+            [0.15, 0.35, 0.15],
+            [0.5, 0.2, 0.15],
+            [0.2, 0.22, 0.5],
+            [0.18, 0.18, 0.18],
+            [0.9, 0.85, 0.7],
+        ];
+        for space in [ColorSpace::AdobeRgb, ColorSpace::DisplayP3, ColorSpace::ProPhoto] {
+            let out = OutputColor::builtin(space, false).unwrap();
+            let mut px = orig.clone();
+            out.convert(&mut px);
+            let input = InputColor::new(out.icc()).unwrap().expect("perfil não sRGB");
+            input.to_linear_rec2020(&mut px);
+            for (a, b) in orig.iter().zip(&px) {
+                for c in 0..3 {
+                    assert!((a[c] - b[c]).abs() < 0.01, "{space:?}: {a:?} → {b:?}");
+                }
+            }
+        }
+        let srgb = OutputColor::builtin(ColorSpace::Srgb, false).unwrap();
+        assert!(InputColor::new(srgb.icc()).unwrap().is_none(), "sRGB usa o caminho rápido");
+        assert!(InputColor::new(b"lixo").is_err());
+    }
 
     /// A conversão por matriz coincide com a LittleCMS a usar o perfil que embutimos —
     /// ou seja, o ficheiro é lido com as cores certas por qualquer programa.

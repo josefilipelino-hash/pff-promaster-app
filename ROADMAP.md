@@ -39,8 +39,9 @@ visualização individual com zoom · estrelas, escolhida/rejeitada, etiquetas d
 ## Fase 2 — Formatos e RAW ✅ *(concluída 2026-11-08, ver PROJECT_STATUS.md)*
 
 LibRaw (DNG, CR2, CR3, NEF, ARW, RAF, ORF, RW2 e restantes), previews embutidas, HEIC/HEIF
-(ImageIO), WebP, AVIF, JPEG XL, PSD composto, metadados EXIF/IPTC/XMP, perfis ICC
-embutidos, processo auxiliar de descodificação, registo de erros por ficheiro,
+(ImageIO), WebP, AVIF, JPEG XL, PSD composto, metadados EXIF (IPTC/XMP de entrada **não** são lidos — ver `KNOWN_LIMITATIONS.md`), perfis ICC
+embutidos (aplicados na revelação desde a auditoria final), registo de erros por ficheiro
+(o processo auxiliar de descodificação previsto não foi implementado),
 sincronização de hora entre câmaras. **Critério-chave:** cada formato marcado como
 “testado” em `SUPPORTED_FORMATS.md` tem um ficheiro real verificado.
 
@@ -110,7 +111,7 @@ Galeria HTML estática por projeto (nomes, data, local, capa, hero, logótipo, t
 capítulos automáticos pelos momentos, temas Light/Dark/Minimal/Editorial, mosaico, grelha,
 visualizador, apresentação e ecrã inteiro em telemóvel, tablet e desktop; favoritas,
 downloads (individual e ZIP), marca de água, PIN/palavra-passe, ocultar fotografias.
-**Por fazer:** publicação direta (S3, R2, B2, SFTP — arquitetura pronta), expiração da
+**Por fazer:** publicação direta (S3, R2, B2, SFTP — não implementada; a galeria é uma pasta para copiar para qualquer alojamento), expiração da
 galeria, estatísticas de visitas (exigem servidor).
 
 ## Fase 11 — Álbuns ✅ *(concluída 2026-11-10, ver PROJECT_STATUS.md)*

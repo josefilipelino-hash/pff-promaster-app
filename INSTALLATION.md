@@ -67,7 +67,7 @@ pnpm dev
 A primeira execução compila todas as dependências Rust e a LibRaw em C++ (alguns minutos;
 o compilador C++ vem com as Xcode Command Line Tools no macOS e com as Build Tools no
 Windows). Abre a janela
-“Momento Studio” no ecrã inicial.
+“PFF ProMaster” no ecrã inicial.
 
 ## Versão 1.0.0-personal no Mac (uso pessoal)
 
@@ -92,8 +92,8 @@ Com a preparação do macOS acima feita e os modelos de IA em `models/` (ver
 O script verifica as ferramentas, instala as dependências exatamente como nos locks,
 confirma os 9 modelos de IA pelo SHA-256 e gera:
 
-- `target/release/bundle/macos/Momento Studio.app`
-- `target/release/bundle/dmg/Momento Studio_1.0.0_aarch64.dmg` (ou `_x64` num Mac Intel)
+- `target/release/bundle/macos/PFF ProMaster.app`
+- `target/release/bundle/dmg/PFF ProMaster_1.0.0_aarch64.dmg` (ou `_x64` num Mac Intel)
 - `target/release/bundle/BUILD_INFO.txt` (commit, ferramentas) e `SHA256SUMS.txt`
 
 Para um único `.dmg` que funcione em Apple Silicon e Intel: `./scripts/build-release.sh --universal`
@@ -101,11 +101,11 @@ Para um único `.dmg` que funcione em Apple Silicon e Intel: `./scripts/build-re
 
 ### 2. Instalar
 
-1. Abrir o `.dmg` e arrastar **Momento Studio** para **Aplicações**.
+1. Abrir o `.dmg` e arrastar **PFF ProMaster** para **Aplicações**.
 2. **Primeira abertura** (aplicação não assinada): clique direito na aplicação → **Abrir** →
    **Abrir**. Em macOS 15+, se não aparecer a opção: **Definições do Sistema → Privacidade e
    segurança → Abrir mesmo assim**. Só é preciso uma vez.
-   Alternativa no Terminal: `xattr -dr com.apple.quarantine "/Applications/Momento Studio.app"`
+   Alternativa no Terminal: `xattr -dr com.apple.quarantine "/Applications/PFF ProMaster.app"`
    (só necessário se o `.dmg` tiver sido descarregado da internet).
 
 ### 3. Permissões de acesso
@@ -121,7 +121,7 @@ autorização uma vez, com uma explicação, quando se acede pela primeira vez a
 | `~/Imagens` (Pictures) e outras pastas escolhidas no diálogo | Sem pedido (não são pastas protegidas) |
 
 Se uma autorização for recusada por engano: **Definições do Sistema → Privacidade e
-segurança → Ficheiros e pastas → Momento Studio**. A aplicação não acede à fototeca do
+segurança → Ficheiros e pastas → PFF ProMaster**. A aplicação não acede à fototeca do
 Fotos.
 
 ### 4. Atualizar para uma versão nova
@@ -138,24 +138,24 @@ Fotos.
    catálogo de uma versão mais recente (nunca o estraga).
 
 As preferências e a lista de projetos recentes (`~/Library/Application Support/
-pt.momentostudio.desktop/`) passam de versão para versão; o identificador
-`pt.momentostudio.desktop` não muda.
+pt.pffpromaster.desktop/`) passam de versão para versão; o identificador
+`pt.pffpromaster.desktop` não muda.
 
 ### 5. Backup
 
 | O quê | Como |
 |---|---|
 | **Originais** | Na importação: **Copiar também para um disco de segurança** + **Verificar cada cópia**. Nunca formatar o cartão antes de a importação acabar sem erros |
-| **Catálogo** (classificações, edições, momentos, álbuns) | Automático: versões a cada 15/30/60/240 min (60 por omissão), ao abrir e ao fechar, em `<projeto>.momento/backups/`. Manual: **Segurança e cópias → Criar versão** ou **Exportar catálogo** (ficheiro único para outro disco) |
+| **Catálogo** (classificações, edições, momentos, álbuns) | Automático: versões a cada 15/30/60/240 min (60 por omissão), ao abrir (se a última versão tiver mais de 60 min) e ao fechar, em `<projeto>.momento/backups/`. Manual: **Segurança e cópias → Criar versão** ou **Exportar catálogo** (ficheiro único para outro disco) |
 | **Projeto completo** | Copiar a pasta `<AAAA-MM-DD_Cliente>.momento` (com a aplicação fechada) para outro disco; a pasta `cache/` pode ser omitida (é regenerada) |
 | Time Machine | Complemento útil (não testado pela aplicação): uma cópia feita com o projeto aberto pode apanhar o catálogo a meio de uma escrita — as versões em `backups/` são sempre consistentes e são as que se restauram |
 
 ### 6. Desinstalar
 
-Arrastar **Momento Studio** de Aplicações para o Lixo. Os projetos e originais **não** são
+Arrastar **PFF ProMaster** de Aplicações para o Lixo. Os projetos e originais **não** são
 tocados. Para apagar também as preferências e os registos:
-`~/Library/Application Support/pt.momentostudio.desktop/` e
-`~/Library/Logs/pt.momentostudio.desktop/`.
+`~/Library/Application Support/pt.pffpromaster.desktop/` e
+`~/Library/Logs/pt.pffpromaster.desktop/`.
 
 ### Assinatura e notarização
 
@@ -180,8 +180,8 @@ sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayata
 |---|---|
 | Projeto (catálogo, cache, cópias de segurança) | `<pasta de trabalho>/<AAAA-MM-DD_Cliente>.momento/` — **disco local**, interno ou externo, nunca numa partilha de rede |
 | Originais | Onde já estavam (modo “manter”) ou na pasta dos originais do projeto (modo “copiar”) |
-| Lista de projetos recentes | macOS: `~/Library/Application Support/pt.momentostudio.desktop/library.db` · Windows: `%APPDATA%\pt.momentostudio.desktop\library.db` |
-| Registos (logs, 14 dias) e relatórios de falhas | macOS: `~/Library/Logs/pt.momentostudio.desktop/` · Windows: `%LOCALAPPDATA%\pt.momentostudio.desktop\logs\` |
+| Lista de projetos recentes | macOS: `~/Library/Application Support/pt.pffpromaster.desktop/library.db` · Windows: `%APPDATA%\pt.pffpromaster.desktop\library.db` |
+| Registos (logs, 14 dias) e relatórios de falhas | macOS: `~/Library/Logs/pt.pffpromaster.desktop/` · Windows: `%LOCALAPPDATA%\pt.pffpromaster.desktop\logs\` |
 
 Apagar a pasta `cache/` de um projeto é seguro: as miniaturas são regeneradas.
 

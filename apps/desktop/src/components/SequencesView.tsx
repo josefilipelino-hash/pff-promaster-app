@@ -108,7 +108,7 @@ export function SequencesView({
                           {p.thumb === "ready" ? <img src={`${imageUrl(token, "thumb", id)}?v=${versions.get(id) ?? 0}`} alt={p.fileName} draggable={false} decoding="async" /> : <span className="thumb-pending" />}
                           {p.flag !== 0 && <span className={`strip-flag${p.flag === 1 ? " pick" : " reject"}`}>{p.flag === 1 ? "♥" : "✕"}</span>}
                         </div>
-                        {r && <LabelChip label={r.label} compact />}
+                        {r && <LabelChip label={r.label} compact protectedByUser={p.flag === 1 || p.stars > 0} />}
                       </div>
                     );
                   })}

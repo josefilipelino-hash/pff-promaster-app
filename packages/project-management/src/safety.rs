@@ -246,6 +246,12 @@ pub fn replace_catalog(paths: &ProjectPaths, file: &Path) -> CoreResult<Option<P
     copy_synced(file, &tmp)?;
     let aside = set_aside(paths, "antes-do-restauro")?;
     std::fs::rename(&tmp, paths.catalog())?;
+    // A cache é indexada pelo id interno das fotografias: com outro catálogo, os mesmos ids
+    // podem ser outras fotografias. É regenerável — apaga-se (ao abrir, as miniaturas em
+    // falta voltam a ser geradas).
+    if let Err(e) = crate::cache::clear_all(paths) {
+        tracing::warn!(erro = %e, "não foi possível limpar a cache depois do restauro");
+    }
     Ok(aside)
 }
 
@@ -329,6 +335,9 @@ pub fn validate_or_recover(
             copy_synced(Path::new(&b.file), &tmp)?;
             let damaged = set_aside(paths, "danificado")?;
             std::fs::rename(&tmp, paths.catalog())?;
+            if let Err(e) = crate::cache::clear_all(paths) {
+                tracing::warn!(erro = %e, "não foi possível limpar a cache depois do restauro");
+            }
             report.restored_from = Some(b.created);
             report.damaged_kept = damaged.map(|p| p.to_string_lossy().into_owned());
             tracing::warn!(versao = b.created, "catálogo restaurado de uma cópia de segurança");
@@ -366,6 +375,50 @@ pub fn remove_temp_files(dir: &Path, max_depth: usize) -> u64 {
         }
     }
     removed
+}
+
+/// "Eliminar projeto" (privacidade): move a pasta `.momento` inteira (catálogo, cache,
+/// rostos, edições, versões) para o Lixo do sistema — recuperável até o Lixo ser esvaziado.
+/// O projeto tem de estar fechado. **Nunca toca nos originais**: recusa se a pasta dos
+/// originais, algum original ou alguma cópia de segurança da importação estiver dentro da
+/// pasta do projeto.
+pub fn delete_project(root: &Path) -> CoreResult<()> {
+    let paths = ProjectPaths::new(root);
+    if !paths.catalog().is_file() {
+        return Err(CoreError::Other("a pasta escolhida não é um projeto".into()));
+    }
+    let (lock, _) = SessionLock::acquire(&paths)?;
+    let root_c = root.canonicalize()?;
+    let inside = |p: &str| {
+        Path::new(p).canonicalize().map(|c| c.starts_with(&root_c)).unwrap_or(false)
+            || Path::new(p).starts_with(root)
+    };
+    {
+        let cat = Catalog::open_existing(&paths.catalog())?;
+        if let Some(dir) = cat.project()?.and_then(|p| p.originals_dir) {
+            if inside(&dir) {
+                return Err(CoreError::Other(
+                    "a pasta dos originais está dentro do projeto: elimine-o manualmente depois de mover os originais".into(),
+                ));
+            }
+        }
+        let originals = cat.originals()?;
+        if let Some(o) = originals
+            .iter()
+            .find(|o| inside(&o.path) || o.backup_path.as_deref().is_some_and(inside))
+        {
+            return Err(CoreError::Other(format!(
+                "há originais dentro da pasta do projeto ({}): nada foi eliminado",
+                o.file_name
+            )));
+        }
+    }
+    lock.release();
+    trash::delete(root).map_err(|e| {
+        CoreError::Other(format!("não foi possível mover o projeto para o Lixo: {e}"))
+    })?;
+    tracing::info!("projeto movido para o Lixo");
+    Ok(())
 }
 
 #[cfg(test)]

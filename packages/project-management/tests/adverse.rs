@@ -629,8 +629,13 @@ fn no_leaks_across_open_close_cycles() {
         samples.push((threads(), fds(), rss_mb()));
     }
     eprintln!("(threads, fds, RSS MB) por ciclo: {samples:?}");
-    let (t5, f5, m5) = samples[4];
-    let (t, f, m) = *samples.last().unwrap();
+    let (t5, f5, _) = samples[4];
+    let (t, f, _) = *samples.last().unwrap();
+    // RSS oscila ~50 MB entre ciclos (o alocador devolve memória a ritmos diferentes e os
+    // outros testes deste ficheiro correm em paralelo no mesmo processo): compara-se o
+    // patamar (máximo de 5 ciclos) do início com o do fim, não amostras isoladas.
+    let plateau = |w: &[(usize, usize, u64)]| w.iter().map(|x| x.2).max().unwrap_or(0);
+    let (m5, m) = (plateau(&samples[4..9]), plateau(&samples[samples.len() - 5..]));
     assert!(t <= t5 + 2, "threads a acumular: {t5} → {t}");
     assert!(f <= f5 + 2, "descritores a acumular: {f5} → {f}");
     assert!(m <= m5 + 60, "memória a crescer: {m5} MB → {m} MB");

@@ -1,4 +1,4 @@
-# Design e UX — Momento Studio
+# Design e UX — PFF ProMaster
 
 Referência do sistema de design (Fase 14). Objetivo: interface comparável ao software
 profissional atual de fotografia — **premium, minimalista, rápida, elegante, sem poluição

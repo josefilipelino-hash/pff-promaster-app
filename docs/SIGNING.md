@@ -75,15 +75,15 @@ a aplicação para notarização e agrafa o resultado (*staple*) automaticamente
 ## 3. Verificar
 
 ```bash
-codesign --verify --deep --strict --verbose=2 "target/release/bundle/macos/Momento Studio.app"
+codesign --verify --deep --strict --verbose=2 "target/release/bundle/macos/PFF ProMaster.app"
 ```
 
 ```bash
-spctl --assess --type execute --verbose "target/release/bundle/macos/Momento Studio.app"
+spctl --assess --type execute --verbose "target/release/bundle/macos/PFF ProMaster.app"
 ```
 
 ```bash
-xcrun stapler validate "target/release/bundle/dmg/Momento Studio_1.0.0_aarch64.dmg"
+xcrun stapler validate "target/release/bundle/dmg/PFF ProMaster_1.0.0_aarch64.dmg"
 ```
 
 Resultado esperado de `spctl`: `accepted` e `source=Notarized Developer ID`.

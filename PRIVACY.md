@@ -1,29 +1,31 @@
 # Privacidade
 
-O Momento Studio processa fotografias privadas de clientes, incluindo rostos. As regras
+O PFF ProMaster processa fotografias privadas de clientes, incluindo rostos. As regras
 abaixo são requisitos de arquitetura, não opções.
 
 ## Regras
 
 1. **Processamento local por omissão.** Importação, análise, IA, edição e exportação
    correm no computador. A aplicação funciona sem Internet.
-2. **Nada é enviado para fora sem autorização explícita.** As únicas ligações de rede
-   previstas são:
-   - download de modelos de IA, iniciado pelo utilizador, a partir das URLs do
-     `models/manifest.json`, com verificação SHA-256 (sem envio de dados);
-   - publicação de galerias (Fase 7), iniciada pelo utilizador, para o destino que ele
-     configurar.
-   Não existe telemetria, análise de utilização nem relatórios de falhas automáticos.
-3. **Dados faciais** (caixas, landmarks, embeddings) ficam apenas no catálogo do projeto,
-   no disco local, e são eliminados quando o projeto é eliminado. Existe opção para
-   apagar só os dados faciais de um projeto.
+2. **Nada é enviado para fora.** A aplicação 1.0.0-personal **não faz nenhuma ligação de
+   rede**: os modelos de IA vêm incluídos na aplicação (preparados antes da compilação por
+   `scripts/prepare-models.py`, com verificação SHA-256) e a publicação direta de galerias
+   não está implementada (a galeria é uma pasta local). Não existe telemetria, análise de
+   utilização nem relatórios de falhas automáticos.
+3. **Dados faciais** (caixas, coeficientes de expressão, assinaturas faciais) ficam apenas
+   no catálogo do projeto, no disco local, e vão com ele quando o projeto é eliminado
+   (**Segurança e cópias → Privacidade → Eliminar projeto**). **Apagar dados de pessoas**
+   apaga as assinaturas faciais (dados biométricos), as pessoas e os nomes; as caixas dos
+   rostos ficam porque a seleção as usa (olhos fechados, expressões).
 4. **Sem treino externo.** As fotografias nunca são usadas para treinar serviços ou
    modelos externos. A aprendizagem de preferências (fase futura) é local, opcional,
    exportável e eliminável.
 5. **Registos (logs)** nunca contêm píxeis, thumbnails, dados faciais nem metadados GPS.
-   Caminhos de ficheiros podem aparecer em registos de erro locais. Ficam apenas no
-   computador (macOS: `~/Library/Logs/pt.momentostudio.desktop/`; Windows:
-   `%LOCALAPPDATA%\pt.momentostudio.desktop\logs\`).
+   Desde a auditoria final, **cada linha** passa por um filtro antes de chegar ao disco que
+   substitui caminhos (que têm nomes de clientes) por `<caminho>` e emails por `<email>`;
+   os erros da interface também ficam registados assim. Ficam 14 dias, apenas no
+   computador (macOS: `~/Library/Logs/pt.pffpromaster.desktop/`; Windows:
+   `%LOCALAPPDATA%\pt.pffpromaster.desktop\logs\`).
 5f. **Fase 8 — máscaras de IA e retrato:** a segmentação (pessoa, cabelo, pele, rosto,
    roupa, objeto) e a deteção dos pontos faciais correm neste computador. As máscaras ficam
    como imagens em `<projeto>/masks/` e os contornos faciais do retrato na receita da
@@ -43,8 +45,8 @@ abaixo são requisitos de arquitetura, não opções.
 5c. **Fase 4 — pessoas (dados biométricos):** a identidade facial (vetor de 128 valores
    por rosto, SFace) é calculada e guardada **só** no `catalog.db` do projeto; nunca é
    enviada para fora, nem usada entre projetos. Nomes e papéis são escritos pelo
-   utilizador. “Gerir pessoas” permite apagar todos os dados de pessoas do projeto
-   (`clear_people`: identidades, grupos e nomes). Os registos nunca contêm vetores faciais.
+   utilizador. **Segurança e cópias → Privacidade → Apagar dados de pessoas** apaga todos os dados de
+   pessoas do projeto (`clear_people`: assinaturas faciais, grupos e nomes). Os registos nunca contêm vetores faciais.
 5b. **Fase 3 — análise e IA:** toda a análise (métricas, rostos, olhos, expressões,
    embeddings) corre neste computador com modelos incluídos na aplicação (`tract-onnx`,
    sem serviços externos). Os modelos são preparados **antes** da compilação; a aplicação
@@ -70,7 +72,8 @@ abaixo são requisitos de arquitetura, não opções.
    pesquisa para não indexar; as imagens têm nomes aleatórios mas **não** estão cifradas —
    quem tiver o endereço direto de uma imagem consegue abri-la. As favoritas do cliente
    ficam só no navegador dele até as enviar. O PIN fica no catálogo local do projeto.
-7. **Credenciais** de publicação ficam no porta-chaves do sistema (Keychain no macOS),
+7. **Credenciais:** a versão 1.0.0-personal não usa credenciais (sem publicação direta).
+   Se a publicação vier a existir, as credenciais ficam no porta-chaves do sistema,
    nunca no catálogo, em ficheiros de texto ou no código.
 8. **Repositório:** fotografias, modelos e credenciais nunca são versionados (garantido
    pelo `.gitignore`).
@@ -87,12 +90,20 @@ abaixo são requisitos de arquitetura, não opções.
    logs (`logs/crash-*.txt`) ficam só no computador e **não** contêm fotografias, metadados,
    caminhos (substituídos por `<caminho>`) nem emails; nada é enviado.
 
-## Eliminação
+## Eliminação (Segurança e cópias → Privacidade)
 
-- **Eliminar projeto:** apaga catálogo, cache e dados faciais. Os originais **só** são
-  apagados se o utilizador o pedir explicitamente, com confirmação separada.
-- **Limpar cache:** apaga previews (regeneráveis).
-- **Limpar dados faciais:** apaga rostos, embeddings e pessoas do projeto.
+- **Eliminar projeto…:** com confirmação, fecha o projeto e move a pasta `.momento`
+  inteira (catálogo, versões, cache, máscaras, dados faciais) para o **Lixo** do sistema,
+  de onde pode ser recuperada até o Lixo ser esvaziado. Os originais e as exportações
+  **nunca** são tocados; se algum original estiver dentro da pasta do projeto, a
+  eliminação é recusada.
+- **Limpar cache:** apaga miniaturas, previews e edições renderizadas (regeneráveis; as
+  miniaturas voltam a ser geradas logo).
+- **Apagar dados de pessoas:** apaga assinaturas faciais, pessoas e nomes. As versões
+  antigas do catálogo em `backups/` mantêm-nos até serem substituídas pela rotação; para
+  apagar tudo, eliminar o projeto.
+- Remover fotografias: **Remover do catálogo** (ficheiros intactos) ou **Mover para o
+  Lixo** (o original vai para o Lixo do sistema, com confirmação).
 
 ## Encriptação
 

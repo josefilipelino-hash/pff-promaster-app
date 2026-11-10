@@ -347,6 +347,11 @@ impl ProjectSession {
             threads().saturating_sub(1).max(2),
             Arc::new(move |b| ev.thumbnails(&b)),
         )?;
+        // Cache apagada (restauro de catálogo, "Limpar cache" ou à mão): as miniaturas
+        // marcadas como feitas voltam a pendentes.
+        if crate::cache::stats(&paths).thumbs.files == 0 {
+            catalog.reset_thumbnails()?;
+        }
         thumbs.enqueue(catalog.pending_thumbnail_ids()?);
         let unfinished = catalog.unfinished_import_session()?;
 
@@ -687,6 +692,38 @@ impl ProjectSession {
 
     pub fn enqueue_thumbnails(&self, ids: Vec<AssetId>) {
         self.with_thumbs(|t| t.enqueue(ids));
+    }
+
+    /// "Limpar cache" (privacidade/espaço): apaga miniaturas, previews e edições renderizadas
+    /// deste projeto e volta a gerar as miniaturas. Recusa durante importação, análise ou
+    /// exportação (que leem a cache).
+    pub fn clear_cache(&self) -> CoreResult<crate::cache::Cleared> {
+        if self.import_running() || self.analysis_running() || self.exports.running() {
+            return Err(CoreError::Other(
+                "espere pelo fim da importação, análise ou exportação antes de limpar a cache"
+                    .into(),
+            ));
+        }
+        let mut guard = self.thumbs.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some(t) = guard.take() {
+            t.shutdown();
+        }
+        let cleared = crate::cache::clear_all(&self.paths);
+        let reset = self.catalog().reset_thumbnails();
+        let ev = self.events.clone();
+        let thumbs = ThumbnailService::start(
+            self.paths.clone(),
+            self.registry.clone(),
+            threads().saturating_sub(1).max(2),
+            Arc::new(move |b| ev.thumbnails(&b)),
+        )?;
+        thumbs.enqueue(self.catalog().pending_thumbnail_ids()?);
+        *guard = Some(thumbs);
+        drop(guard);
+        reset?;
+        let c = cleared?;
+        tracing::info!(ficheiros = c.files, bytes = c.bytes, "cache do projeto limpa");
+        Ok(c)
     }
 
     pub fn thumbnails_remaining(&self) -> usize {

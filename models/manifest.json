@@ -53,6 +53,20 @@
       "source": "https://storage.googleapis.com/mediapipe-models/interactive_segmenter/magic_touch/float32/latest/magic_touch.tflite",
       "license": "Apache-2.0",
       "task": "objeto sob um ponto clicado (máscara Objeto); opcional"
+    },
+    {
+      "id": "scene_classifier",
+      "file": "scene_classifier.onnx",
+      "source": "https://storage.googleapis.com/mediapipe-models/image_classifier/efficientnet_lite2/float32/latest/efficientnet_lite2.tflite",
+      "license": "Apache-2.0",
+      "task": "classificação de cena/objetos (EfficientNet-Lite2) — momentos do casamento"
+    },
+    {
+      "id": "face_identity",
+      "file": "face_identity.onnx",
+      "source": "https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx",
+      "license": "Apache-2.0",
+      "task": "identidade facial SFace (vetor de 128 valores) — agrupamento de pessoas, só no catálogo local"
     }
   ]
 }

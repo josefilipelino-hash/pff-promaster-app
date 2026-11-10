@@ -215,6 +215,7 @@ progress::-moz-progress-bar { background: var(--accent); }
 .l-review { background: var(--l-review); }
 .l-reject { background: var(--l-reject); color: #fff; }
 .l-duplicate { background: var(--l-dup); }
+.l-protected { background: var(--surface-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--l-best); }
 .label-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle; }
 .cell-rec { position: absolute; left: 6px; top: 6px; display: flex; gap: 4px; align-items: center; pointer-events: none; }
 .cell-group { font-size: var(--fs-xs); background: rgba(0, 0, 0, 0.65); color: #ddd; border-radius: var(--r-sm); padding: 1px 5px; font-variant-numeric: tabular-nums; }
@@ -523,10 +524,8 @@ progress::-moz-progress-bar { background: var(--accent); }
 .ts-line { width: 24px; height: 1px; }
 .gallery-pick { width: 48px; height: 48px; object-fit: cover; border-radius: var(--r-sm); border: 1px solid var(--border); flex: none; }
 .gallery-pick.empty { display: inline-block; background: var(--surface-2); }
-.gallery-providers { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.gallery-providers li { display: flex; flex-direction: column; gap: 4px; border: 1px dashed var(--border); border-radius: var(--r-lg); padding: 8px 10px; opacity: 0.75; }
 .gallery-fav { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--fs-sm); }
-@media (max-width: 760px) { .theme-cards, .gallery-providers { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 760px) { .theme-cards { grid-template-columns: repeat(2, 1fr); } }
 
 /* ---------- Fase 11: álbuns ---------- */
 .album-empty { margin: auto; text-align: center; display: flex; flex-direction: column; gap: 10px; align-items: center; padding: 40px; }
@@ -764,3 +763,7 @@ progress { accent-color: var(--accent); height: 4px; border-radius: var(--r-full
 .viewer-loading.state::before { background: #5aa2e0; }
 .viewer-error.state { color: #f0f0f0; background: rgba(0, 0, 0, 0.6); padding: 6px 12px; border-radius: var(--r-full); }
 .viewer-error.state::before { background: #ef5a5f; }
+
+/* Falha num componente (auditoria final): mensagem em vez de janela em branco. */
+.app-error { max-width: 560px; margin: 15vh auto; padding: 0 16px; color: var(--text); }
+.app-error pre { white-space: pre-wrap; word-break: break-word; }

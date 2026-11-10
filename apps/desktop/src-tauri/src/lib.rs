@@ -29,7 +29,8 @@ fn init_logging(app: &tauri::App) {
             .ok()?;
         let (writer, guard) = tracing_appender::non_blocking(appender);
         state::LOG_GUARD.set(guard).ok();
-        Some(fmt::layer().with_ansi(false).with_writer(writer))
+        // Caminhos e emails retirados de cada linha antes de chegar ao disco.
+        Some(fmt::layer().with_ansi(false).with_writer(move || crash::Redacting(writer.clone())))
     });
     let _ = tracing_subscriber::registry()
         .with(filter)
@@ -154,6 +155,9 @@ pub fn run() {
             commands::exclude_faces,
             commands::recluster_people,
             commands::clear_people,
+            commands::clear_cache,
+            commands::log_ui_error,
+            commands::delete_project,
             commands::list_moments,
             commands::asset_moments,
             commands::create_moment,

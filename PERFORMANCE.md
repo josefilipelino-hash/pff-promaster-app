@@ -1,4 +1,4 @@
-# Desempenho — Momento Studio
+# Desempenho — PFF ProMaster
 
 **Fase 12 (2026-11-10).** Objetivo: a aplicação continuar fluida com ~15 000 fotografias.
 Todos os números abaixo foram **medidos** (nada estimado), com o método descrito. Onde algo

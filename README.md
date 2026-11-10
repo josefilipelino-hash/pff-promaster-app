@@ -1,4 +1,4 @@
-# Momento Studio *(nome provisório)*
+# PFF ProMaster *(nome provisório)*
 
 Aplicação desktop local para gestão, seleção, edição, exportação e entrega de fotografia
 de casamentos e outros eventos. Pensada para trabalhos de 3 000 a 15 000 fotografias, com
@@ -29,8 +29,8 @@ Plataformas-alvo: **macOS** (Apple Silicon e Intel) e **Windows 10/11**.
 
 ## Stack
 
-Tauri 2 · React 19 · TypeScript · Rust · SQLite · LibRaw · LittleCMS 2 · ONNX Runtime /
-Core ML. Justificação completa em [`ARCHITECTURE.md`](ARCHITECTURE.md).
+Tauri 2 · React 19 · TypeScript · Rust · SQLite · LibRaw · LittleCMS 2 · tract-onnx (inferência
+ONNX em CPU, Rust puro; sem ONNX Runtime/Core ML nem GPU nesta versão). Justificação completa em [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
 ## Início rápido
 

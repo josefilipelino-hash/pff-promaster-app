@@ -216,3 +216,77 @@ fn non_destructive_editing_end_to_end() {
     let _: AssetId = AssetId(jpg);
     s2.close();
 }
+
+/// Média RGB de um frame.
+fn frame_rgb(f: &[u8]) -> [f32; 3] {
+    let rgba = &f[8 + 3 * 256 * 4..];
+    let n = (rgba.len() / 4) as f32;
+    let mut s = [0f32; 3];
+    for p in rgba.chunks_exact(4) {
+        for c in 0..3 {
+            s[c] += p[c] as f32;
+        }
+    }
+    s.map(|v| v / n)
+}
+
+/// Auditoria final: um JPEG com perfil Adobe RGB embutido é revelado com as cores do perfil
+/// (antes era tratado como sRGB e ficava dessaturado na edição e na exportação).
+#[test]
+fn embedded_icc_profile_is_honoured() {
+    use momento_color_management::{ColorSpace, InputColor, OutputColor};
+    let tmp = tempfile::tempdir().unwrap();
+    let src = tmp.path().join("fonte");
+    let work = tmp.path().join("trabalho");
+    std::fs::create_dir_all(&src).unwrap();
+    std::fs::create_dir_all(&work).unwrap();
+    let px = [120u8, 160, 80];
+    let img = image::RgbImage::from_pixel(600, 400, image::Rgb(px));
+    let adobe = OutputColor::builtin(ColorSpace::AdobeRgb, false).unwrap();
+    std::fs::write(
+        src.join("adobe.jpg"),
+        momento_image_processing::encode_jpeg(&img, 95, Some(adobe.icc())).unwrap(),
+    )
+    .unwrap();
+    std::fs::write(
+        src.join("srgb.jpg"),
+        momento_image_processing::encode_jpeg(&img, 95, None).unwrap(),
+    )
+    .unwrap();
+    let paths = create_project(&NewProject {
+        name: "Perfis".into(),
+        client_name: "Teste".into(),
+        event_type: "wedding".into(),
+        event_date: None,
+        location: String::new(),
+        originals_dir: None,
+        work_dir: work.to_string_lossy().into_owned(),
+    })
+    .unwrap();
+    let s = ProjectSession::open(&paths.root, Arc::new(Rec::default())).unwrap();
+    s.start_import(&ImportRequest {
+        paths: vec![src.to_string_lossy().into_owned()],
+        mode: ImportMode::Reference,
+        recursive: false,
+    })
+    .unwrap();
+    s.wait_import();
+    let photos = s.list_photos().unwrap();
+    let id = |n: &str| photos.iter().find(|p| p.file_name == n).unwrap().id.0;
+    let neutral = s.edit_view(id("srgb.jpg")).unwrap().settings;
+    let render =
+        |k| frame_rgb(&s.render_edit(k, &neutral, 600, 600, RenderQuality::Final, false).unwrap());
+    let plain = render(id("srgb.jpg"));
+    let tagged = render(id("adobe.jpg"));
+    // Esperado: Adobe RGB → Rec. 2020 linear → sRGB.
+    let mut e = vec![px.map(|v| v as f32 / 255.0)];
+    InputColor::new(adobe.icc()).unwrap().unwrap().to_linear_rec2020(&mut e);
+    OutputColor::builtin(ColorSpace::Srgb, false).unwrap().convert(&mut e);
+    let expected = e[0].map(|v| v * 255.0);
+    eprintln!("sem perfil {plain:?} · Adobe RGB {tagged:?} · esperado {expected:?}");
+    for c in 0..3 {
+        assert!((plain[c] - px[c] as f32).abs() < 3.0, "sRGB: {plain:?}");
+        assert!((tagged[c] - expected[c]).abs() < 3.0, "Adobe RGB: {tagged:?} ≠ {expected:?}");
+    }
+    assert!(tagged[1] - tagged[0] > plain[1] - plain[0] + 5.0, "o verde Adobe RGB é mais saturado");
+}

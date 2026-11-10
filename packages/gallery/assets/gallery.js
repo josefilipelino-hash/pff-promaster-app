@@ -1,4 +1,4 @@
-/* Momento Studio — galeria estática.
+/* PFF ProMaster — galeria estática.
  * Sem bibliotecas nem pedidos externos. Funciona aberta do disco (file://) e em qualquer
  * alojamento estático. Dados em data/gallery.js (simples ou cifrados com AES-GCM). */
 (function () {
@@ -16,7 +16,7 @@
       photo: "Fotografia", of: "de", private: "Galeria privada", pinAsk: "Introduza o código que recebeu.",
       pwAsk: "Introduza a palavra-passe que recebeu.", enter: "Entrar", wrong: "Código errado. Tente novamente.",
       noCrypto: "Este navegador não permite abrir galerias protegidas aqui. Abra o endereço https.",
-      made: "Galeria criada com Momento Studio", allPhotos: "Todas",
+      made: "Galeria criada com PFF ProMaster", allPhotos: "Todas",
       favSubject: "Favoritas", favNone: "Sem favoritas"
     },
     en: {
@@ -30,7 +30,7 @@
       photo: "Photo", of: "of", private: "Private gallery", pinAsk: "Enter the code you received.",
       pwAsk: "Enter the password you received.", enter: "Enter", wrong: "Wrong code. Please try again.",
       noCrypto: "This browser cannot open protected galleries here. Use the https address.",
-      made: "Gallery made with Momento Studio", allPhotos: "All",
+      made: "Gallery made with PFF ProMaster", allPhotos: "All",
       favSubject: "Favourites", favNone: "No favourites"
     }
   };

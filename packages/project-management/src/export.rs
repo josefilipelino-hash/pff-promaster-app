@@ -943,8 +943,25 @@ impl ProjectSession {
             p.current = None;
             p.eta_seconds = Some(0.0);
             p.folders = {
-                let mut f: Vec<String> = folders.iter().cloned().collect();
+                // Galeria: as imagens foram escritas na pasta temporária, que já passou a ser
+                // a pasta final.
+                let staged = req.gallery.as_ref().map(|g| {
+                    (
+                        g.folder.to_string_lossy().into_owned(),
+                        g.target.to_string_lossy().into_owned(),
+                    )
+                });
+                let mut f: Vec<String> = folders
+                    .iter()
+                    .map(|d| match &staged {
+                        Some((from, to)) if d.starts_with(from.as_str()) => {
+                            format!("{to}{}", &d[from.len()..])
+                        }
+                        _ => d.clone(),
+                    })
+                    .collect();
                 f.sort();
+                f.dedup();
                 f
             };
             p.state = if job.cancelled.load(Ordering::SeqCst) {

@@ -722,6 +722,11 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
             s.setProject(p);
             void s.reloadPhotos();
           }}
+          onDeleted={() => {
+            s.setSafetyDialog(false);
+            s.setProject(null);
+            onClosed();
+          }}
         />
       )}
       {photoMenu && <Menu x={photoMenu.x} y={photoMenu.y} label={t("menu.photo")} entries={photoMenuEntries()} onClose={() => setPhotoMenu(null)} />}

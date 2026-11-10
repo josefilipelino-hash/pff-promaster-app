@@ -1,4 +1,4 @@
-# Momento Studio 1.0.0-personal
+# PFF ProMaster 1.0.0-personal
 
 **Data:** 2026-11-10 · **Tipo:** versão para uso pessoal (não assinada) · **Tag:** `v1.0.0-personal`
 
@@ -12,15 +12,24 @@ para o laboratório.
 |---|---|
 | Projetos | Um projeto por trabalho (pasta `.momento`), catálogo SQLite gravado a cada alteração (sem "Guardar"), versões automáticas, recuperação de sessões interrompidas |
 | Importação | Cartões/pastas, cópia verificada (BLAKE3) para a pasta dos originais **e** para um disco de segurança em simultâneo; duplicados pelo conteúdo; relatório de tudo o que não entrou |
-| Formatos | RAW de câmara via LibRaw (testado com 15 fabricantes), JPEG, TIFF, PNG, WebP, JPEG XL, JPEG 2000, PSD, EXR, HEIC/AVIF (macOS) |
+| Formatos | RAW de câmara via LibRaw (fabricantes testados com ficheiros reais em `SUPPORTED_FORMATS.md`), JPEG, TIFF, PNG, WebP, JPEG XL, JPEG 2000, PSD, EXR, HEIC/AVIF (macOS; não validado em Mac neste ciclo). Perfis ICC embutidos aplicados; ficheiros não-RAW de 16 bits/HDR são revelados a 8 bits por canal (ver `KNOWN_LIMITATIONS.md`) |
 | Library / Culling | Grelha virtualizada (15 000 fotografias), estrelas, favoritas, rejeitadas, cores, comparação, menus contextuais, atalhos de teclado |
 | Seleção assistida | Nitidez, olhos fechados, exposição, rajadas e duplicados — sugestões que nunca se sobrepõem às decisões do utilizador |
 | Pessoas e momentos | Rostos agrupados localmente; momentos do casamento por cena e hora, várias câmaras sincronizadas |
 | Develop | Revelação não destrutiva de alta precisão, curvas, HSL, máscaras (pincel, gradientes, sujeito/céu por IA), retrato, retoque, AI Denoise, histórico, instantâneos, cópias virtuais |
 | Auto edit e presets | Edição automática por fotografia ou em lote, presets e LUTs, consistência entre fotografias |
-| Exportação | JPEG, JPEG XL, JPEG 2000, PNG, TIFF/BigTIFF (8–32 bits), WebP, AVIF, HEIF/HEIC, OpenEXR, DNG, PDF, PSD (ver `EXPORT_FORMATS.md` para o suporte por sistema); perfis de cor; redimensionar, nitidez de saída, marca de água, metadados (GPS removível); planos com várias receitas numa operação |
+| Exportação | JPEG, JPEG XL, JPEG 2000, PNG, TIFF/BigTIFF (8–32 bits), WebP, AVIF, OpenEXR, PDF, PSD (HEIF/HEIC e DNG **não** exportam — ver `EXPORT_FORMATS.md`); perfis de cor; redimensionar, nitidez de saída, marca de água, metadados (GPS removível); planos com várias receitas numa operação |
 | Galeria | Site estático para o cliente, com PIN/palavra-passe (AES-256-GCM), capítulos por momento, transferências |
 | Álbum | Formatos de laboratório, layouts automáticos pela narrativa do dia, verificação (DPI, rostos na dobra), PDF de impressão com sangria e JPEG/TIFF por spread |
+
+## Auditoria final (antes de fechar a 1.0)
+
+Comparação de toda a implementação com a especificação: **`FINAL_AUDIT.md`** (matriz de
+479 requisitos e três listas). Corrigidos dois problemas críticos (realces/sombras locais
+sem efeito; perfil ICC embutido ignorado na edição/exportação) e os altos/médios
+encontrados; as ações de privacidade prometidas passaram a existir (Segurança e cópias →
+Privacidade). A aplicação chama-se agora **PFF ProMaster**. Tudo o que não funciona ou
+não foi verificado: **`KNOWN_LIMITATIONS.md`**.
 
 ## Novo nesta versão (Fase 16)
 
@@ -50,6 +59,11 @@ Ver `INSTALLATION.md` → "Versão 1.0.0-personal no Mac": instalar (primeira ab
 clique direito → Abrir), permissões, atualizar sem perder catálogos, backup, desinstalar.
 
 ## Limitações conhecidas
+
+Lista completa em **`KNOWN_LIMITATIONS.md`**. As principais:
+
+- Ficheiros não-RAW de 16 bits/HDR revelados a 8 bits; sem soft proofing nem perfil do
+  monitor; LibRaw no mesmo processo; sem rede (publicação direta de galerias não existe).
 
 - **Não assinada nem notarizada** (uso pessoal): o macOS pede confirmação na primeira
   abertura. Passos para assinar: `docs/SIGNING.md`.

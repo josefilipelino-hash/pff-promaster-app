@@ -61,6 +61,9 @@ pub struct SiteInput<'a> {
     pub hero: Option<&'a SiteImage>,
     pub cover: Option<&'a SiteImage>,
     pub logo: Option<&'a Path>,
+    /// Identificador estável da galeria: as favoritas do cliente (guardadas no browser por
+    /// este id e pelos tokens das fotografias) sobrevivem a uma nova geração.
+    pub gallery_id: &'a str,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, serde::Serialize)]
@@ -165,10 +168,10 @@ fn texts(english: bool) -> (&'static str, &'static str) {
 pub fn build(root: &Path, input: &SiteInput) -> CoreResult<BuildReport> {
     let s = input.settings;
     let protected = s.protection != Protection::None;
-    let gallery_id = crypto::token()?;
+    let gallery_id = input.gallery_id;
     std::fs::create_dir_all(root.join("assets/fonts"))?;
     std::fs::create_dir_all(root.join("data"))?;
-    std::fs::write(root.join(MARKER), "Momento Studio\n")?;
+    std::fs::write(root.join(MARKER), "PFF ProMaster\n")?;
     std::fs::write(root.join("assets/gallery.css"), CSS)?;
     std::fs::write(root.join("assets/gallery.js"), JS)?;
     for (name, data) in FONTS {

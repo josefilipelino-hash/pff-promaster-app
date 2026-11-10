@@ -1,6 +1,6 @@
 # Compatibilidade de presets: XMP (Lightroom/Camera Raw) e LUT `.cube`
 
-Resumo honesto do que o motor do Momento Studio consegue — e não consegue — reproduzir.
+Resumo honesto do que o motor do PFF ProMaster consegue — e não consegue — reproduzir.
 
 ## LUT `.cube` — reproduzidas corretamente (com limites)
 

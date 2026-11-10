@@ -87,6 +87,23 @@ pub fn load_source(
     } else {
         (decoded.source_width, decoded.source_height)
     };
+    // Perfil ICC embutido (Adobe RGB, Display P3, ProPhoto…): converter para o espaço de
+    // trabalho; sem perfil, ou sRGB, assume-se sRGB.
+    if let Some(icc) = decoded.icc_profile.as_deref() {
+        match momento_color_management::InputColor::new(icc) {
+            Ok(Some(input)) => {
+                let mut px: Vec<[f32; 3]> =
+                    img.pixels().map(|p| p.0.map(|v| v as f32 / 255.0)).collect();
+                input.to_linear_rec2020(&mut px);
+                let plane = Plane { w: img.width() as usize, h: img.height() as usize, px };
+                return Ok(Source::from_plane(plane, fw, fh, 0.0));
+            }
+            Ok(None) => {}
+            Err(e) => {
+                tracing::warn!(asset = asset.0, erro = %e, "perfil ICC embutido ignorado: assumido sRGB")
+            }
+        }
+    }
     Ok(Source::from_srgb(&img, fw, fh))
 }
 
@@ -106,6 +123,7 @@ pub fn encode_frame(r: &develop::Rendered) -> Vec<u8> {
 
 fn recipe_hash(r: &EditRecipe) -> String {
     let mut h = std::collections::hash_map::DefaultHasher::new();
+    develop::PIPELINE_VERSION.hash(&mut h);
     serde_json::to_string(r).unwrap_or_default().hash(&mut h);
     format!("{:016x}", h.finish())
 }
@@ -327,7 +345,7 @@ pub fn write_sidecar(
     let src = catalog.asset_source(asset)?;
     let path = paths.root.join("edits").join(format!("{}-{}.json", asset.0, variant.0));
     let body = serde_json::json!({
-        "generator": "Momento Studio",
+        "generator": "PFF ProMaster",
         "asset": asset.0,
         "variant": variant.0,
         "original": src.map(|s| s.path),

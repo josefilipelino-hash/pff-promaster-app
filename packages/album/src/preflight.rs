@@ -1,5 +1,5 @@
 //! Verificação antes de enviar ao laboratório: resolução efetiva, zona segura, rostos na
-//! dobra, bordas perto do corte, slots vazios, repetições e especificação por confirmar.
+//! dobra, rostos cortados pelo enquadramento, bordas perto do corte, slots vazios, repetições e especificação por confirmar.
 
 use crate::model::{crop_window, effective_dpi, Album, Slot};
 use serde::{Deserialize, Serialize};
@@ -142,6 +142,23 @@ pub fn check(album: &Album, photos: &HashMap<i64, PhotoInfo>) -> Vec<Issue> {
                     Severity::Warning,
                     "album.issue.lowDpi",
                     Some(dpi.round()),
+                ));
+            }
+            // Rostos cortados pelo enquadramento do slot (mais de 15 % do rosto fora).
+            let [u0, v0, u1, v1] =
+                crop_window(info.width as f32, info.height as f32, sl.w, sl.h, &sl.crop);
+            if info.faces.iter().any(|f| {
+                let area = (f[2] * f[3]).max(1e-9);
+                let vis = ((f[0] + f[2]).min(u1) - f[0].max(u0)).max(0.0)
+                    * ((f[1] + f[3]).min(v1) - f[1].max(v0)).max(0.0);
+                vis > 0.0 && vis / area < 0.85
+            }) {
+                out.push(issue(
+                    Some(si),
+                    Some(sl),
+                    Severity::Warning,
+                    "album.issue.faceCropped",
+                    None,
                 ));
             }
             // Rostos na dobra e fora da zona segura.

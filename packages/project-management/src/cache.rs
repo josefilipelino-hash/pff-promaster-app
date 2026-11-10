@@ -130,3 +130,75 @@ mod tests {
         assert_eq!(stats_of(dir.path()), LevelStats { files: 2, bytes: 2000 });
     }
 }
+
+/// Resultado de limpar a cache.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Cleared {
+    pub files: u64,
+    pub bytes: u64,
+}
+
+fn tally(dir: &Path, out: &mut Cleared) {
+    let Ok(rd) = std::fs::read_dir(dir) else { return };
+    for e in rd.flatten() {
+        match e.file_type() {
+            Ok(t) if t.is_dir() => tally(&e.path(), out),
+            Ok(t) if t.is_file() => {
+                out.files += 1;
+                out.bytes += e.metadata().map(|m| m.len()).unwrap_or(0);
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Apaga toda a cache **regenerável** do projeto (`cache/`: miniaturas, previews, revelações
+/// em resolução total e edições já renderizadas). Nunca toca nos originais, no catálogo,
+/// nas receitas de edição, máscaras, LUTs nem nas cópias de segurança. A pasta é primeiro
+/// renomeada (o projeto fica logo com uma cache vazia) e só depois apagada.
+pub fn clear_all(paths: &ProjectPaths) -> std::io::Result<Cleared> {
+    let cache = paths.cache();
+    let mut out = Cleared::default();
+    if !cache.exists() {
+        std::fs::create_dir_all(&cache)?;
+        return Ok(out);
+    }
+    tally(&cache, &mut out);
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let old = paths.root.join(format!(".cache-a-apagar-{stamp}"));
+    std::fs::rename(&cache, &old)?;
+    std::fs::create_dir_all(&cache)?;
+    std::fs::remove_dir_all(&old)?;
+    Ok(out)
+}
+
+#[cfg(test)]
+mod clear_tests {
+    use super::*;
+
+    #[test]
+    fn clear_all_only_touches_the_cache() {
+        let d = tempfile::tempdir().unwrap();
+        let p = ProjectPaths::new(d.path().join("x.momento"));
+        let thumb = p.cached(CacheLevel::Thumb, momento_core_types::AssetId(7));
+        std::fs::create_dir_all(thumb.parent().unwrap()).unwrap();
+        std::fs::write(&thumb, [0u8; 100]).unwrap();
+        std::fs::create_dir_all(p.cache().join("edits/preview")).unwrap();
+        std::fs::write(p.cache().join("edits/preview/1-ab.jpg"), [0u8; 50]).unwrap();
+        std::fs::write(p.catalog(), b"catalogo").unwrap();
+        std::fs::create_dir_all(p.root.join("masks")).unwrap();
+        std::fs::write(p.root.join("masks/m.png"), b"mascara").unwrap();
+        let c = clear_all(&p).unwrap();
+        assert_eq!(c, Cleared { files: 2, bytes: 150 });
+        assert!(p.cache().is_dir() && std::fs::read_dir(p.cache()).unwrap().next().is_none());
+        assert!(p.catalog().is_file() && p.root.join("masks/m.png").is_file());
+        assert!(!std::fs::read_dir(&p.root)
+            .unwrap()
+            .flatten()
+            .any(|e| e.file_name().to_string_lossy().starts_with(".cache-a-apagar")));
+    }
+}

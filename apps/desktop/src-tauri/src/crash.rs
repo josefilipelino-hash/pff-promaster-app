@@ -11,7 +11,7 @@ const KEEP: usize = 20;
 
 fn header(kind: &str) -> String {
     format!(
-        "Momento Studio — {kind}\nversão: {}\nsistema: {} {}\nquando (UTC, segundos desde 1970): {}\n",
+        "PFF ProMaster — {kind}\nversão: {}\nsistema: {} {}\nquando (UTC, segundos desde 1970): {}\n",
         momento_core_types::CORE_VERSION,
         std::env::consts::OS,
         std::env::consts::ARCH,
@@ -41,7 +41,9 @@ fn write(dir: &Path, body: &str) -> Option<PathBuf> {
     Some(path)
 }
 
-/// Últimas linhas do log da aplicação (já anonimizadas na escrita do relatório).
+/// Últimas linhas do log da aplicação (já anonimizadas na escrita do relatório). Os
+/// ficheiros chamam-se `momento.<AAAA-MM-DD>.log` (rotação diária, ver `lib.rs`); o
+/// formato antigo `momento.log.<data>` também é aceite.
 fn log_tail(dir: &Path, lines: usize) -> String {
     let mut logs: Vec<PathBuf> = std::fs::read_dir(dir)
         .map(|rd| {
@@ -50,7 +52,7 @@ fn log_tail(dir: &Path, lines: usize) -> String {
                 .filter(|p| {
                     p.file_name()
                         .and_then(|n| n.to_str())
-                        .is_some_and(|n| n.starts_with("momento.log"))
+                        .is_some_and(|n| n.starts_with("momento.") && n.contains(".log"))
                 })
                 .collect()
         })
@@ -60,6 +62,21 @@ fn log_tail(dir: &Path, lines: usize) -> String {
     let text = std::fs::read_to_string(last).unwrap_or_default();
     let v: Vec<&str> = text.lines().collect();
     v[v.len().saturating_sub(lines)..].join("\n")
+}
+
+/// Escritor dos registos (`logs/momento.<data>.log`): cada linha passa por `redact` antes de
+/// chegar ao disco — caminhos (que têm nomes de clientes) e emails nunca ficam nos registos.
+pub struct Redacting<W: std::io::Write>(pub W);
+
+impl<W: std::io::Write> std::io::Write for Redacting<W> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.0.write_all(redact(&String::from_utf8_lossy(buf)).as_bytes())?;
+        Ok(buf.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.0.flush()
+    }
 }
 
 /// Pânico em Rust: mensagem, local e pilha de chamadas (só nomes de funções).
@@ -105,10 +122,29 @@ mod tests {
     use super::*;
 
     #[test]
+    fn log_lines_never_carry_paths_or_emails() {
+        use std::io::Write;
+        let mut out = Vec::new();
+        Redacting(&mut out)
+            .write_all(
+                "INFO projeto aberto projeto=/Users/ana/Casamentos/2026-06-20_Inês_e_João.momento cliente=ines@example.pt\n"
+                    .as_bytes(),
+            )
+            .unwrap();
+        let text = String::from_utf8(out).unwrap();
+        assert!(text.contains("projeto aberto") && text.contains("<caminho>"), "{text}");
+        assert!(
+            !text.contains("Inês") && !text.contains("/Users") && !text.contains("ines@"),
+            "{text}"
+        );
+    }
+
+    #[test]
     fn reports_are_written_without_personal_paths_and_rotated() {
         let d = tempfile::tempdir().unwrap();
+        std::fs::write(d.path().join("momento.2026-11-09.log"), "INFO dia anterior\n").unwrap();
         std::fs::write(
-            d.path().join("momento.log.2026-11-10"),
+            d.path().join("momento.2026-11-10.log"),
             "INFO projeto aberto projeto=/Users/ana/Casamentos/Silva.momento\nERROR original não encontrado: /Volumes/Disco/Silva/IMG_1.CR3\n",
         )
         .unwrap();
@@ -118,7 +154,8 @@ mod tests {
         };
         let p = report_unclean(d.path(), &r).unwrap();
         let text = std::fs::read_to_string(p).unwrap();
-        assert!(text.contains("encerramento inesperado") && text.contains("<caminho>"));
+        assert!(text.contains("encerramento inesperado") && text.contains("<caminho>"), "{text}");
+        assert!(!text.contains("dia anterior"), "deve usar o log mais recente: {text}");
         assert!(!text.contains("Silva") && !text.contains("/Users"), "{text}");
         for i in 0..25 {
             std::fs::write(d.path().join(format!("crash-{:04}.txt", i)), "x").unwrap();

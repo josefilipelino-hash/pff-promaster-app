@@ -427,15 +427,6 @@ export function GalleryDialog({ selected, focus, onClose }: { selected: number[]
               </p>
             )}
             <p className="small muted">{t("gallery.publishInfo")}</p>
-            <h4>{t("gallery.providers")}</h4>
-            <ul className="gallery-providers">
-              {["s3", "r2", "b2", "sftp"].map((p) => (
-                <li key={p}>
-                  <strong>{t(`gallery.provider.${p}`)}</strong>
-                  <span className="badge">{t("gallery.providerLater")}</span>
-                </li>
-              ))}
-            </ul>
             <p className="small muted">{t("gallery.providersInfo")}</p>
             <h4>{t("gallery.clientFavorites")}</h4>
             <p className="small muted">{t("gallery.clientFavoritesInfo")}</p>

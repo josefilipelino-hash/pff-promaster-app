@@ -19,13 +19,16 @@ export const QUICK_SEARCHES: [string, Role[]][] = [
   ["groomFather", ["groom", "groom_father"]],
 ];
 
-/** Ids das pessoas com cada papel (a primeira pessoa com esse papel). */
-export function personsForRoles(persons: PersonRow[], roles: Role[]): number[] | null {
+/** Ids das pessoas com cada papel. `null` se faltar um papel; `"ambiguous"` se houver mais
+ *  do que uma pessoa com o mesmo papel (normalmente a mesma pessoa dividida em dois grupos:
+ *  usar só uma esconderia fotografias, por isso pede-se para as juntar). */
+export function personsForRoles(persons: PersonRow[], roles: Role[]): number[] | null | "ambiguous" {
   const ids: number[] = [];
   for (const r of roles) {
-    const p = persons.find((x) => x.role === r && !x.hidden);
-    if (!p) return null;
-    ids.push(p.id);
+    const ps = persons.filter((x) => x.role === r && !x.hidden);
+    if (ps.length === 0) return null;
+    if (ps.length > 1) return "ambiguous";
+    ids.push(ps[0]!.id);
   }
   return ids;
 }
@@ -43,14 +46,15 @@ export function PeoplePanel({ active, onPersons, view, onView }: { active: numbe
       ) : (
         <ul>
           {QUICK_SEARCHES.map(([key, roles]) => {
-            const ids = personsForRoles(persons, roles);
+            const found = personsForRoles(persons, roles);
+            const ids = Array.isArray(found) ? found : null;
             return (
               <li key={key}>
                 <button
                   type="button"
                   className={`side-item${ids && same(ids) ? " active" : ""}`}
                   disabled={!ids}
-                  title={ids ? undefined : t("people.needRoles")}
+                  title={ids ? undefined : t(found === "ambiguous" ? "people.ambiguousRoles" : "people.needRoles")}
                   aria-pressed={!!ids && same(ids)}
                   onClick={() => ids && onPersons(same(ids) ? [] : ids)}
                 >

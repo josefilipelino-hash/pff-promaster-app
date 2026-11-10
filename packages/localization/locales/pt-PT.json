@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Momento Studio",
+    "name": "PFF ProMaster",
     "tagline": "Gestão, seleção, edição e entrega de fotografia de eventos",
     "noBackend": "Núcleo indisponível: a interface está a correr fora da aplicação desktop."
   },
@@ -62,11 +62,8 @@
   "sidebar": {
     "label": "Navegação do projeto",
     "library": "Fotografias",
-    "upcoming": "Brevemente",
     "moments": "Momentos",
     "people": "Pessoas",
-    "phase": "Fase {{phase}}",
-    "availableIn": "Disponível na Fase {{phase}} do desenvolvimento",
     "albums": "Álbuns",
     "delivery": "Entrega",
     "gallery": "Galeria…",
@@ -287,7 +284,10 @@
     "alternativeHint": "Quase tão boa como a melhor do momento.",
     "reviewHint": "Sem falhas graves, mas mais fraca: decida você.",
     "rejectHint": "Sugestão de rejeição (desfocada, olhos fechados…). Nada é apagado.",
-    "duplicateHint": "Cópia praticamente idêntica de outra fotografia (ou JPEG de um par RAW+JPEG)."
+    "duplicateHint": "Cópia praticamente idêntica de outra fotografia (ou JPEG de um par RAW+JPEG).",
+    "protected": "Protegida pelo utilizador",
+    "protectedShort": "Protegida",
+    "protectedHint": "A análise sugeria rejeitar ou marcar como duplicada, mas esta fotografia é favorita ou tem estrelas: a sua decisão prevalece."
   },
   "selection": {
     "title": "Seleção automática",
@@ -550,7 +550,8 @@
     "merge_other": "Juntar {{count}} selecionadas",
     "recluster": "Reagrupar rostos",
     "reclusterHint": "Volta a agrupar os rostos automáticos; as pessoas identificadas mantêm-se.",
-    "showHidden": "Mostrar ocultas"
+    "showHidden": "Mostrar ocultas",
+    "ambiguousRoles": "Há mais do que uma pessoa com o mesmo papel. Junte-as em “Gerir pessoas” (selecionar as duas → Juntar) para pesquisar."
   },
   "role": {
     "bride": "Noiva",
@@ -956,7 +957,7 @@
       "cube_one": "LUT importada",
       "cube_other": "LUT importadas"
     },
-    "xmpWarning": "Os valores do Lightroom/Camera Raw foram interpretados pelo motor do Momento Studio. Os nomes são parecidos, mas os motores não: o aspeto não será igual ao do Lightroom. Reveja o preset numa fotografia antes de o usar em lote.",
+    "xmpWarning": "Os valores do Lightroom/Camera Raw foram interpretados pelo motor do PFF ProMaster. Os nomes são parecidos, mas os motores não: o aspeto não será igual ao do Lightroom. Reveja o preset numa fotografia antes de o usar em lote.",
     "interpreted_one": "{{count}} campo interpretado",
     "interpreted_other": "{{count}} campos interpretados",
     "ignored_one": "{{count}} campo ignorado",
@@ -1493,15 +1494,7 @@
     "folder": "Pasta da galeria",
     "existsNote": "já existe — será substituída depois de confirmar",
     "publishInfo": "A galeria é uma pasta estática: abre diretamente no computador e pode ser publicada como está em qualquer alojamento (Cloudflare Pages, Netlify, um servidor próprio…). Desative a listagem de pastas no servidor.",
-    "providers": "Publicação direta",
-    "provider": {
-      "s3": "Amazon S3",
-      "r2": "Cloudflare R2",
-      "b2": "Backblaze B2",
-      "sftp": "SFTP"
-    },
-    "providerLater": "Fase futura",
-    "providersInfo": "A arquitetura está preparada (plano de envio incremental, credenciais só no porta-chaves do sistema), mas nesta fase nenhum serviço é contactado.",
+    "providersInfo": "Publicação direta para um serviço (S3, R2, B2, SFTP) não está disponível nesta versão: copie a pasta para o alojamento. Nenhum serviço é contactado pela aplicação.",
     "clientFavorites": "Favoritas do cliente",
     "clientFavoritesInfo": "Cole a lista que o cliente lhe enviou da galeria: as fotografias ficam com a etiqueta roxa.",
     "importFavorites": "Marcar favoritas",
@@ -1648,7 +1641,8 @@
       "faceInGutter": "Rosto na dobra.",
       "faceUnsafe": "Rosto fora da zona segura.",
       "edgeNearTrim": "Borda entre o corte e a zona segura: estenda até à sangria ou recue.",
-      "repeated": "Fotografia repetida no álbum."
+      "repeated": "Fotografia repetida no álbum.",
+      "faceCropped": "Rosto cortado pelo enquadramento — ajuste o recorte do slot."
     },
     "openPdf": "Abrir PDF"
   },
@@ -1658,7 +1652,8 @@
       "status": "Estado",
       "versions": "Versões",
       "catalog": "Catálogo",
-      "log": "Registo"
+      "log": "Registo",
+      "privacy": "Privacidade"
     },
     "unclean": "A sessão anterior não fechou o projeto (falha, corte de energia ou aplicação terminada). O catálogo foi verificado por completo em {{ms}} ms: sem perda de dados.",
     "tempRemoved_one": "Foi removido {{count}} ficheiro temporário de uma escrita interrompida.",
@@ -1768,5 +1763,27 @@
     "noStars": "Sem estrelas",
     "remove_one": "Remover…",
     "remove_other": "Remover {{count}}…"
+  },
+  "privacy": {
+    "hint": "Tudo fica neste computador. Aqui pode apagar o que a aplicação gerou sobre este trabalho. Os originais nunca são apagados.",
+    "cacheTitle": "Cache de miniaturas e previews",
+    "cacheHint": "Miniaturas, previews e edições já renderizadas deste projeto. São geradas de novo quando forem precisas (as miniaturas começam logo).",
+    "clearCache": "Limpar cache",
+    "cacheCleared": "Cache limpa: {{count}} ficheiros ({{size}}). As miniaturas estão a ser geradas de novo.",
+    "peopleTitle": "Pessoas e reconhecimento facial",
+    "peopleHint": "Apaga as pessoas, os nomes e as assinaturas faciais (dados biométricos) deste projeto. Ficam só as caixas dos rostos usadas na seleção (olhos fechados, expressões). As versões antigas do catálogo em “Versões” mantêm-nas até serem substituídas; para apagar tudo, elimine o projeto.",
+    "clearPeople": "Apagar dados de pessoas",
+    "peopleCleared": "Dados de pessoas apagados.",
+    "confirmPeople": "Apagar todas as pessoas, nomes e assinaturas faciais deste projeto? As atribuições de pessoas às fotografias perdem-se.",
+    "projectTitle": "Eliminar projeto",
+    "projectHint": "Fecha o projeto e move a pasta do projeto (catálogo, edições, cache, rostos, versões) para o Lixo do sistema, de onde pode ser recuperada. Os originais e as exportações ficam onde estão. Recusa se algum original estiver dentro da pasta do projeto.",
+    "deleteProject": "Eliminar projeto…",
+    "confirmProject": "Mover o projeto “{{name}}” para o Lixo? As fotografias originais não são apagadas.",
+    "projectDeleted": "Projeto “{{name}}” movido para o Lixo."
+  },
+  "uiError": {
+    "title": "Ocorreu um erro na interface",
+    "body": "As suas decisões e edições já estavam gravadas no catálogo. O erro ficou no registo da aplicação (sem caminhos nem dados pessoais). Recarregue a interface para continuar.",
+    "reload": "Recarregar a interface"
   }
 }

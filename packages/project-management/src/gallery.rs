@@ -39,6 +39,24 @@ pub struct GalleryJob {
     pub tokens: HashMap<i64, String>,
     /// Nome do ficheiro original (sem extensão) de cada chave.
     pub names: HashMap<i64, String>,
+    pub gallery_id: String,
+    /// Pasta final; a galeria é gerada em `folder` (temporária ao lado) e só substitui a
+    /// anterior quando está completa.
+    pub target: PathBuf,
+}
+
+const IDENTITY_KEY: &str = "gallery_identity";
+
+/// Id e tokens de uma galeria já gerada numa pasta (guardados no catálogo, nunca na galeria).
+#[derive(Debug, Clone, Default, Serialize, serde::Deserialize)]
+struct Identity {
+    id: String,
+    tokens: HashMap<i64, String>,
+}
+
+fn staging_for(folder: &Path) -> PathBuf {
+    let name = folder.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    folder.with_file_name(format!(".{name}.a-gerar"))
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -310,17 +328,26 @@ impl ProjectSession {
         self.save_gallery_config(&cfg)?;
         let folder = folder_for(&cfg);
         if folder.exists() {
-            // Só se apaga uma pasta que o Momento criou (tem o marcador) e com confirmação.
+            // Só se substitui uma pasta que a aplicação criou (tem o marcador) e com
+            // confirmação. A anterior só sai quando a nova estiver completa.
             if !folder.join(MARKER).is_file() {
                 return Err(CoreError::Other("gallery.problem.blocked".into()));
             }
             if !replace {
                 return Err(CoreError::Other("gallery.problem.exists".into()));
             }
+        }
+        let target = folder.clone();
+        let folder = staging_for(&target);
+        if folder.exists() {
+            // Geração anterior interrompida (tem o marcador: é nossa).
+            if !folder.join(MARKER).is_file() {
+                return Err(CoreError::Other("gallery.problem.blocked".into()));
+            }
             std::fs::remove_dir_all(&folder)?;
         }
         std::fs::create_dir_all(&folder)?;
-        std::fs::write(folder.join(MARKER), "Momento Studio\n")?;
+        std::fs::write(folder.join(MARKER), "PFF ProMaster\n")?;
         let rows = self.gallery_keys(&cfg.settings)?;
         let chapters = self.gallery_chapters(&cfg.settings, &rows, &moment_names)?;
         let mut keys: Vec<i64> = chapters.iter().flat_map(|c| c.keys.iter().copied()).collect();
@@ -329,10 +356,30 @@ impl ProjectSession {
                 keys.push(extra);
             }
         }
+        // Mesma pasta → mesmo id e mesmos tokens: o cliente mantém as favoritas e os links.
+        let cat = self.open_catalog()?;
+        let mut ids: HashMap<String, Identity> = cat
+            .load_value(IDENTITY_KEY)?
+            .and_then(|r| serde_json::from_str(&r).ok())
+            .unwrap_or_default();
+        let place = target.to_string_lossy().into_owned();
+        let mut ident = ids.get(&place).cloned().unwrap_or_default();
+        if ident.id.is_empty() {
+            ident.id = momento_gallery::crypto::token()?;
+        }
         let mut tokens = HashMap::new();
         for k in &keys {
-            tokens.insert(*k, momento_gallery::crypto::token()?);
+            let t = match ident.tokens.get(k) {
+                Some(t) => t.clone(),
+                None => momento_gallery::crypto::token()?,
+            };
+            tokens.insert(*k, t);
         }
+        ident.tokens.extend(tokens.iter().map(|(k, v)| (*k, v.clone())));
+        let gallery_id = ident.id.clone();
+        ids.insert(place, ident);
+        cat.save_value(IDENTITY_KEY, &serde_json::to_string(&ids).unwrap_or_default())?;
+        drop(cat);
         let all = self.list_photos()?;
         let names: HashMap<i64, String> = all
             .iter()
@@ -350,7 +397,15 @@ impl ProjectSession {
             destination: folder.to_string_lossy().into_owned(),
             name: if cfg.settings.english() { "Gallery".into() } else { "Galeria".into() },
             moment_names,
-            gallery: Some(Box::new(GalleryJob { config: cfg, folder, chapters, tokens, names })),
+            gallery: Some(Box::new(GalleryJob {
+                config: cfg,
+                folder,
+                chapters,
+                tokens,
+                names,
+                gallery_id,
+                target,
+            })),
             album: None,
             seq_offset: 0,
         };
@@ -401,10 +456,39 @@ impl ProjectSession {
                 hero: hero.as_ref(),
                 cover: cover.as_ref(),
                 logo: logo.as_deref(),
+                gallery_id: &g.gallery_id,
             },
         )?;
+        // Troca: a galeria nova (completa) ocupa a pasta final; a anterior só é apagada
+        // depois. Se a troca falhar, a anterior fica intacta.
+        let old = g.target.with_file_name(format!(
+            ".{}.anterior",
+            g.target.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default()
+        ));
+        if old.exists() {
+            std::fs::remove_dir_all(&old)?;
+        }
+        let had_old = g.target.exists();
+        if had_old {
+            std::fs::rename(&g.target, &old)?;
+        }
+        if let Err(e) = std::fs::rename(&g.folder, &g.target) {
+            if had_old {
+                let _ = std::fs::rename(&old, &g.target);
+            }
+            return Err(e.into());
+        }
+        if had_old {
+            if let Err(e) = std::fs::remove_dir_all(&old) {
+                tracing::warn!(erro = %e, "galeria anterior não removida");
+            }
+        }
         tracing::info!(fotografias = report.photos, ficheiros = report.files, "galeria gerada");
-        Ok(report.index)
+        let index = Path::new(&report.index)
+            .strip_prefix(&g.folder)
+            .map(|rel| g.target.join(rel))
+            .unwrap_or_else(|_| g.target.join("index.html"));
+        Ok(index.to_string_lossy().into_owned())
     }
 
     /// Favoritas escolhidas pelo cliente (lista de nomes copiada da galeria): marca as

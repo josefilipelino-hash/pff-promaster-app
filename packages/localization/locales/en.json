@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Momento Studio",
+    "name": "PFF ProMaster",
     "tagline": "Event photography management, culling, editing and delivery",
     "noBackend": "Core unavailable: the interface is running outside the desktop app."
   },
@@ -62,11 +62,8 @@
   "sidebar": {
     "label": "Project navigation",
     "library": "Photos",
-    "upcoming": "Coming soon",
     "moments": "Moments",
     "people": "People",
-    "phase": "Phase {{phase}}",
-    "availableIn": "Available in development Phase {{phase}}",
     "albums": "Albums",
     "delivery": "Delivery",
     "gallery": "Gallery…",
@@ -287,7 +284,10 @@
     "alternativeHint": "Almost as good as the best of this moment.",
     "reviewHint": "No serious flaws, but weaker: your call.",
     "rejectHint": "Suggested reject (out of focus, eyes closed…). Nothing is deleted.",
-    "duplicateHint": "Near-identical copy of another photo (or the JPEG of a RAW+JPEG pair)."
+    "duplicateHint": "Near-identical copy of another photo (or the JPEG of a RAW+JPEG pair).",
+    "protected": "Protected by the user",
+    "protectedShort": "Protected",
+    "protectedHint": "The analysis suggested rejecting it or marking it as a duplicate, but this photo is a favourite or has stars: your decision wins."
   },
   "selection": {
     "title": "Smart selection",
@@ -550,7 +550,8 @@
     "merge_other": "Merge {{count}} selected",
     "recluster": "Regroup faces",
     "reclusterHint": "Regroups automatic faces; identified people are kept.",
-    "showHidden": "Show hidden"
+    "showHidden": "Show hidden",
+    "ambiguousRoles": "More than one person has the same role. Merge them in “Manage people” (select both → Merge) to search."
   },
   "role": {
     "bride": "Bride",
@@ -956,7 +957,7 @@
       "cube_one": "LUT imported",
       "cube_other": "LUTs imported"
     },
-    "xmpWarning": "The Lightroom/Camera Raw values were interpreted by the Momento Studio engine. The names are similar but the engines are not: the look will not match Lightroom. Check the preset on one photo before using it in batch.",
+    "xmpWarning": "The Lightroom/Camera Raw values were interpreted by the PFF ProMaster engine. The names are similar but the engines are not: the look will not match Lightroom. Check the preset on one photo before using it in batch.",
     "interpreted_one": "{{count}} field interpreted",
     "interpreted_other": "{{count}} fields interpreted",
     "ignored_one": "{{count}} field ignored",
@@ -1493,15 +1494,7 @@
     "folder": "Gallery folder",
     "existsNote": "already exists — will be replaced after you confirm",
     "publishInfo": "The gallery is a static folder: it opens directly on the computer and can be published as is on any host (Cloudflare Pages, Netlify, your own server…). Disable directory listing on the server.",
-    "providers": "Direct publishing",
-    "provider": {
-      "s3": "Amazon S3",
-      "r2": "Cloudflare R2",
-      "b2": "Backblaze B2",
-      "sftp": "SFTP"
-    },
-    "providerLater": "Future phase",
-    "providersInfo": "The architecture is ready (incremental upload plan, credentials only in the system keychain), but no service is contacted in this phase.",
+    "providersInfo": "Direct publishing to a service (S3, R2, B2, SFTP) is not available in this version: copy the folder to your hosting. The application contacts no service.",
     "clientFavorites": "Client favourites",
     "clientFavoritesInfo": "Paste the list the client sent you from the gallery: those photos get the purple label.",
     "importFavorites": "Mark favourites",
@@ -1648,7 +1641,8 @@
       "faceInGutter": "Face on the fold.",
       "faceUnsafe": "Face outside the safe zone.",
       "edgeNearTrim": "Edge between trim and safe zone: extend to the bleed or pull back.",
-      "repeated": "Photo repeated in the album."
+      "repeated": "Photo repeated in the album.",
+      "faceCropped": "Face cut by the framing — adjust the slot crop."
     },
     "openPdf": "Open PDF"
   },
@@ -1658,7 +1652,8 @@
       "status": "Status",
       "versions": "Versions",
       "catalog": "Catalogue",
-      "log": "Log"
+      "log": "Log",
+      "privacy": "Privacy"
     },
     "unclean": "The previous session did not close the project (crash, power cut or app killed). The catalogue was fully checked in {{ms}} ms: no data lost.",
     "tempRemoved_one": "{{count}} temporary file from an interrupted write was removed.",
@@ -1768,5 +1763,27 @@
     "noStars": "No stars",
     "remove_one": "Remove…",
     "remove_other": "Remove {{count}}…"
+  },
+  "privacy": {
+    "hint": "Everything stays on this computer. Here you can delete what the application generated about this job. Originals are never deleted.",
+    "cacheTitle": "Thumbnail and preview cache",
+    "cacheHint": "Thumbnails, previews and already rendered edits of this project. They are generated again when needed (thumbnails start right away).",
+    "clearCache": "Clear cache",
+    "cacheCleared": "Cache cleared: {{count}} files ({{size}}). Thumbnails are being generated again.",
+    "peopleTitle": "People and face recognition",
+    "peopleHint": "Deletes the people, names and face signatures (biometric data) of this project. Only the face boxes used by the selection (closed eyes, expressions) remain. Older catalog versions under “Versions” keep them until replaced; to delete everything, delete the project.",
+    "clearPeople": "Delete people data",
+    "peopleCleared": "People data deleted.",
+    "confirmPeople": "Delete all people, names and face signatures of this project? Person assignments are lost.",
+    "projectTitle": "Delete project",
+    "projectHint": "Closes the project and moves the project folder (catalog, edits, cache, faces, versions) to the system Trash, where it can be recovered. Originals and exports stay where they are. Refused if any original is inside the project folder.",
+    "deleteProject": "Delete project…",
+    "confirmProject": "Move the project “{{name}}” to the Trash? The original photos are not deleted.",
+    "projectDeleted": "Project “{{name}}” moved to the Trash."
+  },
+  "uiError": {
+    "title": "An error occurred in the interface",
+    "body": "Your decisions and edits were already saved in the catalog. The error was written to the application log (without paths or personal data). Reload the interface to continue.",
+    "reload": "Reload the interface"
   }
 }
