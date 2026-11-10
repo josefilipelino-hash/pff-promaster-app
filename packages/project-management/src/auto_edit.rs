@@ -535,6 +535,7 @@ impl ProjectSession {
                 break;
             }
             let Some(key) = q.lock().unwrap_or_else(|e| e.into_inner()).pop_front() else { break };
+            momento_task_queue::foreground::yield_to_foreground();
             let name = cat
                 .resolve_key(key)
                 .ok()

@@ -87,7 +87,7 @@ impl Detector {
         let s = INPUT as f32 / w.max(h) as f32;
         let (nw, nh) =
             (((w as f32 * s).round() as u32).max(1), ((h as f32 * s).round() as u32).max(1));
-        let resized = imageops::resize(img, nw, nh, imageops::FilterType::Triangle);
+        let resized = momento_ai_analysis::resize::rgb(img, nw, nh);
         let mut boxed = RgbImage::new(INPUT, INPUT);
         let (px, py) = ((INPUT - nw) / 2, (INPUT - nh) / 2);
         imageops::replace(&mut boxed, &resized, px as i64, py as i64);

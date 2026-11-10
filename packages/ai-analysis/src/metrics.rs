@@ -40,12 +40,7 @@ pub fn to_work_gray(img: &RgbImage) -> GrayImage {
     let (w, h) = img.dimensions();
     let s = WORK_EDGE as f32 / w.max(h) as f32;
     let small = if s < 1.0 {
-        imageops::resize(
-            img,
-            ((w as f32 * s) as u32).max(1),
-            ((h as f32 * s) as u32).max(1),
-            imageops::FilterType::Triangle,
-        )
+        crate::resize::rgb(img, ((w as f32 * s) as u32).max(1), ((h as f32 * s) as u32).max(1))
     } else {
         img.clone()
     };
@@ -93,11 +88,10 @@ pub fn region_sharpness(img: &RgbImage, x: f32, y: f32, w: f32, h: f32, norm_edg
     let s = norm_edge as f32 / (x1 - x0).max(y1 - y0) as f32;
     // Só se reduz (nunca se amplia: ampliar inventa suavidade e baixa a nitidez medida).
     let crop = if s < 1.0 {
-        imageops::resize(
+        crate::resize::rgb(
             &crop,
             ((crop.width() as f32 * s) as u32).max(8),
             ((crop.height() as f32 * s) as u32).max(8),
-            imageops::FilterType::Triangle,
         )
     } else {
         crop

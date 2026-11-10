@@ -68,6 +68,22 @@ pub fn eotf(x: f32) -> f32 {
     }
 }
 
+/// `eotf` para a exportação: tabela de 65 537 entradas com interpolação, exata junto ao
+/// ponto de quebra. Erro < 4e-7 (≈ 3 ulp em 1,0; medido no teste); antes, `powf` por canal (Fase 12).
+pub fn eotf_hq(x: f32) -> f32 {
+    const N: usize = 65_536;
+    const KINK: f32 = 0.040_45;
+    static T: std::sync::OnceLock<Vec<f32>> = std::sync::OnceLock::new();
+    if !(0.0..=1.0).contains(&x) || (x - KINK).abs() < 2.0 / N as f32 {
+        return eotf(x);
+    }
+    let t = T.get_or_init(|| (0..=N).map(|i| eotf(i as f32 / N as f32)).collect());
+    let p = x * N as f32;
+    let i = (p as usize).min(N - 1);
+    let f = p - i as f32;
+    t[i] + (t[i + 1] - t[i]) * f
+}
+
 /// Tabela para acelerar a curva sRGB no intervalo [0, 1] (4096 entradas + interpolação).
 pub struct Lut {
     t: Vec<f32>,
@@ -262,6 +278,17 @@ mod tests {
         }
         let w = mul3(&SRGB_TO_REC2020, [1.0, 1.0, 1.0]);
         assert!(w.iter().all(|v| (v - 1.0).abs() < 1e-3));
+    }
+
+    #[test]
+    fn eotf_hq_matches_the_formula() {
+        let mut worst = 0.0f32;
+        for i in 0..=2_000_000u32 {
+            let x = i as f32 / 2_000_000.0;
+            worst = worst.max((eotf_hq(x) - eotf(x)).abs());
+        }
+        assert!(worst < 4e-7, "erro {worst}");
+        assert_eq!(eotf_hq(1.2), eotf(1.2));
     }
 
     #[test]

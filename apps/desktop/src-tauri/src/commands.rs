@@ -1059,3 +1059,39 @@ pub async fn delete_lab_preset(state: State<'_, AppState>, id: String) -> CmdRes
     let lib = state.library();
     LabStore { lib: &lib }.delete(&id).map_err(err)
 }
+
+// ---------- Diagnóstico de desempenho (Fase 12) ----------
+
+static PROCESS_START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+
+/// Instante do arranque do processo (para medir o tempo de lançamento).
+pub fn mark_process_start() {
+    PROCESS_START.get_or_init(std::time::Instant::now);
+}
+
+/// Modo de diagnóstico (`MOMENTO_PERF=1`): a interface mede FPS e tempos e regista-os.
+#[tauri::command]
+pub fn perf_mode() -> bool {
+    std::env::var("MOMENTO_PERF").is_ok_and(|v| v == "1")
+}
+
+/// Regista uma medição da interface no log (só em modo de diagnóstico; sem dados pessoais).
+#[tauri::command]
+pub fn perf_log(event: String, data: serde_json::Value) {
+    if !perf_mode() {
+        return;
+    }
+    let since = PROCESS_START.get().map(|t| t.elapsed().as_millis()).unwrap_or(0);
+    let rss = std::fs::read_to_string("/proc/self/status")
+        .ok()
+        .and_then(|s| {
+            s.lines()
+                .find(|l| l.starts_with("VmRSS:"))?
+                .split_whitespace()
+                .nth(1)?
+                .parse::<u64>()
+                .ok()
+        })
+        .map(|kb| kb / 1024);
+    tracing::info!(target: "perf", evento = %event, desde_arranque_ms = since as u64, rss_mb = ?rss, dados = %data, "medição");
+}

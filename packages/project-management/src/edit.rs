@@ -209,6 +209,14 @@ impl EditService {
         c.retain(|e| e.0 != key);
         c.push_front((key, src));
         c.truncate(2);
+        // Resolução total (exportação): ~400 MB a 24 MP — no máximo uma em memória.
+        let mut full_seen = false;
+        c.retain(|e| {
+            let full = e.0 .1;
+            let keep = !(full && full_seen);
+            full_seen |= full;
+            keep
+        });
     }
 
     /// Fonte de edição (em cache).
@@ -218,15 +226,15 @@ impl EditService {
         registry: &CodecRegistry,
         asset: AssetId,
     ) -> CoreResult<Arc<Source>> {
-        if let Some(s) = self
-            .cache
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .iter()
-            .find(|e| e.0 == asset)
-            .map(|e| e.1.clone())
         {
-            return Ok(s);
+            // LRU: um acerto passa para a frente (antes saía pela ordem de entrada).
+            let mut c = self.cache.lock().unwrap_or_else(|e| e.into_inner());
+            if let Some(i) = c.iter().position(|e| e.0 == asset) {
+                let e = c.remove(i).expect("posição válida");
+                let s = e.1.clone();
+                c.push_front(e);
+                return Ok(s);
+            }
         }
         let s = Arc::new(load_source(catalog, registry, asset, Some(EDIT_EDGE))?);
         let mut c = self.cache.lock().unwrap_or_else(|e| e.into_inner());
@@ -327,4 +335,25 @@ pub fn write_sidecar(
         "recipe": recipe,
     });
     write_atomic(&path, serde_json::to_string_pretty(&body).unwrap_or_default().as_bytes())
+}
+
+#[cfg(test)]
+mod cache_tests {
+    use super::*;
+
+    fn src() -> Arc<Source> {
+        Arc::new(Source::from_srgb(&image::RgbImage::new(8, 8), 8, 8))
+    }
+
+    #[test]
+    fn at_most_one_full_resolution_ai_result_in_memory() {
+        let e = EditService::new();
+        e.ai_store((AssetId(1), true, 50), src());
+        e.ai_store((AssetId(2), true, 50), src());
+        assert!(e.ai_cached((AssetId(2), true, 50)).is_some());
+        assert!(e.ai_cached((AssetId(1), true, 50)).is_none(), "a anterior em resolução total sai");
+        e.ai_store((AssetId(3), false, 50), src());
+        assert!(e.ai_cached((AssetId(2), true, 50)).is_some());
+        assert!(e.ai_cached((AssetId(3), false, 50)).is_some());
+    }
 }

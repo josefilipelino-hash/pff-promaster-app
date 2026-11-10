@@ -403,6 +403,17 @@ Implementação atual:
   emite eventos para a interface a cada ~150 ms. Pânicos num descodificador são apanhados
   (`catch_unwind`) e a miniatura fica marcada como falhada.
 
+- **Prioridade do primeiro plano (Fase 12, D-079):** a preview/1:1 da fotografia vista e
+  o editor seguram `foreground::Interactive`; miniaturas, análise, edição automática e
+  exportação chamam `yield_to_foreground()` entre itens (espera máx. 3 s). As previews a
+  gerar passam por um **portão LIFO** (3 de cada vez, o pedido mais recente primeiro; o
+  que está em cache sai logo) — D-080.
+- **Ligações ao catálogo (Fase 12, D-078):** o trabalho fora da ligação principal usa um
+  pool (`project-management::pool`, até 8 inativas) em vez de abrir uma ligação por pedido.
+- **Exportação (Fase 12, D-081):** pipeline em duas fases — uma thread prepara
+  (descodifica + revela) a fotografia seguinte enquanto a atual é codificada e gravada.
+- Medições e método: `PERFORMANCE.md`.
+
 Desenho original (mantido como objetivo para trabalhos futuros sem estado de domínio):
 
 - Tabela `job` no catálogo (persistente): tipo, payload JSON, prioridade, estado,
@@ -805,3 +816,11 @@ ficheiros a partir do frontend (caminhos sempre resolvidos e verificados no núc
 | D-075 | 2026-11-10 | PDF escrito diretamente (JPEG q95 + ICCBased + Trim/BleedBox) | Biblioteca PDF externa | Sem dependências novas; os laboratórios pedem precisamente isto |
 | D-076 | 2026-11-10 | Exportação em RGB (perfil do laboratório como ICC de saída), sem conversão CMYK | CMYK com lcms2 | Laboratórios fotográficos imprimem em RGB; CMYK fica para quando um laboratório o exigir |
 | D-077 | 2026-11-10 | Exportação de álbuns pela mesma fila (pausa, cancelamento, progresso) | Fila própria | Uma só fila para exportação, galeria e álbum |
+| D-078 | 2026-11-10 | Pool de ligações SQLite para imagens servidas, edições e exportação | Uma ligação por pedido | `perf`: 72 % do tempo de servir uma miniatura era abrir a ligação (3,80 → 0,10 ms) |
+| D-079 | 2026-11-10 | Primeiro plano global: o trabalho interativo faz o segundo plano ceder entre itens (máx. 3 s) | Prioridades do SO por thread | Portável (macOS/Windows/Linux) e medido: preview vista com carga 95 → 60 ms |
+| D-080 | 2026-11-10 | Portão LIFO com 3 previews a gerar de cada vez | Sem limite / 1 / 2 | Navegação rápida: espera da última 844 / 575 / 634 / 562 ms (3 = melhor equilíbrio) |
+| D-081 | 2026-11-10 | Exportação em pipeline (1 fotografia adiantada) + render no próprio buffer + última receita sem cópia | Duas fotografias em paralelo | CPU a 215 % → 19 → 30 exp./min; RAM 1,3 GB (2 em paralelo ≈ 2,2 GB) |
+| D-082 | 2026-11-10 | Curvas de transferência por tabela de 65 537 entradas, exatas junto às quebras e perto de 0 nas gama | `powf` por canal | 17 % da exportação; erro medido < 4e-7 (≈ 3 % de um nível de 16 bits) |
+| D-083 | 2026-11-10 | Redução triangular própria (vírgula fixa, paralela) na análise; hashes percetuais mantêm `imageops` | Crate externa de resize | 51 % da análise em `imageops::resize`; sem dependência nova; hashes gravados continuam comparáveis |
+| D-084 | 2026-11-10 | Índices `variant(asset_id)` e `snapshot(variant_id)` (migração v8) | — | `EXPLAIN QUERY PLAN` com 15 000: varrimentos completos (0,41 → 0,004 ms; apagar 300: 257 → 6 ms) |
+| D-085 | 2026-11-10 | LibRaw sem OpenMP | Demosaico paralelo com OpenMP | O Apple Clang não traz OpenMP: partiria a compilação no macOS; a revelação a 100 % já tem prioridade |

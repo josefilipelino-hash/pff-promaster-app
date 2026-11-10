@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { perfMark, perfWatchGrid } from "./logic/perfProbe";
 import { api } from "./api";
 import { DEFAULT_FILTER, type Filter } from "./logic/filters";
 import { EMPTY_SELECTION, type Selection } from "./logic/selection";
@@ -292,8 +293,13 @@ export const useStore = create<State & Actions>((set, get) => ({
   },
 
   async reloadPhotos() {
+    const t0 = performance.now();
+    const first = get().photos.length === 0;
     const rows = await api.listPhotos();
+    const t1 = performance.now();
     get().setPhotos(rows);
+    perfMark("lista_fotografias", { fotografias: rows.length, ipc_ms: Math.round(t1 - t0), estado_ms: Math.round(performance.now() - t1) });
+    if (first) perfWatchGrid(t0, rows.length);
   },
 
   setFilter(f) {

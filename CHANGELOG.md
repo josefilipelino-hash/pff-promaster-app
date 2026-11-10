@@ -5,6 +5,28 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [0.12.0] — 2026-11-10 — Fase 12: desempenho
+
+### Adicionado
+- `PERFORMANCE.md`: benchmarks medidos com 15 000 fotografias e a resolução real (antes e
+  depois), bottlenecks encontrados por profiling e limitações.
+- Benchmark pelo caminho real da aplicação (`examples/perf_bench.rs`).
+- Modo de diagnóstico `MOMENTO_PERF=1`: tempo de lançamento, abertura do projeto, FPS do
+  scroll e tempo da preview no visualizador, no log.
+
+### Melhorado
+- A fotografia que está a ser vista passa à frente do trabalho em segundo plano
+  (miniaturas, análise de IA, edição automática, exportação).
+- Navegação rápida com as setas: a fotografia em que se para aparece primeiro (−33 %).
+- Miniaturas servidas 38× mais depressa (pool de ligações ao catálogo); grelha pronta ao
+  abrir um projeto de 15 000 em 242 ms (antes 794 ms).
+- Análise de IA 1,85× mais rápida por fotografia.
+- Exportação +60 % (19 → 30 fotografias de 24 MP por minuto).
+- Índices SQLite em falta (cópias virtuais, apagar fotografias).
+- Caches em memória: LRU verdadeira no editor; no máximo um resultado de AI Denoise em
+  resolução total.
+
+
 ## [0.11.0] — 2026-11-10 — Fase 11: álbuns
 
 ### Adicionado

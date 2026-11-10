@@ -3,12 +3,14 @@
 //! - [`WorkQueue`]: fila em memória partilhada por várias threads de trabalho, com
 //!   prioridade para itens urgentes (ex.: miniaturas visíveis no ecrã), sem duplicados
 //!   e com encerramento limpo.
+//! - [`foreground`]: o trabalho interativo (fotografia vista) passa à frente do segundo plano.
 //! - Modelo de estados de tarefas ([`JobState`], [`Priority`]) para a futura tabela `job`.
 //!
 //! Persistência na Fase 1: cada trabalho guarda o seu estado no próprio domínio
 //! (`import_item.state`, `asset.thumb_state`), o que permite retomar após falha sem uma
 //! tabela genérica. Ver ARCHITECTURE.md §9.
 
+pub mod foreground;
 mod work_queue;
 pub use work_queue::WorkQueue;
 

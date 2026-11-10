@@ -699,9 +699,8 @@ fn render_impl(
     let e = &s.effects;
     let grain_px = (src.full_width.max(src.full_height) as f32 / w.max(h) as f32).max(1.0);
     let gsize = 1.0 + e.grain_size / 100.0 * 4.0;
-    let finish = |x: usize, y: usize| -> [f32; 3] {
-        let i = y * w + x;
-        let mut d = disp[i];
+    // Só lê o próprio píxel: o resultado linear pode ser escrito no próprio `disp`.
+    let finish = |mut d: [f32; 3], x: usize, y: usize| -> [f32; 3] {
         let (u, v) = ((x as f32 + 0.5) / w as f32, (y as f32 + 0.5) / h as f32);
         if e.vignette != 0.0 {
             let round = e.vignette_roundness / 100.0;
@@ -725,9 +724,9 @@ fn render_impl(
             let amp = e.grain / 100.0 * 0.22 * (0.3 + 0.7 * 4.0 * l * (1.0 - l));
             d = d.map(|c| c + n * amp);
         }
-        // Exato (sem tabela) na exportação: precisão para 16/32 bits.
+        // Exportação: tabela de alta resolução (erro < 4e-7, precisão para 16/32 bits).
         let lin: [f32; 3] = if linear_out {
-            d.map(|c| eotf(c.clamp(0.0, 1.0)))
+            d.map(|c| super::color::eotf_hq(c.clamp(0.0, 1.0)))
         } else {
             [tr.to_linear.get(d[0]), tr.to_linear.get(d[1]), tr.to_linear.get(d[2])]
         };
@@ -744,10 +743,11 @@ fn render_impl(
         }
     };
     if linear_out {
-        let px: Vec<[f32; 3]> = (0..w * h)
-            .into_par_iter()
-            .map(|i| if valid[i] { finish(i % w, i / w) } else { [0.0; 3] })
-            .collect();
+        // No mesmo buffer (Fase 12): menos uma imagem inteira em memória na exportação.
+        let mut px = disp;
+        px.par_iter_mut().enumerate().for_each(|(i, d)| {
+            *d = if valid[i] { finish(*d, i % w, i / w) } else { [0.0; 3] };
+        });
         return Output::Linear(LinearImage { width: w as u32, height: h as u32, px });
     }
     let mut rgba = vec![0u8; w * h * 4];
@@ -761,7 +761,7 @@ fn render_impl(
                     row[x * 4..x * 4 + 4].copy_from_slice(&[0, 0, 0, 255]);
                     continue;
                 }
-                let out = mul3(&REC2020_TO_SRGB, finish(x, y));
+                let out = mul3(&REC2020_TO_SRGB, finish(disp[y * w + x], x, y));
                 for c in 0..3 {
                     let b = tr.encode_u8(out[c]);
                     row[x * 4 + c] = b;

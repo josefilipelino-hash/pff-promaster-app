@@ -1,3 +1,4 @@
+import { perfViewerLoaded, perfViewerShown } from "../logic/perfProbe";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { imageUrl } from "../api";
@@ -70,6 +71,7 @@ export function Viewer({
 
   // Nova fotografia: volta a “ajustar”.
   useEffect(() => {
+    perfViewerShown(photo.id);
     setZoom("fit");
     setOffset({ x: 0, y: 0 });
     setFullLoaded(false);
@@ -194,7 +196,7 @@ export function Viewer({
       >
         <div className="viewer-image" style={{ width: cssW, height: cssH, transform: `translate(${offset.x}px, ${offset.y}px)` }}>
           {!previewFailed ? (
-            <img src={`${imageUrl(token, "preview", photo.id)}?v=${version}`} alt={photo.fileName} draggable={false} onError={() => setPreviewFailed(true)} />
+            <img src={`${imageUrl(token, "preview", photo.id)}?v=${version}`} alt={photo.fileName} draggable={false} onError={() => setPreviewFailed(true)} onLoad={() => perfViewerLoaded(photo.id)} />
           ) : (
             <div className="viewer-error">{t("viewer.loadFailed")}</div>
           )}

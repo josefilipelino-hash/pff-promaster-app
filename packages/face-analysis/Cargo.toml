@@ -10,6 +10,7 @@ authors.workspace = true
 
 [dependencies]
 momento-core-types.workspace = true
+momento-ai-analysis.workspace = true
 tract-onnx.workspace = true
 rayon.workspace = true
 anyhow = "1"

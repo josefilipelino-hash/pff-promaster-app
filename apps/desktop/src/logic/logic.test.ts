@@ -210,3 +210,15 @@ describe("álbum: geometria do editor (Fase 11)", async () => {
     expect(templateBoxes("-|F")[0]![0]).toBeGreaterThan(0.5);
   });
 });
+
+describe("diagnóstico de desempenho (Fase 12)", async () => {
+  const { frameStats } = await import("./perfProbe");
+  it("FPS, p95 e frames longos de uma janela de frames", () => {
+    expect(frameStats([])).toEqual({ fps: 0, p95: 0, long: 0, frames: 0 });
+    const s = frameStats([...Array(19).fill(16), 80]);
+    expect(s.frames).toBe(20);
+    expect(s.long).toBe(1);
+    expect(s.fps).toBe(Math.round((20 * 1000) / (19 * 16 + 80)));
+    expect(s.p95).toBe(80);
+  });
+});

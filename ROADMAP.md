@@ -124,10 +124,17 @@ PDF de prova.
 **Por fazer:** texto e grafismos nas páginas, capa, CMYK/PDF/X, desfazer no editor,
 encomendas diretas a laboratórios.
 
-## Fase 12 — Otimização e distribuição
+## Fase 12 — Desempenho ✅ *(concluída 2026-11-10, ver PERFORMANCE.md)*
 
-GPU (wgpu), otimização Apple Silicon, projetos grandes, recuperação, testes de carga,
-assinatura de instaladores.
+Conjunto de 15 000 fotografias + conjunto a resolução real; profiling com `perf`; pool de
+ligações SQLite, prioridade da fotografia vista sobre o segundo plano, portão LIFO das
+previews, exportação em pipeline, curvas por tabela, redução rápida na análise de IA,
+índices em falta, caches LRU; modo de diagnóstico na aplicação (`MOMENTO_PERF=1`).
+**Por fazer:** medir em macOS/Windows e com GPU; RAW em resolução total paralelo.
+
+## Fase 13 — Distribuição
+
+GPU (wgpu), otimização Apple Silicon, recuperação, assinatura de instaladores.
 
 > **Windows** deixou de ser tarefa da fase de otimização: por decisão do utilizador (D-011), Windows e
 > macOS são plataformas-alvo desde a Fase 1 — CI, compilação cruzada e instalador NSIS.

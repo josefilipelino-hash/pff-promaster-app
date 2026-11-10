@@ -301,6 +301,14 @@ pub const CATALOG: &[&str] = &[
         computed_at INTEGER NOT NULL
     ) STRICT;
     "#,
+    // v8 — Fase 12: índices medidos com 15 000 fotografias (EXPLAIN QUERY PLAN): o índice
+    // parcial de `variant` só serve a versão principal — contar cópias virtuais e apagar
+    // fotografias (cascata) percorriam a tabela toda (0,41 → 0,004 ms; 300 apagadas:
+    // 257 → 6 ms). `snapshot` também é apagada em cascata a partir da variante.
+    r#"
+    CREATE INDEX variant_by_asset ON variant(asset_id);
+    CREATE INDEX snapshot_by_variant ON snapshot(variant_id);
+    "#,
 ];
 
 /// Migrações da biblioteca global (projetos recentes).

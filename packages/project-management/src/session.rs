@@ -253,7 +253,17 @@ pub struct ProjectSession {
     pub(crate) auto_job: Mutex<Option<crate::auto_edit::AutoEditJob>>,
     /// Fila de exportação.
     pub(crate) exports: crate::export::ExportQueue,
+    /// Ligações ao catálogo reutilizadas pelo trabalho fora da ligação principal.
+    pool: Arc<crate::pool::CatalogPool>,
+    /// Ordem das previews a gerar (mais recente primeiro).
+    view_gate: momento_task_queue::foreground::LifoGate,
 }
+
+/// Previews geradas em simultâneo. Medido (navegação rápida, 16 fotografias de 24 MP a
+/// cada 40 ms, 4 execuções): sem limite, a última esperava 844 ms; com 1/2/3 permissões,
+/// 575/634/562 ms (e 5,2/2,7/2,0 s para todas). 3 sobrepõe as fases em série
+/// (descodificar/codificar) sem pôr a fotografia vista atrás das antigas.
+const VIEW_PERMITS: usize = 3;
 
 impl ProjectSession {
     /// Abre um projeto: migra o catálogo, faz cópia de segurança, inicia as miniaturas em
@@ -290,6 +300,7 @@ impl ProjectSession {
 
         momento_image_processing::develop::lut::add_search_path(paths.root.join("luts"));
         momento_image_processing::develop::local::add_raster_path(paths.root.join("masks"));
+        let paths_catalog = paths.catalog();
         let session = Arc::new(ProjectSession {
             paths,
             catalog: Mutex::new(catalog),
@@ -305,6 +316,8 @@ impl ProjectSession {
             ai_inflight: Mutex::new(std::collections::HashSet::new()),
             auto_job: Mutex::new(None),
             exports: Default::default(),
+            pool: crate::pool::CatalogPool::new(paths_catalog),
+            view_gate: momento_task_queue::foreground::LifoGate::new(VIEW_PERMITS),
         });
         if let Some(s) = unfinished {
             tracing::info!(sessao = s.id.0, "a retomar importação interrompida");
@@ -380,11 +393,12 @@ impl ProjectSession {
         quality: RenderQuality,
         uncropped: bool,
     ) -> CoreResult<Vec<u8>> {
+        let _fg = momento_task_queue::foreground::Interactive::begin();
         let (_, asset) = self.catalog().resolve_key(key)?;
         // AI Denoise: se ainda não estiver calculado, render sem ele e cálculo em segundo
         // plano (evento `ai_denoise` quando estiver pronto).
         let (src, _) =
-            self.source_for(&self.open_catalog()?, asset, settings, false, false, key)?;
+            self.source_for(&*self.open_catalog()?, asset, settings, false, false, key)?;
         Ok(self.edits.render_frame(&src, settings, max_w, max_h, quality, uncropped))
     }
 
@@ -402,15 +416,15 @@ impl ProjectSession {
     ) -> CoreResult<Vec<u8>> {
         let (_, asset) = self.catalog().resolve_key(key)?;
         let (src, _) =
-            self.source_for(&self.open_catalog()?, asset, settings, false, false, key)?;
+            self.source_for(&*self.open_catalog()?, asset, settings, false, false, key)?;
         Ok(self
             .edits
             .render_frame_overlay(&src, settings, max_w, max_h, quality, uncropped, overlay))
     }
 
     /// Ligação própria para operações longas (não bloqueia a do resto da interface).
-    pub(crate) fn open_catalog(&self) -> CoreResult<Catalog> {
-        Catalog::open_existing(&self.paths.catalog())
+    pub(crate) fn open_catalog(&self) -> CoreResult<crate::pool::PooledCatalog> {
+        self.pool.get()
     }
 
     pub(crate) fn after_edit(self: &Arc<Self>, keys: Vec<i64>) {
@@ -539,14 +553,14 @@ impl ProjectSession {
         v: f32,
     ) -> CoreResult<Option<(f32, f32)>> {
         let (_, asset) = self.catalog().resolve_key(key)?;
-        let src = self.edits.source(&self.open_catalog()?, &self.registry, asset)?;
+        let src = self.edits.source(&*self.open_catalog()?, &self.registry, asset)?;
         Ok(momento_image_processing::develop::sample_for_white_balance(&src, settings, u, v)
             .map(momento_image_processing::develop::color::neutralize))
     }
 
     pub fn auto_straighten(&self, key: i64, settings: &DevelopSettings) -> CoreResult<Option<f32>> {
         let (_, asset) = self.catalog().resolve_key(key)?;
-        let src = self.edits.source(&self.open_catalog()?, &self.registry, asset)?;
+        let src = self.edits.source(&*self.open_catalog()?, &self.registry, asset)?;
         Ok(momento_image_processing::develop::auto_straighten(&src, settings))
     }
 
@@ -557,9 +571,18 @@ impl ProjectSession {
         key: i64,
         level: crate::paths::CacheLevel,
     ) -> CoreResult<crate::previews::Servable> {
+        // A preview/1:1 da fotografia aberta passa à frente do segundo plano.
+        let _fg = (level != crate::paths::CacheLevel::Thumb)
+            .then(momento_task_queue::foreground::Interactive::begin);
         let cat = self.open_catalog()?;
         let (variant, asset) = cat.resolve_key(key)?;
         let recipe = cat.recipe_of(variant)?;
+        // Já em cache: sai logo, sem esperar por gerações em curso.
+        let cached = recipe.is_identity() && self.paths.cached(level, asset).is_file();
+        // Gerar: no máximo VIEW_PERMITS de cada vez, o pedido mais recente primeiro (a
+        // fotografia em que o utilizador parou ao navegar depressa).
+        let _turn =
+            (level != crate::paths::CacheLevel::Thumb && !cached).then(|| self.view_gate.acquire());
         if recipe.is_identity() {
             return crate::previews::ensure(&self.paths, &self.registry, asset, level);
         }

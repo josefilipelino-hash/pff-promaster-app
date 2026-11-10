@@ -2,7 +2,7 @@
 //! classes ImageNet. Dá pistas como “gown”, “suit”, “church”, “altar”, “Loafer”,
 //! “microphone”, “plate”, “limousine”, “stage”… usadas na classificação de momentos.
 
-use image::{imageops, RgbImage};
+use image::RgbImage;
 use tract_onnx::prelude::*;
 
 pub const SCENE_INPUT: u32 = 260;
@@ -22,7 +22,7 @@ pub fn classify(plan: &crate::Plan, img: &RgbImage) -> TractResult<Vec<f32>> {
     let small = if img.dimensions() == (SCENE_INPUT, SCENE_INPUT) {
         img.clone()
     } else {
-        imageops::resize(img, SCENE_INPUT, SCENE_INPUT, imageops::FilterType::Triangle)
+        momento_ai_analysis::resize::rgb(img, SCENE_INPUT, SCENE_INPUT)
     };
     let data: Vec<f32> = small.as_raw().iter().map(|&v| (v as f32 - 127.0) / 128.0).collect();
     let t: Tensor = tract_ndarray::Array4::from_shape_vec(

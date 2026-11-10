@@ -79,6 +79,9 @@ abaixo são requisitos de arquitetura, não opções.
    EXIF nem GPS) e sem ligações de rede; nada é enviado a laboratórios — o utilizador
    envia os ficheiros como quiser. As caixas dos rostos servem só para o recorte e as
    verificações, nunca são escritas nos ficheiros.
+6d. **Diagnóstico de desempenho (Fase 12):** só com `MOMENTO_PERF=1`. Regista no log local
+   tempos, contagens e memória (ex.: "grelha pronta em 242 ms, 15 000 fotografias") —
+   nunca nomes de ficheiros, caminhos, imagens ou metadados. Nada é enviado.
 
 ## Eliminação
 

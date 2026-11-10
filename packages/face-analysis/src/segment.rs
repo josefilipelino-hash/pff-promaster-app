@@ -7,7 +7,7 @@
 //! As saídas são de baixa resolução: a aplicação refina as bordas com um *guided filter*
 //! guiado pela própria fotografia.
 
-use image::{imageops, RgbImage};
+use image::RgbImage;
 use momento_core_types::{CoreError, CoreResult};
 use std::path::Path;
 use tract_onnx::prelude::*;
@@ -67,7 +67,7 @@ fn letterbox(img: &RgbImage, n: u32) -> (Vec<f32>, usize, usize) {
         ((img.width() as f32 * s).round() as u32).max(1),
         ((img.height() as f32 * s).round() as u32).max(1),
     );
-    let r = imageops::resize(img, w, h, imageops::FilterType::Triangle);
+    let r = momento_ai_analysis::resize::rgb(img, w, h);
     let mut out = vec![0f32; (n * n * 3) as usize];
     for (x, y, p) in r.enumerate_pixels() {
         let i = ((y * n + x) * 3) as usize;

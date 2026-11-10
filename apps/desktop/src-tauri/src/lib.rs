@@ -29,6 +29,7 @@ fn init_logging(app: &tauri::App) {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    commands::mark_process_start();
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .register_asynchronous_uri_scheme_protocol("momento", protocol::handle)
@@ -49,6 +50,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::perf_mode,
+            commands::perf_log,
             commands::app_info,
             commands::export_capabilities,
             commands::export_recipes,

@@ -1,71 +1,68 @@
 # Estado do projeto
 
-**Última atualização:** 2026-11-10 · **Fase atual:** 11 — Álbuns · **Estado:** ✅ concluída
-**Versão:** 0.11.0 · **Branch:** `main` · **Plataformas-alvo:** macOS (Apple Silicon e Intel) e Windows 10/11
+**Última atualização:** 2026-11-10 · **Fase atual:** 12 — Desempenho · **Estado:** ✅ concluída
+**Versão:** 0.12.0 · **Branch:** `main` · **Plataformas-alvo:** macOS (Apple Silicon e Intel) e Windows 10/11
 
 ---
 
 ## Resumo
 
-Cada projeto pode ter **álbuns fotográficos** (vista "Álbum"): formatos 20×20 a 30×40 cm e
-personalizado, com largura, altura, orientação, páginas, DPI, sangria, zona segura,
-dobra, ICC e laboratório. Presets de laboratório personalizados; sem preset nem
-confirmação, as medidas ficam **por confirmar** (não há valores universais). Editor com
-arrastar e largar, layouts de 1 a 6+ fotografias, full bleed, panorâmicas, alinhar,
-distribuir, margens, espaçamento, recorte e zoom. **"Criar álbum automaticamente"** monta
-uma narrativa pelos momentos. Alertas de DPI, zona segura e rostos na dobra. Exportação
-pela fila, a partir dos originais: JPEG/TIFF por spread ou página, PDF de impressão e PDF
-de prova.
+Fase dedicada a desempenho, medida com um projeto de **15 000 fotografias** e com
+fotografias a resolução real (24 MP e RAW de 18 câmaras). Profiling com `perf` em vez de
+intuição; cada alteração medida antes e depois. Detalhes e método: **`PERFORMANCE.md`**.
+
+## Resultados principais (medidos)
+
+| Medição | Antes | Depois |
+|---|---|---|
+| Lançamento até à interface pronta (a quente) | 760–815 ms | 778–800 ms |
+| RAM em repouso / com 15 000 abertas (PSS, núcleo + WebKit) | 225 / 297 MB | 228 / 285 MB |
+| Abrir projeto de 15 000: grelha pronta | 794 ms | **242 ms** |
+| Scroll da grelha (15 000) | 67–71 FPS | 67–75 FPS (44 células no DOM) |
+| Servir miniatura em cache | 3,80 ms | **0,10 ms** |
+| Preview da fotografia vista com IA em fundo (p50) | 95 ms (sem carga 64) | **60 ms** |
+| Navegação rápida: espera da fotografia em que se para | 844 ms | **562 ms** |
+| Visualizador na aplicação, com a análise das 15 000 a correr | — | p50 79 ms (sem carga 67) |
+| Miniaturas (1600 px / 24 MP) | 119/s / 43/s | sem alteração |
+| Abrir RAW: preview p50 / revelação completa p50 | 478 ms / 2,0 s | sem alteração |
+| IA por fotografia (24 MP, 2 threads) | 0,431 s | **0,233 s** |
+| Exportação JPEG 24 MP | 19/min | **30–31/min** |
 
 ## Funcional (verificado)
 
-| Funcionalidade | Verificação |
+| Pedido | Estado |
 |---|---|
-| Formatos 20×20, 25×25, 30×30, 35×35, 20×30, 25×35, 30×40 e personalizado; orientação | Testes; interface (30×40 → 40 cm horizontal; editar → "Personalizado") |
-| Páginas (pares), DPI, sangria, zona segura, dobra, cor/ICC, unidade de exportação, fundo | Testes; aplicação real (20 páginas → 10 spreads, 150 DPI) |
-| Presets de laboratório personalizados; medidas "por confirmar" | Teste de fluxo (biblioteca); interface (aplicar preset → confirmado) |
-| Arrastar e largar da tira para o spread ou para uma moldura | Aplicação real (xdotool) e teste de interface |
-| Layouts de 1 a 6+ (incl. panorâmica, full bleed, grelhas justificadas), margens, espaçamento | Testes; aplicação real (F\|F aplicado) |
-| Mover, redimensionar, recortar, zoom, alinhar, distribuir, teclado (setas, Delete) | Testes de lógica e interface; aplicação real (Shift+clique + Delete) |
-| "Criar álbum automaticamente" (seleção, momentos, cronologia, classificação, orientação, pessoas, relevância) | Testes (ordem da narrativa, sem duplicados, sem rostos na dobra); aplicação real: 55 fotografias → Abertura → Cerimónia → Casal → Receção → Festa |
-| Evitar baixa resolução: fotografias pequenas demais ficam de fora; as restantes nunca são ampliadas além do DPI do laboratório | Teste de regressão (erro encontrado na aplicação real e corrigido) |
-| Alertas de DPI (erro < 50 %, aviso < 80 %), zona segura, rostos na dobra, bordas perto do corte, vazias, repetidas | Testes; aplicação real (46 DPI → erro e exportação bloqueada) |
-| PDF de impressão | Aplicação real + `pypdf`: 10 páginas, MediaBox 606×306 mm, TrimBox 600×300 mm, 3579×1807 px (150 DPI exatos), ICCBased |
-| PDF de prova | Aplicação real: 120 DPI, guias de corte/zona segura/dobra, marca "PROVA" |
-| JPEG por spread / TIFF | Teste de fluxo (largura exata com sangria) e testes do crate |
-| Persistência | Álbum reaberto igual depois de reiniciar a aplicação |
-
-## Desempenho medido (Linux x86_64, 4 núcleos, release)
-
-| Operação | Resultado |
-|---|---|
-| Automático com 55 fotografias | instantâneo (< 1 s na aplicação real) |
-| PDF de impressão 30×30, 10 spreads, 150 DPI (fotografias ~0,8 MP) | 5,4 MB; concluído em segundos (não cronometrado com precisão) |
-
-A 300 DPI e com fotografias de 24 MP a revelação dos originais domina (como na Fase 9).
-Mac/Windows: **não medido**.
+| Lazy loading, virtualização da grelha | Já existia; verificado com 15 000 (44 células no DOM) |
+| Cache de miniaturas e de previews (disco, LRU) | Já existia; verificado |
+| LRU em memória | Corrigida (era FIFO) + limite de AI Denoise em resolução total |
+| Processamento paralelo controlado, filas, workers | Miniaturas N−1, análise N/2, previews 3 (LIFO), exportação em pipeline com 1 adiantada |
+| Prioridades: "a fotografia 3421 primeiro" | **Novo:** primeiro plano global + portão LIFO; medido no núcleo e na aplicação real |
+| Batching e transações | Já existia (lotes de 48/150 ms); verificado |
+| Índices SQLite | **2 novos** (migração v8), por `EXPLAIN QUERY PLAN` |
+| Processamento incremental | Já existia (estado por fotografia, retoma) |
+| Não carregar milhares de RAW completos | Verificado: preview embutida/meia resolução; resolução total só a pedido, nunca em cache |
+| Medições pedidas | Todas em `PERFORMANCE.md` (lançamento, RAM, FPS, miniaturas, RAW, IA, exportações/min) |
 
 ## Não funcional / limitações
 
-- **Texto e grafismos** nas páginas, **capa** e lombada: não implementados.
-- **CMYK / PDF/X:** não; o PDF é RGB com o perfil ICC escolhido (D-076).
-- **Desfazer** no editor: não (a montagem automática pede confirmação antes de substituir).
-- O automático usa a análise (relevância, grupos, rostos) quando existe; sem análise usa
-  as estrelas e só deteta rajadas pelo tempo (< 3 s) — imagens repetidas com horas
-  diferentes não são detetadas.
-- Encomendas diretas a laboratórios: não (o utilizador envia os ficheiros).
-- Mac/Windows não executados.
+- **GPU:** não medida nem usada (ambiente sem GPU); render em CPU.
+- **macOS e Windows:** nenhuma medição. O WebView do Linux (WebKitGTK) usa até ~540 MB de
+  cache de imagens durante scroll longo (estabiliza); WKWebView/WebView2 por medir.
+- **RAW em resolução total** numa só thread (LibRaw sem OpenMP, D-085): 2–6 s.
+- DNG de telemóveis/drones sem preview grande: ~2 s para a preview de ecrã.
+- Conjunto de 15 000 é sintético (JPEG 1600 px); o custo a resolução real foi medido à
+  parte com 58 ficheiros. Discos lentos (HDD, rede, cartões) não medidos.
 
 ## Arquitetura
 
-Decisões D-071 a D-077. Crate `momento-album` (`spec`, `model`, `layouts`, `auto`,
-`preflight`, `compose`, `pdf`, `export`); `project-management::album` (catálogo, dados das
-fotografias, exportação pela fila); tabela `album_lab` (biblioteca, migração 4); editor
-`AlbumView.tsx` + `logic/album.ts`.
+Decisões D-078 a D-085. Novos: `task-queue::foreground` (primeiro plano + portão LIFO),
+`project-management::pool`, `ai-analysis::resize`, `color_management::EncodeLut`,
+`develop::color::eotf_hq`, `Prepared::produce_owned`, migração v8, modo de diagnóstico
+(`perf_mode`/`perf_log`, `logic/perfProbe.ts`).
 
 ## Dependências novas
 
-Nenhuma (o PDF é escrito diretamente; JPEG/TIFF/ICC pelo motor de exportação existente).
+Nenhuma (a `rayon`, já usada, passa a ser dependência do `ai-analysis`).
 
 ## Comandos exatos
 
@@ -77,32 +74,34 @@ pnpm dev
 ./scripts/check.sh
 ```
 
+Benchmarks (ver o cabeçalho do ficheiro para todos os comandos):
+
+```bash
+cargo run --release -p momento-project-management --example perf_bench -- open <projeto>
+```
+
+Aplicação com o diagnóstico de desempenho no log:
+
+```bash
+MOMENTO_PERF=1 pnpm dev
+```
+
 ## Testes realizados (2026-11-10)
 
 | Conjunto | Resultado |
 |---|---|
-| `cargo test --release --workspace` (com amostras RAW, modelos e rostos) | ✅ 248 passaram, 0 falharam, 1 ignorado (débito 24 MP, manual) |
-| `pnpm -r test` (Vitest) | ✅ 72 (desktop) + 6 (localização) |
+| `cargo test --release --workspace` (com amostras RAW, modelos e rostos) | ✅ 255 passaram, 0 falharam, 1 ignorado (débito 24 MP, manual) |
+| `pnpm -r test` (Vitest) | ✅ 73 (desktop) + 6 (localização) |
 | `tsc --noEmit`, `cargo fmt --check`, `cargo clippy -D warnings` | ✅ limpos |
-| Aplicação real (build release, Linux/Xvfb) | ✅ criar álbum, especificação, automático (2×), arrastar e largar, layout, Delete, alertas, PDF de impressão e de prova validados por `pypdf` |
-
-Novos testes: `album` (8), `tests/album_flow.rs`, interface (+3), lógica (+4).
-
-## Problemas encontrados no teste real (corrigidos)
-
-1. O automático colocava uma fotografia pequena numa página inteira (84 DPI → erro): agora
-   reduz a moldura ao tamanho que a fotografia aguenta; o filtro usa o DPI do laboratório.
-2. Os atalhos globais (estrelas, rejeitar, setas) atuavam na seleção invisível da grelha
-   enquanto se editava o álbum: desligados na vista Álbum (exceto ajuda e Revelar).
-3. A fila mostrava "Abrir galeria" num álbum (botão que falharia): agora "Abrir PDF".
+| Aplicação real (release, Linux/Xvfb, 15 000 fotografias) | ✅ lançamento, RAM, abrir projeto, scroll, visualizador com/sem análise em fundo |
 
 ## Riscos
 
 | Risco | Impacto | Mitigação |
 |---|---|---|
-| Laboratório exige CMYK ou PDF/X | Médio | Exportar JPEG/TIFF por página com o ICC do laboratório; CMYK numa fase futura |
-| Medidas erradas do laboratório | Alto | Medidas "por confirmar" até haver preset; PDF de prova com guias antes de encomendar |
-| Álbuns muito grandes (80+ páginas a 300 DPI) | Médio | Exportação pela fila com pausa/cancelamento e cache de originais |
+| WebView de macOS/Windows com outra política de memória | Médio | Medir com `MOMENTO_PERF=1` num Mac/PC real |
+| RAW de 45–60 MP em resolução total lentos | Médio | Prioridade sobre o segundo plano; OpenMP/GPU numa fase futura |
+| Exportação a 45 MP: pico de RAM ~2× o de 24 MP | Médio | Pipeline com 1 adiantada; medir em 8 GB |
 
 ## Histórico de fases
 
@@ -120,15 +119,17 @@ Novos testes: `album` (8), `tests/album_flow.rs`, interface (+3), lógica (+4).
 | 9 — Exportação | ✅ | 2026-11-09 |
 | 10 — Galerias | ✅ | 2026-11-10 |
 | 11 — Álbuns | ✅ | 2026-11-10 |
-| 12 — Otimização e distribuição | ⏸ próxima | — |
+| 12 — Desempenho | ✅ | 2026-11-10 |
+| 13 — Distribuição | ⏸ próxima | — |
 
 ## Próximo passo
 
-**Recomendado:** montar um álbum de um casamento teu com o preset do teu laboratório
-(medidas reais de sangria, zona segura e dobra) e enviar o PDF de prova ao laboratório.
+**Recomendado:** abrir um casamento teu grande com `MOMENTO_PERF=1` num Mac e enviar-me
+as linhas `perf: medição` do log, para ter números reais de macOS (WKWebView, Apple
+Silicon, GPU).
 
-**Fase 12 — Otimização e distribuição:** GPU (wgpu), Apple Silicon, projetos grandes,
-recuperação, testes de carga, instaladores assinados.
+**Fase 13 — Distribuição:** GPU (wgpu), Apple Silicon, recuperação, instaladores
+assinados.
 
 **Pendente do utilizador:** repositório GitHub (CI em macOS/Windows); fotografias de teste;
-medidas do teu laboratório; nome definitivo.
+medidas do laboratório; nome definitivo.

@@ -23,6 +23,7 @@ pub mod gallery;
 pub mod local_edit;
 pub mod organize;
 pub mod paths;
+pub mod pool;
 pub mod preset_store;
 pub mod previews;
 mod session;

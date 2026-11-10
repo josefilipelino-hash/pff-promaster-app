@@ -64,6 +64,8 @@ import type {
 export const api = {
   available: () => isTauri(),
   appInfo: () => invoke<AppInfo>("app_info"),
+  perfMode: () => invoke<boolean>("perf_mode"),
+  perfLog: (event: string, data: Record<string, unknown>) => invoke<void>("perf_log", { event, data }),
   eventTypes: () => invoke<string[]>("event_types"),
   recentProjects: () => invoke<RecentProject[]>("list_recent_projects"),
   forgetRecent: (path: string) => invoke<void>("forget_recent_project", { path }),

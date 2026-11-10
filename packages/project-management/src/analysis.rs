@@ -14,7 +14,7 @@
 //! recomendações — que **nunca** apagam nem alteram fotografias.
 
 use crate::paths::{CacheLevel, ProjectPaths};
-use image::{imageops, RgbImage};
+use image::RgbImage;
 use momento_ai_analysis::selection::{self, FaceInfo, Label, PhotoInput, Settings};
 use momento_ai_analysis::{hash, metrics};
 use momento_core_types::{AssetId, CoreError, CoreResult};
@@ -100,11 +100,10 @@ fn work_image(
         return Ok(img);
     }
     let s = WORK_EDGE as f32 / w.max(h) as f32;
-    Ok(imageops::resize(
+    Ok(momento_ai_analysis::resize::rgb(
         &img,
         ((w as f32 * s) as u32).max(1),
         ((h as f32 * s) as u32).max(1),
-        imageops::FilterType::Triangle,
     ))
 }
 
@@ -448,6 +447,7 @@ impl AnalysisService {
                             }
                         });
                         while let Some(id) = queue.pop() {
+                            momento_task_queue::foreground::yield_to_foreground();
                             let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                                 analyze_one(&paths, &catalog, &registry, models.as_ref(), id)
                             }));

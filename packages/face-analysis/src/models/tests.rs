@@ -3,6 +3,7 @@
 
 use super::*;
 use crate::mesh::face_roi;
+use image::imageops;
 
 fn setup() -> Option<(VisionModels, RgbImage)> {
     let dir = find_models_dir(&[])?;

@@ -19,4 +19,5 @@ pub mod hash;
 pub mod metrics;
 pub mod moments;
 pub mod people;
+pub mod resize;
 pub mod selection;

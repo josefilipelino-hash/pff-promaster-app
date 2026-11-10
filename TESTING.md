@@ -69,6 +69,22 @@ plataforma, ecrã inicial, validação do formulário, grelha virtualizada com 3
 secções futuras desativadas, classificação por teclado e em seleção múltipla, filtro
 Favoritas + visualizador, reversão quando o núcleo recusa, paridade de traduções.
 
+## Fase 12 — desempenho
+
+| Teste | O que verifica |
+|---|---|
+| `task-queue::foreground` (2) | o segundo plano espera enquanto há trabalho interativo e nunca mais do que 3 s; o portão LIFO serve o pedido mais recente primeiro |
+| `project-management::pool` | ligações reutilizadas, limite de inativas, ligação a meio de uma transação não volta ao pool |
+| `edit::cache_tests` | no máximo um resultado de AI Denoise em resolução total em memória |
+| `color-management` (+1), `develop::color` (+1) | tabelas das curvas de transferência = fórmula (erro < 2,5e-7 / < 4e-7) em 2 milhões de pontos, exatas fora de [0, 1] |
+| `ai-analysis::resize` | redução rápida = `imageops` Triangle ±2 níveis (RGB e cinzento, várias escalas) |
+| Lógica (+1) | estatísticas de frames do modo de diagnóstico (FPS, p95, frames longos) |
+| `examples/perf_bench.rs` | benchmarks pelo caminho real (ver `PERFORMANCE.md`) |
+| Aplicação real (Xvfb, `MOMENTO_PERF=1`) | lançamento, RAM, abrir 15 000, FPS do scroll, visualizador com/sem análise em fundo |
+
+Os testes de qualidade existentes (exportação 8/16/32 bits, análise com modelos reais e
+referências) continuam a passar depois das otimizações.
+
 ## Fase 11 — álbuns
 
 | Teste | O que verifica |

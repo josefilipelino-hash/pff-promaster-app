@@ -55,6 +55,55 @@ impl ColorSpace {
     }
 }
 
+/// Codificação rápida com tabela de 65 537 entradas e interpolação linear.
+///
+/// Medido na Fase 12: `powf` por canal era 17 % do tempo da exportação. O erro máximo da
+/// tabela é < 2,5e-7 (≈ 1,6 % de um nível de 16 bits; medido no teste); perto de 0 nas curvas gama puras
+/// (derivada infinita) e fora de [0, 1] usa a fórmula exata.
+pub struct EncodeLut {
+    curve: Curve,
+    lo: f32,
+    /// Ponto de quebra da curva por partes (a interpolação não o atravessa).
+    kink: f32,
+    t: Vec<f32>,
+}
+
+impl EncodeLut {
+    const N: usize = 65_536;
+
+    pub fn new(curve: Curve) -> Self {
+        let lo = match curve {
+            Curve::Gamma(_) => 0.004,
+            _ => 0.0,
+        };
+        let kink = match curve {
+            Curve::Srgb => 0.003_130_8,
+            Curve::Bt709 => 0.018,
+            _ => -1.0,
+        };
+        let t = if curve == Curve::Linear {
+            Vec::new()
+        } else {
+            (0..=Self::N).map(|i| curve.encode(i as f32 / Self::N as f32)).collect()
+        };
+        EncodeLut { curve, lo, kink, t }
+    }
+
+    #[inline]
+    pub fn encode(&self, x: f32) -> f32 {
+        if self.t.is_empty()
+            || !(self.lo..=1.0).contains(&x)
+            || (x - self.kink).abs() < 2.0 / Self::N as f32
+        {
+            return self.curve.encode(x);
+        }
+        let p = x * Self::N as f32;
+        let i = (p as usize).min(Self::N - 1);
+        let f = p - i as f32;
+        self.t[i] + (self.t[i + 1] - self.t[i]) * f
+    }
+}
+
 /// Curva de transferência (linear → codificado).
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Curve {
@@ -108,6 +157,11 @@ impl Curve {
                 }
             }
         }
+    }
+
+    /// Tabela de codificação para muitos píxeis (ver [`EncodeLut`]).
+    pub fn encode_lut(self) -> EncodeLut {
+        EncodeLut::new(self)
     }
 
     fn tone_curve(self) -> CoreResult<lcms2::ToneCurve> {
@@ -358,7 +412,8 @@ impl OutputColor {
     pub fn convert(&self, px: &mut [[f32; 3]]) {
         match &self.kind {
             Kind::Matrix { m, curve } => {
-                let (m, curve, linear) = (*m, *curve, self.linear);
+                let (m, linear) = (*m, self.linear);
+                let curve = curve.encode_lut();
                 px.par_iter_mut().for_each(|q| {
                     let v = [
                         m[0][0] * q[0] + m[0][1] * q[1] + m[0][2] * q[2],
@@ -390,6 +445,23 @@ mod tests {
 
     /// A conversão por matriz coincide com a LittleCMS a usar o perfil que embutimos —
     /// ou seja, o ficheiro é lido com as cores certas por qualquer programa.
+    #[test]
+    fn encode_lut_matches_the_formula() {
+        for c in [Curve::Srgb, Curve::Bt709, Curve::Gamma(2.2), Curve::Gamma(1.8), Curve::Linear] {
+            let lut = c.encode_lut();
+            let mut worst = 0.0f32;
+            for i in 0..=2_000_000u32 {
+                let x = i as f32 / 2_000_000.0;
+                worst = worst.max((lut.encode(x) - c.encode(x)).abs());
+            }
+            for x in [-0.5f32, 1.5, 7.0] {
+                assert_eq!(lut.encode(x), c.encode(x), "fora de [0,1] é exato");
+            }
+            eprintln!("{c:?}: erro máximo {worst:e}");
+            assert!(worst < 2.5e-7, "{c:?}: erro {worst}");
+        }
+    }
+
     #[test]
     fn matrix_conversion_matches_lcms_with_embedded_profile() {
         let src = builtin_profile(ColorSpace::Rec2020, true).unwrap();

@@ -19,6 +19,12 @@ use momento_color_management::{ColorSpace, OutputColor};
 use momento_core_types::{CoreError, CoreResult};
 use momento_image_processing::develop::LinearImage;
 
+/// Imagem a produzir: emprestada (várias receitas) ou entregue (última receita).
+enum Src<'a> {
+    Borrowed(&'a LinearImage),
+    Owned(LinearImage),
+}
+
 /// Receita preparada para uma exportação: perfil de cor, marca de água e notas da
 /// normalização (carregados uma vez, usados em todas as fotografias).
 pub struct Prepared {
@@ -71,9 +77,28 @@ impl Prepared {
 
     /// Produz o ficheiro (bytes) a partir da imagem revelada em resolução total.
     pub fn produce(&self, img: &LinearImage, photo: &PhotoMeta) -> CoreResult<Produced> {
+        self.produce_px(Src::Borrowed(img), photo)
+    }
+
+    /// Como [`Prepared::produce`], mas fica com a imagem: sem redimensionar, trabalha no
+    /// próprio buffer em vez de o copiar (Fase 12: menos uma imagem inteira em memória).
+    pub fn produce_owned(&self, img: LinearImage, photo: &PhotoMeta) -> CoreResult<Produced> {
+        self.produce_px(Src::Owned(img), photo)
+    }
+
+    fn produce_px(&self, img: Src<'_>, photo: &PhotoMeta) -> CoreResult<Produced> {
         let r = &self.recipe;
-        let plan = process::plan(&r.size, img.width, img.height);
-        let mut px = process::resample(&img.px, img.width as usize, img.height as usize, &plan);
+        let (iw, ih) = match &img {
+            Src::Borrowed(i) => (i.width, i.height),
+            Src::Owned(i) => (i.width, i.height),
+        };
+        let plan = process::plan(&r.size, iw, ih);
+        let same = plan.x0 == 0.0 && plan.y0 == 0.0 && plan.w == iw && plan.h == ih;
+        let mut px = match img {
+            Src::Owned(i) if same => i.px,
+            Src::Owned(i) => process::resample(&i.px, iw as usize, ih as usize, &plan),
+            Src::Borrowed(i) => process::resample(&i.px, iw as usize, ih as usize, &plan),
+        };
         let (w, h) = (plan.w as usize, plan.h as usize);
         process::sharpen(&mut px, w, h, r);
         if let Some(m) = &self.mark {

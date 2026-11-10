@@ -500,192 +500,249 @@ impl ProjectSession {
         let mut folders: HashSet<String> = HashSet::new();
         // Ficheiros escritos: (chave, receita, caminho, largura, altura).
         let mut outputs: Vec<(i64, usize, PathBuf, u32, u32)> = Vec::new();
-        for (pi, &key) in req.keys.iter().enumerate() {
-            if job.cancelled.load(Ordering::SeqCst) {
-                break;
-            }
-            let Some(row) = rows.get(&key) else {
-                update(&mut |p| {
-                    p.files_failed += prepared.len() as u64;
-                    p.errors.push(ExportError {
-                        file: key.to_string(),
-                        message: "fotografia inexistente".into(),
-                    });
-                });
-                continue;
-            };
-            update(&mut |p| p.current = Some(row.file_name.clone()));
-            self.emit_export(job);
-            let photo = (|| -> CoreResult<_> {
-                let (variant, asset) = cat.resolve_key(key)?;
-                let settings = Settings::from_recipe(&cat.recipe_of(variant)?);
-                // Sempre o original em resolução total (+ AI Denoise da receita).
-                let (src, _) = self.source_for(&cat, asset, &settings, true, true, key)?;
-                // Resolução nativa do recorte (nunca ampliada).
-                let (nw, nh) = native_size(src.width(), src.height(), &settings.geometry);
-                let lin = develop::render_linear(
-                    &src,
-                    &settings,
-                    &RenderOptions {
-                        max_width: nw,
-                        max_height: nh,
-                        quality: Quality::Final,
-                        uncropped: false,
-                    },
-                );
-                let moment = moments
-                    .get(&asset)
-                    .map(|id| {
-                        req.moment_names
-                            .get(id)
-                            .cloned()
-                            .or_else(|| moment_kind.get(id).cloned())
-                            .unwrap_or_default()
-                    })
-                    .unwrap_or_default();
-                let meta = self.photo_meta(asset, row.stars, &project, moment)?;
-                Ok((lin, meta))
-            })();
-            let (lin, meta) = match photo {
-                Ok(v) => v,
-                Err(e) => {
-                    update(&mut |p| {
-                        p.files_failed += prepared.len() as u64;
-                        p.photos_done += 1;
-                        p.errors.push(ExportError {
-                            file: row.file_name.clone(),
-                            message: e.to_string(),
-                        });
-                    });
-                    self.emit_export(job);
-                    continue;
-                }
-            };
-            for (ri, prep) in prepared.iter().enumerate() {
-                // Pausa (pedida ou por falta de espaço) e cancelamento entre ficheiros.
-                if job.paused.load(Ordering::SeqCst) {
-                    update(&mut |p| p.state = JobState::Paused);
-                    self.emit_export(job);
-                    while job.paused.load(Ordering::SeqCst) && !job.cancelled.load(Ordering::SeqCst)
-                    {
-                        std::thread::sleep(std::time::Duration::from_millis(200));
+        // Pipeline em duas fases (Fase 12, medido com `perf`: a thread da exportação fazia
+        // em série a descodificação e a codificação, com a CPU a 215 % de 400 %): uma thread
+        // prepara (descodifica + revela) a fotografia seguinte enquanto esta codifica e grava
+        // a atual. O canal tem capacidade 1: no máximo uma fotografia adiantada em memória.
+        let load = |cat: &momento_database::Catalog,
+                    key: i64,
+                    row: &momento_database::assets::PhotoRow|
+         -> CoreResult<_> {
+            let (variant, asset) = cat.resolve_key(key)?;
+            let settings = Settings::from_recipe(&cat.recipe_of(variant)?);
+            // Sempre o original em resolução total (+ AI Denoise da receita).
+            let (src, _) = self.source_for(cat, asset, &settings, true, true, key)?;
+            // Resolução nativa do recorte (nunca ampliada).
+            let (nw, nh) = native_size(src.width(), src.height(), &settings.geometry);
+            let lin = develop::render_linear(
+                &src,
+                &settings,
+                &RenderOptions {
+                    max_width: nw,
+                    max_height: nh,
+                    quality: Quality::Final,
+                    uncropped: false,
+                },
+            );
+            let moment = moments
+                .get(&asset)
+                .map(|id| {
+                    req.moment_names
+                        .get(id)
+                        .cloned()
+                        .or_else(|| moment_kind.get(id).cloned())
+                        .unwrap_or_default()
+                })
+                .unwrap_or_default();
+            let meta = self.photo_meta(asset, row.stars, &project, moment)?;
+            Ok((lin, meta))
+        };
+        std::thread::scope(|sc| {
+            let (tx, rx) = std::sync::mpsc::sync_channel::<(
+                usize,
+                CoreResult<(develop::LinearImage, PhotoMeta)>,
+            )>(1);
+            let (load, rows_ref) = (&load, &rows);
+            sc.spawn(move || {
+                let rows = rows_ref;
+                let cat = match self.open_catalog() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        let _ = tx.send((usize::MAX, Err(e)));
+                        return;
                     }
-                    update(&mut |p| {
-                        p.state = JobState::Running;
-                        p.paused_reason = None;
-                    });
-                    self.emit_export(job);
+                };
+                for (pi, &key) in req.keys.iter().enumerate() {
+                    if job.cancelled.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    let Some(row) = rows.get(&key) else { continue };
+                    // A fotografia aberta pelo utilizador passa à frente.
+                    momento_task_queue::foreground::yield_to_foreground();
+                    if tx.send((pi, load(&cat, key, row))).is_err() {
+                        break;
+                    }
                 }
+            });
+            for (pi, &key) in req.keys.iter().enumerate() {
                 if job.cancelled.load(Ordering::SeqCst) {
                     break;
                 }
-                let r = &prep.recipe;
-                let (ow, oh) = prep.output_size(lin.width, lin.height);
-                let date = meta.capture_time.clone().unwrap_or_default();
-                let vars = Vars {
-                    stem: meta.file_stem.clone(),
-                    seq: r.naming.seq_start + pi as u32,
-                    date: date.get(0..10).unwrap_or("").to_string(),
-                    time: date.get(11..19).unwrap_or("").replace(':', ""),
-                    project: project.0.clone(),
-                    client: project.1.clone(),
-                    recipe: r.name.clone(),
-                    moment: meta.moment.clone(),
-                    width: ow,
-                    height: oh,
-                    token: req
-                        .gallery
-                        .as_ref()
-                        .and_then(|g| g.tokens.get(&key).cloned())
-                        .unwrap_or_default(),
-                };
-                let dir = dest.join(naming::subfolder(&r.naming, &vars));
-                let name = naming::file_name(&r.naming, &vars, prep.extension());
-                let Some(path) =
-                    naming::resolve(&dir, &name, r.naming.conflict, &mut reserved, &protected)
-                else {
-                    update(&mut |p| p.files_skipped += 1);
+                let Some(row) = rows.get(&key) else {
+                    update(&mut |p| {
+                        p.files_failed += prepared.len() as u64;
+                        p.errors.push(ExportError {
+                            file: key.to_string(),
+                            message: "fotografia inexistente".into(),
+                        });
+                    });
                     continue;
                 };
-                let result = prep.produce(&lin, &meta).and_then(|out| {
-                    // Espaço: pausa em vez de falhar a meio de um ficheiro.
-                    loop {
-                        let free = free_space(&dir);
-                        update(&mut |p| p.free_bytes = free);
-                        if free.is_none_or(|f| f >= out.bytes.len() as u64 + SPACE_MARGIN)
-                            || job.cancelled.load(Ordering::SeqCst)
-                        {
-                            break;
-                        }
-                        job.paused.store(true, Ordering::SeqCst);
+                update(&mut |p| p.current = Some(row.file_name.clone()));
+                self.emit_export(job);
+                let photo = match rx.recv() {
+                    Ok((i, r)) if i == pi => r,
+                    Ok((_, Err(e))) => Err(e),
+                    Ok(_) => Err(CoreError::Other("ordem da exportação".into())),
+                    Err(_) => break,
+                };
+                let (lin, meta) = match photo {
+                    Ok(v) => v,
+                    Err(e) => {
                         update(&mut |p| {
-                            p.state = JobState::Paused;
-                            p.paused_reason = Some("noSpace".into());
+                            p.files_failed += prepared.len() as u64;
+                            p.photos_done += 1;
+                            p.errors.push(ExportError {
+                                file: row.file_name.clone(),
+                                message: e.to_string(),
+                            });
                         });
+                        self.emit_export(job);
+                        continue;
+                    }
+                };
+                let (lw, lh) = (lin.width, lin.height);
+                let mut lin = Some(lin);
+                for (ri, prep) in prepared.iter().enumerate() {
+                    // Pausa (pedida ou por falta de espaço) e cancelamento entre ficheiros.
+                    if job.paused.load(Ordering::SeqCst) {
+                        update(&mut |p| p.state = JobState::Paused);
                         self.emit_export(job);
                         while job.paused.load(Ordering::SeqCst)
                             && !job.cancelled.load(Ordering::SeqCst)
                         {
-                            std::thread::sleep(std::time::Duration::from_millis(300));
+                            std::thread::sleep(std::time::Duration::from_millis(200));
                         }
+                        update(&mut |p| {
+                            p.state = JobState::Running;
+                            p.paused_reason = None;
+                        });
+                        self.emit_export(job);
                     }
                     if job.cancelled.load(Ordering::SeqCst) {
-                        return Err(CoreError::Other("cancelada".into()));
-                    }
-                    momento_image_processing::write_atomic(&path, &out.bytes)?;
-                    Ok((out.bytes.len() as u64, out.width, out.height))
-                });
-                match result {
-                    Ok((n, ow, oh)) => {
-                        outputs.push((key, ri, path.clone(), ow, oh));
-                        ratio[ri].0 += n;
-                        ratio[ri].1 += est[ri][pi];
-                        folders.insert(dir.to_string_lossy().into_owned());
-                        update(&mut |p| {
-                            p.files_done += 1;
-                            p.bytes_written += n;
-                        });
-                    }
-                    Err(e) if job.cancelled.load(Ordering::SeqCst) => {
-                        tracing::info!(erro = %e, "exportação cancelada");
                         break;
                     }
-                    Err(e) => update(&mut |p| {
-                        p.files_failed += 1;
-                        p.errors.push(ExportError {
-                            file: path
-                                .file_name()
-                                .map(|n| n.to_string_lossy().into_owned())
-                                .unwrap_or_default(),
-                            message: e.to_string(),
-                        });
-                    }),
+                    let r = &prep.recipe;
+                    let (ow, oh) = prep.output_size(lw, lh);
+                    let date = meta.capture_time.clone().unwrap_or_default();
+                    let vars = Vars {
+                        stem: meta.file_stem.clone(),
+                        seq: r.naming.seq_start + pi as u32,
+                        date: date.get(0..10).unwrap_or("").to_string(),
+                        time: date.get(11..19).unwrap_or("").replace(':', ""),
+                        project: project.0.clone(),
+                        client: project.1.clone(),
+                        recipe: r.name.clone(),
+                        moment: meta.moment.clone(),
+                        width: ow,
+                        height: oh,
+                        token: req
+                            .gallery
+                            .as_ref()
+                            .and_then(|g| g.tokens.get(&key).cloned())
+                            .unwrap_or_default(),
+                    };
+                    let dir = dest.join(naming::subfolder(&r.naming, &vars));
+                    let name = naming::file_name(&r.naming, &vars, prep.extension());
+                    let Some(path) =
+                        naming::resolve(&dir, &name, r.naming.conflict, &mut reserved, &protected)
+                    else {
+                        update(&mut |p| p.files_skipped += 1);
+                        continue;
+                    };
+                    // A última receita fica com a imagem (sem a copiar).
+                    let produced = if ri + 1 == prepared.len() {
+                        match lin.take() {
+                            Some(l) => prep.produce_owned(l, &meta),
+                            None => Err(CoreError::Other("imagem já usada".into())),
+                        }
+                    } else {
+                        match lin.as_ref() {
+                            Some(l) => prep.produce(l, &meta),
+                            None => Err(CoreError::Other("imagem já usada".into())),
+                        }
+                    };
+                    let result = produced.and_then(|out| {
+                        // Espaço: pausa em vez de falhar a meio de um ficheiro.
+                        loop {
+                            let free = free_space(&dir);
+                            update(&mut |p| p.free_bytes = free);
+                            if free.is_none_or(|f| f >= out.bytes.len() as u64 + SPACE_MARGIN)
+                                || job.cancelled.load(Ordering::SeqCst)
+                            {
+                                break;
+                            }
+                            job.paused.store(true, Ordering::SeqCst);
+                            update(&mut |p| {
+                                p.state = JobState::Paused;
+                                p.paused_reason = Some("noSpace".into());
+                            });
+                            self.emit_export(job);
+                            while job.paused.load(Ordering::SeqCst)
+                                && !job.cancelled.load(Ordering::SeqCst)
+                            {
+                                std::thread::sleep(std::time::Duration::from_millis(300));
+                            }
+                        }
+                        if job.cancelled.load(Ordering::SeqCst) {
+                            return Err(CoreError::Other("cancelada".into()));
+                        }
+                        momento_image_processing::write_atomic(&path, &out.bytes)?;
+                        Ok((out.bytes.len() as u64, out.width, out.height))
+                    });
+                    match result {
+                        Ok((n, ow, oh)) => {
+                            outputs.push((key, ri, path.clone(), ow, oh));
+                            ratio[ri].0 += n;
+                            ratio[ri].1 += est[ri][pi];
+                            folders.insert(dir.to_string_lossy().into_owned());
+                            update(&mut |p| {
+                                p.files_done += 1;
+                                p.bytes_written += n;
+                            });
+                        }
+                        Err(e) if job.cancelled.load(Ordering::SeqCst) => {
+                            tracing::info!(erro = %e, "exportação cancelada");
+                            break;
+                        }
+                        Err(e) => update(&mut |p| {
+                            p.files_failed += 1;
+                            p.errors.push(ExportError {
+                                file: path
+                                    .file_name()
+                                    .map(|n| n.to_string_lossy().into_owned())
+                                    .unwrap_or_default(),
+                                message: e.to_string(),
+                            });
+                        }),
+                    }
+                    // Progresso a cada ficheiro (não só por fotografia).
+                    self.emit_export(job);
                 }
-                // Progresso a cada ficheiro (não só por fotografia).
+                // Estimativa corrigida: o que falta × (real ÷ estimado) de cada receita.
+                let remaining: u64 = (0..prepared.len())
+                    .map(|ri| {
+                        let left: u64 = est[ri][pi + 1..].iter().sum();
+                        let (real, guess) = ratio[ri];
+                        if guess > 0 {
+                            (left as f64 * real as f64 / guess as f64) as u64
+                        } else {
+                            left
+                        }
+                    })
+                    .sum();
+                let elapsed = started.elapsed().as_secs_f64();
+                update(&mut |p| {
+                    p.photos_done += 1;
+                    p.bytes_estimated = p.bytes_written + remaining;
+                    let left = p.photos_total - p.photos_done;
+                    p.eta_seconds = Some(elapsed / p.photos_done as f64 * left as f64);
+                    p.folders = folders.iter().cloned().collect();
+                });
                 self.emit_export(job);
             }
-            // Estimativa corrigida: o que falta × (real ÷ estimado) de cada receita.
-            let remaining: u64 = (0..prepared.len())
-                .map(|ri| {
-                    let left: u64 = est[ri][pi + 1..].iter().sum();
-                    let (real, guess) = ratio[ri];
-                    if guess > 0 {
-                        (left as f64 * real as f64 / guess as f64) as u64
-                    } else {
-                        left
-                    }
-                })
-                .sum();
-            let elapsed = started.elapsed().as_secs_f64();
-            update(&mut |p| {
-                p.photos_done += 1;
-                p.bytes_estimated = p.bytes_written + remaining;
-                let left = p.photos_total - p.photos_done;
-                p.eta_seconds = Some(elapsed / p.photos_done as f64 * left as f64);
-                p.folders = folders.iter().cloned().collect();
-            });
-            self.emit_export(job);
-        }
+            drop(rx);
+        });
         // Galeria: montar o site com os ficheiros escritos.
         let mut failed = false;
         if let Some(g) = req.gallery.as_ref().filter(|_| !job.cancelled.load(Ordering::SeqCst)) {

@@ -22,6 +22,8 @@ pub struct GeoMap {
     ca_b: f32,
     /// Ignora o recorte (modo de recorte na interface mostra a imagem toda).
     pub uncropped: bool,
+    /// 1 / (meia-diagonal)² — constante, calculada uma vez (antes: `sqrt` por píxel).
+    inv_hd2: f32,
 }
 
 /// Dimensões do resultado (proporção do recorte) dentro de uma caixa `max_w`×`max_h`.
@@ -89,6 +91,7 @@ impl GeoMap {
             ca_r: lens.ca_red / 100.0 * 0.004,
             ca_b: lens.ca_blue / 100.0 * 0.004,
             uncropped,
+            inv_hd2: 4.0 / (src_aspect * src_aspect + 1.0),
         }
     }
 
@@ -122,8 +125,7 @@ impl GeoMap {
             ox = -ox;
         }
         // Distorção da objetiva (raio normalizado pela meia-diagonal).
-        let hd = (self.src_aspect * self.src_aspect + 1.0).sqrt() / 2.0;
-        let r2 = (ox * ox + oy * oy) / (hd * hd);
+        let r2 = (ox * ox + oy * oy) * self.inv_hd2;
         let k = 1.0 + self.k_dist * r2;
         ox *= k;
         oy *= k;

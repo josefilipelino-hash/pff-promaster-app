@@ -4,7 +4,7 @@ use crate::detector::{Detector, FaceDetection};
 use crate::mesh::{run_blendshapes, run_mesh};
 use crate::tensor::to_nhwc;
 use crate::FaceResult;
-use image::{imageops, RgbImage};
+use image::RgbImage;
 use momento_core_types::{CoreError, CoreResult};
 use std::path::{Path, PathBuf};
 use tract_onnx::prelude::*;
@@ -154,7 +154,7 @@ impl VisionModels {
 
     /// Vetor visual normalizado (norma L2 = 1) da imagem inteira.
     pub fn embed(&self, img: &RgbImage) -> CoreResult<Vec<f32>> {
-        let small = imageops::resize(img, 224, 224, imageops::FilterType::Triangle);
+        let small = momento_ai_analysis::resize::rgb(img, 224, 224);
         let out = self
             .embedder
             .run(tvec!(to_nhwc(&small, -1.0, 1.0).into()))

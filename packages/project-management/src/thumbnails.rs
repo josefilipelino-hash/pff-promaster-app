@@ -102,6 +102,8 @@ impl ThumbnailService {
                     .name(format!("thumb-{i}"))
                     .spawn(move || {
                         while let Some(id) = queue.pop() {
+                            // A fotografia aberta pelo utilizador passa à frente.
+                            momento_task_queue::foreground::yield_to_foreground();
                             // Um pânico num descodificador não pode matar a thread nem a aplicação.
                             let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                                 generate(&paths, &catalog, &registry, id)
