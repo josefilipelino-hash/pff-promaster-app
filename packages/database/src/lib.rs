@@ -21,6 +21,7 @@ pub mod migrations;
 pub mod moments;
 pub mod people;
 pub mod project;
+pub mod safety;
 pub mod ui_state;
 
 use momento_core_types::{CoreError, CoreResult};
@@ -66,8 +67,11 @@ pub(crate) fn open_with_migrations(path: &Path, list: &[&str]) -> CoreResult<Con
 
 fn configure(conn: &Connection) -> CoreResult<()> {
     conn.execute_batch(
+        // FULL (Fase 13): cada transação confirmada está no disco antes de a função
+        // voltar — um corte de energia não perde a última classificação/edição. Com WAL,
+        // NORMAL nunca corrompia, mas podia perder as últimas transações.
         "PRAGMA journal_mode = WAL;
-         PRAGMA synchronous = NORMAL;
+         PRAGMA synchronous = FULL;
          PRAGMA foreign_keys = ON;
          PRAGMA busy_timeout = 10000;",
     )

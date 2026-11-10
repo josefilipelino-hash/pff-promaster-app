@@ -6,7 +6,7 @@ use momento_project_management::{ImportSummary, ProjectSession, SessionEvents};
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 
 pub static LOG_GUARD: OnceLock<tracing_appender::non_blocking::WorkerGuard> = OnceLock::new();
 
@@ -19,6 +19,7 @@ pub const EV_EDITS: &str = "edits-changed";
 pub const EV_AUTO_EDIT: &str = "auto-edit-progress";
 pub const EV_AI_DENOISE: &str = "ai-denoise";
 pub const EV_EXPORT: &str = "export-progress";
+pub const EV_AVAILABILITY: &str = "availability";
 
 struct Emitter2 {
     app: AppHandle,
@@ -60,6 +61,9 @@ impl SessionEvents for Emitter2 {
     }
     fn export_progress(&self, p: &momento_project_management::export::ExportProgress) {
         let _ = self.app.emit(EV_EXPORT, p);
+    }
+    fn availability(&self, s: &momento_project_management::AvailabilitySummary) {
+        let _ = self.app.emit(EV_AVAILABILITY, s);
     }
 }
 
@@ -118,6 +122,12 @@ impl AppState {
                 .into_owned(),
         });
         let session = ProjectSession::open(path, events)?;
+        let report = session.open_report();
+        if report.previous_unclean {
+            if let Ok(dir) = self.app.path().app_log_dir() {
+                crate::crash::report_unclean(&dir, &report);
+            }
+        }
         self.library().touch(&session.recent_entry()?)?;
         let token = self.next_token.fetch_add(1, Ordering::SeqCst);
         *self.project.write().unwrap_or_else(|e| e.into_inner()) =

@@ -309,6 +309,19 @@ pub const CATALOG: &[&str] = &[
     CREATE INDEX variant_by_asset ON variant(asset_id);
     CREATE INDEX snapshot_by_variant ON snapshot(variant_id);
     "#,
+    // v9 — Fase 13: segurança. Cópia de segurança feita na importação, disponibilidade
+    // dos originais (`status`: ok / offline / missing — a coluna já existia) e registo de
+    // eventos de segurança (sessão interrompida, restauros, validações).
+    r#"
+    ALTER TABLE asset ADD COLUMN backup_path TEXT;
+    CREATE INDEX asset_unavailable ON asset(status) WHERE status != 'ok';
+    CREATE TABLE safety_log (
+        id     INTEGER PRIMARY KEY,
+        at     INTEGER NOT NULL,
+        kind   TEXT NOT NULL,
+        detail TEXT NOT NULL
+    ) STRICT;
+    "#,
 ];
 
 /// Migrações da biblioteca global (projetos recentes).

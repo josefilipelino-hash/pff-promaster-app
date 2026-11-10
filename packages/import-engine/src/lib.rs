@@ -44,6 +44,10 @@ pub struct ImportOptions {
     pub project_dir: Option<PathBuf>,
     /// Número de threads de processamento.
     pub threads: usize,
+    /// Verificar cada cópia (reler e comparar o hash BLAKE3). Ligado por omissão.
+    pub verify: bool,
+    /// Segunda cópia, para um disco de segurança (ORIGINAL → Trabalho + ORIGINAL → Backup).
+    pub backup_dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
@@ -213,12 +217,16 @@ fn sanitize(s: &str) -> String {
 }
 
 /// Destino no modo cópia: `<originais>/<câmara>/<nome>`; colisões recebem sufixo `_1`, `_2`…
-fn copy_destination(shared: &Shared, file_name: &str, camera: Option<&str>) -> CoreResult<PathBuf> {
-    let base = shared
-        .options
-        .originals_dir
-        .as_ref()
-        .ok_or_else(|| CoreError::Other("sem pasta dos originais".into()))?;
+/// Destino de uma cópia em `base/<câmara>/`. Se o nome já existir com **o mesmo
+/// conteúdo** (cópia feita numa importação interrompida), é reutilizado — nada de
+/// duplicados `_1` órfãos. Devolve (caminho, já existia).
+fn copy_destination(
+    shared: &Shared,
+    base: &Path,
+    file_name: &str,
+    camera: Option<&str>,
+    hash: &[u8; 32],
+) -> CoreResult<(PathBuf, bool)> {
     let dir = base.join(sanitize(camera.unwrap_or("Sem_camara")));
     let (stem, ext) = match file_name.rsplit_once('.') {
         Some((s, e)) => (s.to_string(), format!(".{e}")),
@@ -228,12 +236,65 @@ fn copy_destination(shared: &Shared, file_name: &str, camera: Option<&str>) -> C
     for n in 0..10_000 {
         let name = if n == 0 { format!("{stem}{ext}") } else { format!("{stem}_{n}{ext}") };
         let candidate = dir.join(name);
-        if !candidate.exists() && !reserved.contains(&candidate) {
+        if reserved.contains(&candidate) {
+            continue;
+        }
+        if !candidate.exists() {
             reserved.insert(candidate.clone());
-            return Ok(candidate);
+            return Ok((candidate, false));
+        }
+        if std::fs::read(&candidate).is_ok_and(|d| <[u8; 32]>::from(blake3::hash(&d)) == *hash) {
+            reserved.insert(candidate.clone());
+            return Ok((candidate, true));
         }
     }
     Err(CoreError::Other("não foi possível encontrar um nome livre".into()))
+}
+
+/// Cópia atómica (temporário + `fsync` + `rename`) e, se pedido, verificada relendo o
+/// destino. Um encerramento a meio deixa só um temporário `.<nome>.<pid>-<n>.tmp`, que é
+/// removido na abertura seguinte — nunca um ficheiro meio escrito com o nome final.
+fn copy_verified(
+    shared: &Shared,
+    base: &Path,
+    file_name: &str,
+    camera: Option<&str>,
+    data: &[u8],
+    hash: &[u8; 32],
+) -> CoreResult<PathBuf> {
+    use std::io::Write;
+    let (dest, existed) = copy_destination(shared, base, file_name, camera, hash)?;
+    if existed {
+        return Ok(dest);
+    }
+    let dir = dest.parent().ok_or_else(|| CoreError::Other("destino sem pasta".into()))?;
+    std::fs::create_dir_all(dir)?;
+    static N: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let tmp = dir.join(format!(
+        ".{}.{}-{}.tmp",
+        dest.file_name().and_then(|n| n.to_str()).unwrap_or("f"),
+        std::process::id(),
+        N.fetch_add(1, Ordering::Relaxed)
+    ));
+    let res = (|| -> CoreResult<()> {
+        let mut f = std::fs::File::create(&tmp)?;
+        f.write_all(data)?;
+        f.sync_all()?;
+        drop(f);
+        if shared.options.verify {
+            let back: [u8; 32] = blake3::hash(&std::fs::read(&tmp)?).into();
+            if back != *hash {
+                return Err(CoreError::Corrupt("a cópia não coincide com o original".into()));
+            }
+        }
+        std::fs::rename(&tmp, &dest)?;
+        Ok(())
+    })();
+    if let Err(e) = res {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(e);
+    }
+    Ok(dest)
 }
 
 fn process_file(path_str: &str, shared: &Shared) -> Processed {
@@ -301,25 +362,31 @@ fn process_file_inner(path_str: &str, shared: &Shared) -> CoreResult<Processed> 
         shared.registry.candidates(det.format, |c| c.decode).first().map(|c| c.id().to_string());
     let file_name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
 
+    let camera = exif.camera_model.as_deref();
     let (final_path, source_path) = match shared.options.mode {
         ImportMode::Reference => (path_str.to_string(), None),
         ImportMode::Copy => {
-            let dest = copy_destination(shared, &file_name, exif.camera_model.as_deref())?;
-            if let Some(parent) = dest.parent() {
-                std::fs::create_dir_all(parent)?;
-            }
-            std::fs::write(&dest, &data)?;
-            // Verificação: reler do disco e comparar o hash.
-            let verify: [u8; 32] = blake3::hash(&std::fs::read(&dest)?).into();
-            if verify != hash {
-                let _ = std::fs::remove_file(&dest);
-                return Err(CoreError::Corrupt("a cópia não coincide com o original".into()));
-            }
+            let base = shared
+                .options
+                .originals_dir
+                .as_ref()
+                .ok_or_else(|| CoreError::Other("sem pasta dos originais".into()))?;
+            let dest = copy_verified(shared, base, &file_name, camera, &data, &hash)?;
             (dest.to_string_lossy().into_owned(), Some(path_str.to_string()))
         }
     };
+    // Segunda cópia (disco de segurança), com a mesma verificação.
+    let backup_path = match &shared.options.backup_dir {
+        Some(b) => Some(
+            copy_verified(shared, b, &file_name, camera, &data, &hash)?
+                .to_string_lossy()
+                .into_owned(),
+        ),
+        None => None,
+    };
 
     Ok(Processed::Asset(Box::new(NewAsset {
+        backup_path,
         path: final_path,
         source_path,
         file_name,

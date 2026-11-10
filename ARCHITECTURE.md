@@ -731,6 +731,10 @@ Ver `EXPORT_FORMATS.md`.
 
 ## 20. Segurança da aplicação
 
+Fiabilidade (Fase 13 — catálogo, originais, importação, exportação, crash logs): ver
+`RELIABILITY.md` e as decisões D-086 a D-092.
+
+
 Ver `SECURITY.md`. Resumo: CSP restritiva, capabilities mínimas do Tauri (só `core:default`
 na Fase 0), comandos validam todos os argumentos, nenhum acesso genérico ao sistema de
 ficheiros a partir do frontend (caminhos sempre resolvidos e verificados no núcleo).
@@ -824,3 +828,10 @@ ficheiros a partir do frontend (caminhos sempre resolvidos e verificados no núc
 | D-083 | 2026-11-10 | Redução triangular própria (vírgula fixa, paralela) na análise; hashes percetuais mantêm `imageops` | Crate externa de resize | 51 % da análise em `imageops::resize`; sem dependência nova; hashes gravados continuam comparáveis |
 | D-084 | 2026-11-10 | Índices `variant(asset_id)` e `snapshot(variant_id)` (migração v8) | — | `EXPLAIN QUERY PLAN` com 15 000: varrimentos completos (0,41 → 0,004 ms; apagar 300: 257 → 6 ms) |
 | D-085 | 2026-11-10 | LibRaw sem OpenMP | Demosaico paralelo com OpenMP | O Apple Clang não traz OpenMP: partiria a compilação no macOS; a revelação a 100 % já tem prioridade |
+| D-086 | 2026-11-10 | `synchronous = FULL` no catálogo (com WAL) | `NORMAL` | Cada transação confirmada está no disco: um corte de energia não perde a última classificação/edição. Custo medido: 200 classificações 0,4 → 1,7 ms |
+| D-087 | 2026-11-10 | Uso exclusivo e deteção de interrupção com `File::try_lock` + conteúdo "running" | PID em ficheiro | O sistema liberta o bloqueio se o processo morrer; portável; distingue "noutra janela" de "sessão interrompida". MSRV 1.85 → 1.89 |
+| D-088 | 2026-11-10 | Catálogo danificado: guardar de lado e restaurar a versão válida mais recente automaticamente | Pedir ao utilizador antes de abrir | Abrir com um catálogo danificado arrisca mais danos; nada é apagado e a interface explica |
+| D-089 | 2026-11-10 | Offline vs em falta pela existência da pasta do ficheiro; verificação a cada 30 s | Identificar volumes por UUID | Portável e suficiente: disco desligado → a pasta desaparece; relink confirma o conteúdo por hash |
+| D-090 | 2026-11-10 | Lixo do sistema pela crate `trash` (MIT) e confirmação exigida também no núcleo | Apagar com `remove_file` / só confirmação na interface | Recuperável; defesa em profundidade contra uma chamada acidental |
+| D-091 | 2026-11-10 | Exportação interrompida retomável pelo índice da próxima fotografia | Lista de ficheiros feitos | Escrita pequena por fotografia; limite documentado (a fotografia em gravação no instante da falha pode sair `_1`) |
+| D-092 | 2026-11-10 | Crash logs locais e anonimizados (caminhos/emails removidos) | Enviar relatórios | Pedido: sem fotografias nem dados sensíveis; nada sai do computador |

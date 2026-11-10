@@ -1,7 +1,9 @@
+import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect } from "react";
+import { api } from "../api";
 import { useTranslation } from "react-i18next";
 import { cameraName, formatAperture, formatBytes, formatCaptureTime, formatExposure, formatFocal } from "../logic/format";
-import { useStore } from "../store";
+import { errorText, useStore } from "../store";
 import type { Color, PhotoRow } from "../types";
 import { AnalysisSection } from "./AnalysisSection";
 import { OrganizationSection } from "./OrganizationSection";
@@ -118,8 +120,49 @@ export function InfoPanel({
               <dd title={d.sourcePath}>{d.sourcePath}</dd>
             </>
           )}
+          <OriginalActions photo={photo} />
         </div>
       )}
     </aside>
+  );
+}
+
+/** Original: mostrar no gestor de ficheiros; indisponível → aviso e localizar (relink). */
+function OriginalActions({ photo }: { photo: PhotoRow }) {
+  const { t } = useTranslation();
+  const toast = useStore((s) => s.toast);
+  const reloadPhotos = useStore((s) => s.reloadPhotos);
+  const av = photo.availability ?? "ok";
+  const fail = (e: unknown) => toast("error", errorText(e, t));
+  const relink = async () => {
+    const f = await open({ multiple: false, title: t("safety.locate") });
+    if (typeof f !== "string") return;
+    try {
+      const r = await api.relinkFile(photo.id, f);
+      toast("info", t("safety.relinked", { count: r.relinked, left: r.stillUnavailable }));
+      await reloadPhotos();
+    } catch (e) {
+      fail(e);
+    }
+  };
+  return (
+    <div className="original-actions">
+      {av !== "ok" && (
+        <p className="notice warn small" role="status">
+          {t(av === "offline" ? "safety.photoOffline" : "safety.photoMissing")}
+        </p>
+      )}
+      <div className="dev-row">
+        {av === "ok" ? (
+          <button type="button" className="btn small" onClick={() => api.revealOriginal(photo.id).catch(fail)}>
+            {t("safety.reveal")}
+          </button>
+        ) : (
+          <button type="button" className="btn small" onClick={() => void relink()}>
+            {t("safety.locate")}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

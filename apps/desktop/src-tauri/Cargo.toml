@@ -31,3 +31,6 @@ momento-core-types.workspace = true
 momento-database.workspace = true
 momento-import-engine.workspace = true
 momento-project-management.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

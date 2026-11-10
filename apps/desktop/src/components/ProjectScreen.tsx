@@ -8,11 +8,13 @@ import { applyFilter, collectionCounts, labelCounts } from "../logic/filters";
 import { clickSelect, moveFocus, restrict, selectAll, targets } from "../logic/selection";
 import { keyToAction, type Action } from "../logic/shortcuts";
 import { errorText, useStore } from "../store";
-import type { Color, GroupRow, ImportMode, Label } from "../types";
+import type {
+  ImportSafety, Color, GroupRow, ImportMode, Label } from "../types";
 import { AutoEditDialog, AutoEditQueue } from "./AutoEdit";
 import { ExportDialog, ExportQueue } from "./Export";
 import { GalleryDialog } from "./Gallery";
 import { AlbumView } from "./AlbumView";
+import { DeleteDialog, SafetyDialog } from "./SafetyDialogs";
 import { ConsistencyView } from "./ConsistencyView";
 import { ApplyPresetDialog } from "./Presets";
 import { ClockDialog } from "./ClockDialog";
@@ -100,6 +102,16 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
       }, wait);
     };
     api.exportJobs().then((j) => useStore.getState().setExportJobs(j)).catch(() => {});
+    // Fase 13: sessão anterior interrompida, catálogo restaurado, exportações a meio.
+    api
+      .safetyStatus()
+      .then((st) => {
+        const s0 = useStore.getState();
+        if (st.report.restoredFrom != null) s0.toast("error", t("safety.toastRestored"));
+        else if (st.report.previousUnclean) s0.toast("info", t("safety.toastUnclean"));
+        if (st.pendingExports.length > 0 || st.report.restoredFrom != null) s0.setSafetyDialog(true);
+      })
+      .catch(() => {});
     const un = [
       events.importProgress((p) => {
         const st = useStore.getState();
@@ -120,6 +132,12 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
         useStore.getState().bumpEdited(keys);
         // Numa fila de centenas de fotografias chegam muitos avisos: recarregar com limite.
         scheduleReload();
+      }),
+      events.availability((a) => {
+        const st = useStore.getState();
+        st.reloadPhotos().catch(() => {});
+        if (a.reconnected > 0) st.toast("info", t("safety.toastReconnected", { count: a.reconnected }));
+        if (a.offline + a.missing > 0 && a.changed > a.reconnected) st.toast("error", t("safety.toastUnavailable", { offline: a.offline, missing: a.missing }));
       }),
       events.exportProgress((p) => {
         const st = useStore.getState();
@@ -301,12 +319,12 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
     if (paths.length > 0) s.setPendingImport({ paths, hasFolders: folder });
   };
 
-  const startImport = async (mode: ImportMode, recursive: boolean) => {
+  const startImport = async (mode: ImportMode, recursive: boolean, safety?: ImportSafety) => {
     const pending = s.pendingImport;
     s.setPendingImport(null);
     if (!pending) return;
     try {
-      await api.startImport(pending.paths, mode, recursive);
+      await api.startImport(pending.paths, mode, recursive, safety);
       s.setImportRunning(true);
     } catch (e) {
       fail(e);
@@ -434,6 +452,11 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
           return st.setHelpOpen(true);
         case "export":
           return st.setExportDialog(true);
+        case "delete": {
+          const keys = targets(st.selection);
+          if (keys.length > 0 && (st.view === "grid" || st.view === "sequences")) st.setDeleteRequest(keys);
+          return;
+        }
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -443,7 +466,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const st = useStore.getState();
-      if (isTyping(e.target) || st.pendingImport || st.importSummary || st.helpOpen || st.clockOpen || st.autoDialog || st.presetDialog || st.exportDialog || st.galleryDialog) return;
+      if (isTyping(e.target) || st.pendingImport || st.importSummary || st.helpOpen || st.clockOpen || st.autoDialog || st.presetDialog || st.exportDialog || st.galleryDialog || st.safetyDialog || st.deleteRequest) return;
       const a = keyToAction(e, mac);
       if (!a) return;
       // No álbum, as teclas são do editor: nada de classificar ou mover a seleção da
@@ -484,6 +507,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
           }}
           onDropMoment={(ids, m) => void assignMoment(ids, m)}
           onGallery={() => s.setGalleryDialog(true)}
+          onSafety={() => s.setSafetyDialog(true)}
           activePersons={s.filter.persons ?? []}
           onPersons={(ids) => {
             s.setFilter({ persons: ids });
@@ -600,7 +624,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
         />
       )}
 
-      {s.pendingImport && <ImportDialog paths={s.pendingImport.paths} originalsDir={project.originalsDir} onCancel={() => s.setPendingImport(null)} onStart={(m, r) => void startImport(m, r)} />}
+      {s.pendingImport && <ImportDialog paths={s.pendingImport.paths} originalsDir={project.originalsDir} onCancel={() => s.setPendingImport(null)} onStart={(m, r, sf) => void startImport(m, r, sf)} />}
       {s.importSummary && <ImportReport summary={s.importSummary} onClose={() => s.setImportSummary(null)} />}
             {s.helpOpen && <HelpOverlay onClose={() => s.setHelpOpen(false)} />}
       {s.clockOpen && <ClockDialog onClose={() => s.setClockOpen(false)} onApplied={() => void reloadAfterClock()} />}
@@ -608,6 +632,16 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
       {s.presetDialog && <ApplyPresetDialog onClose={() => s.setPresetDialog(false)} />}
       <AutoEditQueue />
       {s.exportDialog && <ExportDialog selected={order.filter((k) => s.selection.ids.has(k))} visible={order} onClose={() => s.setExportDialog(false)} />}
+      {s.safetyDialog && (
+        <SafetyDialog
+          onClose={() => s.setSafetyDialog(false)}
+          onReopened={(p) => {
+            s.setProject(p);
+            void s.reloadPhotos();
+          }}
+        />
+      )}
+      {s.deleteRequest && <DeleteDialog keys={s.deleteRequest} onClose={() => s.setDeleteRequest(null)} />}
       {s.galleryDialog && <GalleryDialog selected={order.filter((k) => s.selection.ids.has(k))} focus={s.selection.focus} onClose={() => s.setGalleryDialog(false)} />}
       <ExportQueue />
       {s.dragIds && <div className="drag-badge">{t("moments.dropHint", { count: s.dragIds.length })}</div>}

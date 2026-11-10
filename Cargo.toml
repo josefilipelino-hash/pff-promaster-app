@@ -23,9 +23,9 @@ members = [
 ]
 
 [workspace.package]
-version = "0.12.0"
+version = "0.13.0"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.89"
 license = "UNLICENSED"
 publish = false
 authors = ["José Filipe Lino"]
@@ -38,6 +38,8 @@ thiserror = "2.0"
 tracing = "0.1"
 rusqlite = { version = "0.40", features = ["bundled", "backup"] }
 tempfile = "3"
+# Lixo do sistema (macOS, Windows, Linux/freedesktop) para "mover para o lixo" (Fase 13).
+trash = "5.3"
 image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "tiff", "webp", "bmp", "gif", "exr", "hdr", "ico", "pnm", "tga"] }
 jxl-oxide = { version = "0.12.6", default-features = false, features = ["image"] }
 jpeg2k = { version = "0.10.1", default-features = false, features = ["openjp2"] }

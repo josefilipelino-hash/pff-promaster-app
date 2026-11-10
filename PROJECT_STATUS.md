@@ -1,68 +1,68 @@
 # Estado do projeto
 
-**Última atualização:** 2026-11-10 · **Fase atual:** 12 — Desempenho · **Estado:** ✅ concluída
-**Versão:** 0.12.0 · **Branch:** `main` · **Plataformas-alvo:** macOS (Apple Silicon e Intel) e Windows 10/11
+**Última atualização:** 2026-11-10 · **Fase atual:** 13 — Fiabilidade · **Estado:** ✅ concluída
+**Versão:** 0.13.0 · **Branch:** `main` · **Plataformas-alvo:** macOS (Apple Silicon e Intel) e Windows 10/11
 
 ---
 
 ## Resumo
 
-Fase dedicada a desempenho, medida com um projeto de **15 000 fotografias** e com
-fotografias a resolução real (24 MP e RAW de 18 câmaras). Profiling com `perf` em vez de
-intuição; cada alteração medida antes e depois. Detalhes e método: **`PERFORMANCE.md`**.
-
-## Resultados principais (medidos)
-
-| Medição | Antes | Depois |
-|---|---|---|
-| Lançamento até à interface pronta (a quente) | 760–815 ms | 778–800 ms |
-| RAM em repouso / com 15 000 abertas (PSS, núcleo + WebKit) | 225 / 297 MB | 228 / 285 MB |
-| Abrir projeto de 15 000: grelha pronta | 794 ms | **242 ms** |
-| Scroll da grelha (15 000) | 67–71 FPS | 67–75 FPS (44 células no DOM) |
-| Servir miniatura em cache | 3,80 ms | **0,10 ms** |
-| Preview da fotografia vista com IA em fundo (p50) | 95 ms (sem carga 64) | **60 ms** |
-| Navegação rápida: espera da fotografia em que se para | 844 ms | **562 ms** |
-| Visualizador na aplicação, com a análise das 15 000 a correr | — | p50 79 ms (sem carga 67) |
-| Miniaturas (1600 px / 24 MP) | 119/s / 43/s | sem alteração |
-| Abrir RAW: preview p50 / revelação completa p50 | 478 ms / 2,0 s | sem alteração |
-| IA por fotografia (24 MP, 2 threads) | 0,431 s | **0,233 s** |
-| Exportação JPEG 24 MP | 19/min | **30–31/min** |
+A aplicação passa a ser segura para trabalho real: não há "Guardar" — cada alteração é
+gravada no disco quando acontece; o catálogo tem versões verificadas (automáticas e
+manuais), é validado em cada abertura e recuperado sozinho se estiver danificado; uma
+sessão interrompida é detetada e explicada; nada é apagado sem pedido explícito e
+confirmado; discos desligados ficam offline e voltam sozinhos. Comportamento detalhado e
+testes: **`RELIABILITY.md`**.
 
 ## Funcional (verificado)
 
-| Pedido | Estado |
-|---|---|
-| Lazy loading, virtualização da grelha | Já existia; verificado com 15 000 (44 células no DOM) |
-| Cache de miniaturas e de previews (disco, LRU) | Já existia; verificado |
-| LRU em memória | Corrigida (era FIFO) + limite de AI Denoise em resolução total |
-| Processamento paralelo controlado, filas, workers | Miniaturas N−1, análise N/2, previews 3 (LIFO), exportação em pipeline com 1 adiantada |
-| Prioridades: "a fotografia 3421 primeiro" | **Novo:** primeiro plano global + portão LIFO; medido no núcleo e na aplicação real |
-| Batching e transações | Já existia (lotes de 48/150 ms); verificado |
-| Índices SQLite | **2 novos** (migração v8), por `EXPLAIN QUERY PLAN` |
-| Processamento incremental | Já existia (estado por fotografia, retoma) |
-| Não carregar milhares de RAW completos | Verificado: preview embutida/meia resolução; resolução total só a pedido, nunca em cache |
-| Medições pedidas | Todas em `PERFORMANCE.md` (lançamento, RAM, FPS, miniaturas, RAW, IA, exportações/min) |
+| Pedido | Como | Verificação |
+|---|---|---|
+| Auto save / journaling | Transação por alteração, WAL + `synchronous = FULL`, histórico de edições | `kill -9` na aplicação real: alteração anterior mantida |
+| Checkpoints | WAL a cada 5 min e no fecho | Teste de fecho limpo |
+| Backups do catálogo, versões, programado | `backups/`: ao abrir, a cada 15/30/60/240 min (60 por omissão), no fecho, manual; validados; retenção 10 + 1/dia (14 dias) | Testes; aplicação real (versão manual criada) |
+| Validação | `quick_check` em cada abertura (68 ms com 15 000), `integrity_check` depois de interrupção (89 ms) | Testes; aplicação real |
+| Recuperação | Catálogo danificado guardado + versão válida restaurada; restauro manual com confirmação (atual guardado antes) | Teste de catálogo danificado; interface |
+| Recuperação de sessão | Bloqueio "running" → validação completa, temporários limpos, importação retomada, exportações retomáveis, aviso, crash log | SIGKILL em importação e exportação (testes); `kill -9` na aplicação real |
+| Exportar / importar catálogo | Instantâneo validado; importação valida e guarda o atual | Interface |
+| Nunca eliminar automaticamente | Nenhum caminho de código apaga originais sem pedido | Revisão + testes |
+| Delete destrutivo com confirmação | Escolha obrigatória; lixo com segunda confirmação; núcleo recusa sem `confirmed` | Interface (Enter não apaga) + teste do núcleo |
+| Remover só do catálogo / mover para o lixo / localizar / relink | Lixo do sistema (`trash`); relink por ficheiro ou pasta confirmado pelo conteúdo | Testes; aplicação real |
+| Disco indisponível → offline, sem perder a referência; reconexão automática | Verificação a cada 30 s | Aplicação real: 300 offline em 30 s, reconectadas em 22 s |
+| Importação: checksum opcional, ORIGINAL → Trabalho + Backup, integridade | Cópias atómicas e verificadas (BLAKE3), caminho do backup registado | SIGKILL a meio: 400/400 em ambos os destinos, hashes certos |
+| Crash logs sem dados sensíveis | `logs/crash-*.txt`, caminhos e emails removidos | Teste + aplicação real |
+| Testes deliberados | Importação, exportação, disco removido, ficheiro desaparecido, BD bloqueada, RAW corrompido (+ catálogo danificado, 2.ª instância) | `tests/resilience.rs` (6), estáveis em 3 execuções seguidas |
+
+## Problemas encontrados pelos testes (corrigidos)
+
+1. **Temporário órfão no disco de backup** depois de um SIGKILL a meio de uma cópia: a
+   limpeza só cobria a cache e a pasta dos originais → a retoma da importação limpa também
+   o disco de backup.
+2. Mensagem "projeto em uso" repetida (detalhe = mensagem) → corrigida.
+3. Contagem "Analisar N fotografias" desatualizada depois de remover do catálogo → recarregada.
+4. Teste da galeria protegida instável (~1 %): o base64 do conteúdo cifrado podia conter
+   "Ana" por acaso → a procura de fugas ignora os blocos cifrados (15/15 execuções).
 
 ## Não funcional / limitações
 
-- **GPU:** não medida nem usada (ambiente sem GPU); render em CPU.
-- **macOS e Windows:** nenhuma medição. O WebView do Linux (WebKitGTK) usa até ~540 MB de
-  cache de imagens durante scroll longo (estabiliza); WKWebView/WebView2 por medir.
-- **RAW em resolução total** numa só thread (LibRaw sem OpenMP, D-085): 2–6 s.
-- DNG de telemóveis/drones sem preview grande: ~2 s para a preview de ecrã.
-- Conjunto de 15 000 é sintético (JPEG 1600 px); o custo a resolução real foi medido à
-  parte com 58 ficheiros. Discos lentos (HDD, rede, cartões) não medidos.
+- macOS e Windows **não executados** (APIs portáveis: bloqueio de ficheiros da biblioteca
+  padrão, lixo do sistema via `trash`).
+- Catálogo em disco de rede (SMB/NFS) não é detetado nem impedido (o WAL não é seguro aí).
+- Exportação retomada: a fotografia a ser gravada no instante exato da falha pode sair
+  duas vezes (`_1`).
+- Falhas em código nativo (LibRaw, etc.) não geram relatório no momento; são detetadas e
+  registadas na abertura seguinte.
 
 ## Arquitetura
 
-Decisões D-078 a D-085. Novos: `task-queue::foreground` (primeiro plano + portão LIFO),
-`project-management::pool`, `ai-analysis::resize`, `color_management::EncodeLut`,
-`develop::color::eotf_hq`, `Prepared::produce_owned`, migração v8, modo de diagnóstico
-(`perf_mode`/`perf_log`, `logic/perfProbe.ts`).
+Decisões D-086 a D-092. Novos: `database::safety` (validação, checkpoint, disponibilidade,
+remover, relink, registo), migração v9 (`backup_path`, `safety_log`), `project-management::
+{safety, availability, originals}`, registo de exportações, `core-types::redact`,
+`src-tauri/crash.rs`, `SafetyDialogs.tsx`.
 
 ## Dependências novas
 
-Nenhuma (a `rayon`, já usada, passa a ser dependência do `ai-analysis`).
+`trash` 5.3 (MIT; lixo do sistema em macOS, Windows e Linux). Ver `LICENSES.md`.
 
 ## Comandos exatos
 
@@ -74,34 +74,28 @@ pnpm dev
 ./scripts/check.sh
 ```
 
-Benchmarks (ver o cabeçalho do ficheiro para todos os comandos):
+Testes de falhas (matam processos a meio):
 
 ```bash
-cargo run --release -p momento-project-management --example perf_bench -- open <projeto>
-```
-
-Aplicação com o diagnóstico de desempenho no log:
-
-```bash
-MOMENTO_PERF=1 pnpm dev
+cargo test --release -p momento-project-management --test resilience
 ```
 
 ## Testes realizados (2026-11-10)
 
 | Conjunto | Resultado |
 |---|---|
-| `cargo test --release --workspace` (com amostras RAW, modelos e rostos) | ✅ 255 passaram, 0 falharam, 1 ignorado (débito 24 MP, manual) |
-| `pnpm -r test` (Vitest) | ✅ 73 (desktop) + 6 (localização) |
-| `tsc --noEmit`, `cargo fmt --check`, `cargo clippy -D warnings` | ✅ limpos |
-| Aplicação real (release, Linux/Xvfb, 15 000 fotografias) | ✅ lançamento, RAM, abrir projeto, scroll, visualizador com/sem análise em fundo |
+| `cargo test --release --workspace` (com amostras RAW, modelos e rostos) | ✅ 267 passaram, 0 falharam, 1 ignorado (débito 24 MP, manual) |
+| `pnpm -r test` (Vitest) | ✅ 78 (desktop) + 6 (localização) |
+| `tsc --noEmit`, `cargo fmt --check`, `cargo clippy -D warnings` | ✅ limpos (lint novo da MSRV 1.89 aplicado) |
+| Aplicação real (release, Linux/Xvfb) | ✅ disco desligado/ligado, Delete, versões, `kill -9` + reabertura, crash log, 2.ª instância |
 
 ## Riscos
 
 | Risco | Impacto | Mitigação |
 |---|---|---|
-| WebView de macOS/Windows com outra política de memória | Médio | Medir com `MOMENTO_PERF=1` num Mac/PC real |
-| RAW de 45–60 MP em resolução total lentos | Médio | Prioridade sobre o segundo plano; OpenMP/GPU numa fase futura |
-| Exportação a 45 MP: pico de RAM ~2× o de 24 MP | Médio | Pipeline com 1 adiantada; medir em 8 GB |
+| Lixo indisponível em alguns volumes externos | Baixo | A fotografia fica no catálogo com o motivo; remover só do catálogo continua possível |
+| Catálogo num disco de rede | Alto | Documentado; aviso na interface numa fase futura |
+| Disco de backup cheio durante a importação | Médio | Esperado (não testado): a cópia falha antes do `rename`, a fotografia fica com erro no relatório e não entra pela metade |
 
 ## Histórico de fases
 
@@ -120,16 +114,16 @@ MOMENTO_PERF=1 pnpm dev
 | 10 — Galerias | ✅ | 2026-11-10 |
 | 11 — Álbuns | ✅ | 2026-11-10 |
 | 12 — Desempenho | ✅ | 2026-11-10 |
-| 13 — Distribuição | ⏸ próxima | — |
+| 13 — Fiabilidade | ✅ | 2026-11-10 |
+| 14 — Distribuição | ⏸ próxima | — |
 
 ## Próximo passo
 
-**Recomendado:** abrir um casamento teu grande com `MOMENTO_PERF=1` num Mac e enviar-me
-as linhas `perf: medição` do log, para ter números reais de macOS (WKWebView, Apple
-Silicon, GPU).
+**Recomendado:** num Mac, importar um cartão com "Copiar também para um disco de
+segurança", desligar e ligar o disco externo com o projeto aberto, e experimentar
+"Segurança e cópias → Versões".
 
-**Fase 13 — Distribuição:** GPU (wgpu), Apple Silicon, recuperação, instaladores
-assinados.
+**Fase 14 — Distribuição:** GPU (wgpu), Apple Silicon, instaladores assinados.
 
 **Pendente do utilizador:** repositório GitHub (CI em macOS/Windows); fotografias de teste;
 medidas do laboratório; nome definitivo.

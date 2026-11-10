@@ -5,6 +5,7 @@
 
 pub mod ids;
 pub mod recipe;
+pub mod redact;
 
 pub use ids::*;
 
@@ -27,6 +28,12 @@ pub enum CoreError {
     Corrupt(String),
     #[error("versão do catálogo ({found}) mais recente do que a suportada ({supported})")]
     CatalogTooNew { found: u32, supported: u32 },
+    /// O projeto está aberto noutra janela ou noutro processo.
+    #[error("o projeto já está aberto noutra janela")]
+    ProjectInUse,
+    /// O original não está acessível (disco desligado ou ficheiro em falta).
+    #[error("original indisponível: {0}")]
+    Unavailable(String),
     #[error("{0}")]
     Other(String),
 }
@@ -49,6 +56,8 @@ impl From<&CoreError> for ErrorPayload {
             CoreError::UnsupportedFormat(_) => "error.unsupportedFormat",
             CoreError::Corrupt(_) => "error.corrupt",
             CoreError::CatalogTooNew { .. } => "error.catalogTooNew",
+            CoreError::ProjectInUse => "error.projectInUse",
+            CoreError::Unavailable(_) => "error.unavailable",
             CoreError::Other(_) => "error.other",
         };
         ErrorPayload { code: code.into(), detail: e.to_string() }

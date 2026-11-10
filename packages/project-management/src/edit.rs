@@ -41,8 +41,7 @@ pub fn load_source(
         .ok_or_else(|| CoreError::Other(format!("fotografia {asset} inexistente")))?;
     let format = format_from_id(&src.format)
         .ok_or_else(|| CoreError::UnsupportedFormat(src.format.clone()))?;
-    let data = std::fs::read(&src.path)
-        .map_err(|e| CoreError::Other(format!("original não encontrado: {} ({e})", src.path)))?;
+    let data = crate::availability::read_original(&src.path)?;
     if format.family() == FormatFamily::Raw {
         match RawFile::open(&data).and_then(|mut raw| {
             let info = raw.info().clone();

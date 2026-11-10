@@ -34,10 +34,13 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 
-/// Número de cópias de segurança do catálogo mantidas.
-const BACKUPS_KEPT: usize = 10;
-/// Intervalo mínimo entre cópias de segurança automáticas (segundos).
-const BACKUP_INTERVAL: i64 = 3600;
+/// Intervalo por omissão das cópias de segurança automáticas (minutos; 0 = desligadas).
+pub const DEFAULT_BACKUP_MINUTES: u32 = 60;
+const BACKUP_MINUTES_KEY: &str = "safety.backup_minutes";
+/// Verificação da disponibilidade dos originais (discos ligados/desligados).
+const AVAILABILITY_EVERY: std::time::Duration = std::time::Duration::from_secs(30);
+/// Checkpoint do WAL (as alterações passam para o ficheiro principal do catálogo).
+const CHECKPOINT_EVERY: std::time::Duration = std::time::Duration::from_secs(300);
 
 /// Dados do formulário “Novo projeto”.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -92,6 +95,8 @@ pub trait SessionEvents: Send + Sync {
     fn ai_denoise(&self, _p: &crate::auto_edit::AiDenoiseProgress) {}
     /// Fila de exportação.
     fn export_progress(&self, _p: &crate::export::ExportProgress) {}
+    /// A disponibilidade dos originais mudou (disco desligado/ligado, ficheiro em falta).
+    fn availability(&self, _s: &AvailabilitySummary) {}
 }
 
 /// Estado de edição + ajustes já interpretados (a interface trabalha com `settings`).
@@ -141,6 +146,22 @@ pub(crate) fn models_dir() -> Option<PathBuf> {
 }
 
 const AUTO_ANALYSIS_KEY: &str = "analysis_auto";
+
+/// Segurança da importação (Fase 13).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ImportSafety {
+    /// Reler cada cópia e comparar o checksum BLAKE3.
+    pub verify: bool,
+    /// Segunda cópia num disco de segurança.
+    pub backup_dir: Option<String>,
+}
+
+impl Default for ImportSafety {
+    fn default() -> Self {
+        ImportSafety { verify: true, backup_dir: None }
+    }
+}
 
 /// Pedido de importação vindo da interface.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
@@ -199,32 +220,6 @@ pub fn create_project(input: &NewProject) -> CoreResult<ProjectPaths> {
 }
 
 /// Cópia de segurança do catálogo, se a última tiver mais de uma hora; mantém as últimas 10.
-fn backup_catalog(catalog: &Catalog, paths: &ProjectPaths) -> CoreResult<Option<PathBuf>> {
-    let dir = paths.backups();
-    std::fs::create_dir_all(&dir)?;
-    let mut existing: Vec<(i64, PathBuf)> = std::fs::read_dir(&dir)?
-        .flatten()
-        .filter_map(|e| {
-            let name = e.file_name().to_string_lossy().into_owned();
-            let ts = name.strip_prefix("catalog-")?.strip_suffix(".db")?.parse::<i64>().ok()?;
-            Some((ts, e.path()))
-        })
-        .collect();
-    existing.sort();
-    let now = momento_database::now_unix();
-    if existing.last().is_some_and(|(ts, _)| now - ts < BACKUP_INTERVAL) {
-        return Ok(None);
-    }
-    let dest = dir.join(format!("catalog-{now}.db"));
-    catalog.backup_to(&dest)?;
-    existing.push((now, dest.clone()));
-    while existing.len() > BACKUPS_KEPT {
-        let (_, old) = existing.remove(0);
-        let _ = std::fs::remove_file(old);
-    }
-    Ok(Some(dest))
-}
-
 struct RunningImport {
     control: Arc<ImportControl>,
     handle: JoinHandle<()>,
@@ -257,6 +252,28 @@ pub struct ProjectSession {
     pool: Arc<crate::pool::CatalogPool>,
     /// Ordem das previews a gerar (mais recente primeiro).
     view_gate: momento_task_queue::foreground::LifoGate,
+    /// Uso exclusivo do projeto (libertado no fecho limpo).
+    lock: Mutex<Option<crate::safety::SessionLock>>,
+    /// O que aconteceu ao abrir (sessão interrompida, restauro…).
+    open_report: crate::safety::OpenReport,
+    /// Manutenção em segundo plano: disponibilidade, checkpoints, cópias de segurança.
+    maintenance: Mutex<Option<JoinHandle<()>>>,
+    stop_maintenance: Arc<(Mutex<bool>, std::sync::Condvar)>,
+}
+
+/// Cópia de segurança automática se a última tiver mais de `minutes` minutos.
+fn backup_if_due(catalog: &Catalog, paths: &ProjectPaths, minutes: u32) -> CoreResult<bool> {
+    if minutes == 0 {
+        return Ok(false);
+    }
+    let last = crate::safety::list_backups(paths)
+        .into_iter()
+        .find(|b| b.kind == "auto")
+        .map(|b| b.created);
+    if last.is_some_and(|t| momento_database::now_unix() - t < minutes as i64 * 60) {
+        return Ok(false);
+    }
+    crate::safety::create_backup(catalog, paths, "auto").map(|_| true)
 }
 
 /// Previews geradas em simultâneo. Medido (navegação rápida, 16 fotografias de 24 MP a
@@ -276,11 +293,41 @@ impl ProjectSession {
                 paths.root.display()
             )));
         }
+        // Uso exclusivo; a sessão anterior fechou bem?
+        let (lock, unclean) = crate::safety::SessionLock::acquire(&paths)?;
+        let mut report =
+            crate::safety::OpenReport { previous_unclean: unclean, ..Default::default() };
+        // Validação (completa depois de uma interrupção) e, se preciso, restauro da versão
+        // válida mais recente; o catálogo danificado fica guardado.
+        crate::safety::validate_or_recover(&paths, unclean, &mut report)?;
         let catalog = Catalog::open(&paths.catalog())?;
-        if catalog.project()?.is_none() {
+        let Some(record) = catalog.project()? else {
             return Err(CoreError::Other("catálogo sem projeto".into()));
+        };
+        if unclean {
+            tracing::warn!(
+                "a sessão anterior não fechou o projeto; catálogo validado por completo"
+            );
+            let mut n = crate::safety::remove_temp_files(&paths.cache(), 3);
+            if let Some(o) = record.originals_dir.as_deref() {
+                n += crate::safety::remove_temp_files(Path::new(o), 4);
+            }
+            report.temp_files_removed = n;
+            let _ = catalog.log_event(
+                "sessao_interrompida",
+                &format!(
+                    "validação completa em {} ms; {n} ficheiros temporários removidos",
+                    report.validation_ms
+                ),
+            );
         }
-        if let Err(e) = backup_catalog(&catalog, &paths) {
+        if let Some(ts) = report.restored_from {
+            let _ = catalog.log_event(
+                "catalogo_restaurado",
+                &format!("versão {ts}; danificado guardado em backups/"),
+            );
+        }
+        if let Err(e) = backup_if_due(&catalog, &paths, 60) {
             tracing::warn!(erro = %e, "cópia de segurança do catálogo falhou");
         }
         {
@@ -317,8 +364,13 @@ impl ProjectSession {
             auto_job: Mutex::new(None),
             exports: Default::default(),
             pool: crate::pool::CatalogPool::new(paths_catalog),
+            lock: Mutex::new(Some(lock)),
+            open_report: report,
+            maintenance: Mutex::new(None),
+            stop_maintenance: Arc::new((Mutex::new(false), std::sync::Condvar::new())),
             view_gate: momento_task_queue::foreground::LifoGate::new(VIEW_PERMITS),
         });
+        session.start_maintenance();
         if let Some(s) = unfinished {
             tracing::info!(sessao = s.id.0, "a retomar importação interrompida");
             session.spawn_import(s.id, s.mode, s.recursive)?;
@@ -329,7 +381,7 @@ impl ProjectSession {
         Ok(session)
     }
 
-    fn catalog(&self) -> std::sync::MutexGuard<'_, Catalog> {
+    pub(crate) fn catalog(&self) -> std::sync::MutexGuard<'_, Catalog> {
         self.catalog.lock().unwrap_or_else(|e| e.into_inner())
     }
 
@@ -650,6 +702,28 @@ impl ProjectSession {
 
     /// Inicia uma importação em segundo plano. Só uma de cada vez.
     pub fn start_import(self: &Arc<Self>, req: &ImportRequest) -> CoreResult<i64> {
+        self.start_import_with(req, &ImportSafety::default())
+    }
+
+    /// Importação com verificação opcional e cópia para um disco de segurança (Fase 13).
+    pub fn start_import_with(
+        self: &Arc<Self>,
+        req: &ImportRequest,
+        safety: &ImportSafety,
+    ) -> CoreResult<i64> {
+        if let Some(b) = safety.backup_dir.as_deref() {
+            let b = Path::new(b);
+            if !b.is_dir() {
+                return Err(CoreError::Unavailable(
+                    b.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default(),
+                ));
+            }
+            if b.starts_with(&self.paths.root) {
+                return Err(CoreError::Other(
+                    "a cópia de segurança não pode ficar dentro do projeto".into(),
+                ));
+            }
+        }
         if self.import_running() {
             return Err(CoreError::Other("já existe uma importação em curso".into()));
         }
@@ -657,15 +731,26 @@ impl ProjectSession {
             return Err(CoreError::Other("nenhum ficheiro indicado".into()));
         }
         let paths: Vec<PathBuf> = req.paths.iter().map(PathBuf::from).collect();
-        let options = self.import_options(req.mode, req.recursive)?;
+        let options = self.import_options(req.mode, req.recursive, Some(safety))?;
         let (session, _) =
             momento_import_engine::create_session(&mut self.catalog(), &paths, &options)?;
+        // As mesmas opções numa retoma depois de uma interrupção.
+        self.catalog().save_setting(
+            &format!("import_safety:{}", session.0),
+            &serde_json::to_string(safety).unwrap_or_default(),
+        )?;
         self.catalog().set_project_status("importing")?;
         self.spawn_import(session, req.mode, req.recursive)?;
         Ok(session.0)
     }
 
-    fn import_options(&self, mode: ImportMode, recursive: bool) -> CoreResult<ImportOptions> {
+    fn import_options(
+        &self,
+        mode: ImportMode,
+        recursive: bool,
+        safety: Option<&ImportSafety>,
+    ) -> CoreResult<ImportOptions> {
+        let safety = safety.cloned().unwrap_or_default();
         let originals = self.catalog().project()?.and_then(|p| p.originals_dir).map(PathBuf::from);
         if mode == ImportMode::Copy && originals.is_none() {
             return Err(CoreError::Other(
@@ -678,6 +763,8 @@ impl ProjectSession {
             originals_dir: originals,
             project_dir: Some(self.paths.root.clone()),
             threads: (threads() / 2).max(2),
+            verify: safety.verify,
+            backup_dir: safety.backup_dir.map(PathBuf::from),
         })
     }
 
@@ -687,7 +774,16 @@ impl ProjectSession {
         mode: ImportMode,
         recursive: bool,
     ) -> CoreResult<()> {
-        let options = self.import_options(mode, recursive)?;
+        let saved: Option<ImportSafety> = self
+            .catalog()
+            .load_setting(&format!("import_safety:{}", session.0))?
+            .and_then(|j| serde_json::from_str(&j).ok());
+        let options = self.import_options(mode, recursive, saved.as_ref())?;
+        // Retoma: temporários de cópias interrompidas também no disco de segurança (a
+        // pasta dos originais é limpa na abertura). Só o padrão de nomes da aplicação.
+        if let Some(b) = &options.backup_dir {
+            crate::safety::remove_temp_files(b, 4);
+        }
         let control = Arc::new(ImportControl::default());
         let (me, ctl) = (self.clone(), control.clone());
         let handle = std::thread::Builder::new()
@@ -1047,7 +1143,175 @@ impl ProjectSession {
         if let Some(t) = t {
             t.shutdown();
         }
+        self.stop_maintenance();
+        // Fecho limpo: tudo no ficheiro principal, uma versão recente e o bloqueio libertado.
+        {
+            let cat = self.catalog();
+            if let Err(e) = cat.checkpoint() {
+                tracing::warn!(erro = %e, "checkpoint no fecho falhou");
+            }
+            if let Err(e) = backup_if_due(&cat, &self.paths, 15) {
+                tracing::warn!(erro = %e, "cópia de segurança no fecho falhou");
+            }
+        }
+        if let Some(l) = self.lock.lock().unwrap_or_else(|e| e.into_inner()).take() {
+            l.release();
+        }
     }
+
+    // ---------------------------------------------------------------- segurança (Fase 13)
+
+    pub fn open_report(&self) -> crate::safety::OpenReport {
+        self.open_report.clone()
+    }
+
+    pub fn backup_minutes(&self) -> u32 {
+        self.catalog()
+            .load_setting(BACKUP_MINUTES_KEY)
+            .ok()
+            .flatten()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(DEFAULT_BACKUP_MINUTES)
+    }
+
+    pub fn set_backup_minutes(&self, minutes: u32) -> CoreResult<()> {
+        self.catalog().save_setting(BACKUP_MINUTES_KEY, &minutes.to_string())
+    }
+
+    pub fn list_backups(&self) -> Vec<crate::safety::BackupInfo> {
+        crate::safety::list_backups(&self.paths)
+    }
+
+    /// Versão manual (nunca apagada automaticamente).
+    pub fn create_backup(&self) -> CoreResult<crate::safety::BackupInfo> {
+        let b = crate::safety::create_backup(&self.catalog(), &self.paths, "manual")?;
+        let _ = self.catalog().log_event("copia_manual", &b.created.to_string());
+        Ok(b)
+    }
+
+    pub fn export_catalog(&self, dest: &Path) -> CoreResult<()> {
+        crate::safety::export_catalog(&self.catalog(), dest)?;
+        let _ = self.catalog().log_event("catalogo_exportado", "");
+        Ok(())
+    }
+
+    /// Validação completa agora (pode demorar em catálogos grandes).
+    pub fn validate_catalog(&self) -> CoreResult<momento_database::safety::Validation> {
+        let v = self.catalog().validate(true)?;
+        let _ = self.catalog().log_event("validacao", if v.ok() { "ok" } else { "problemas" });
+        Ok(v)
+    }
+
+    pub fn safety_events(&self, limit: u32) -> CoreResult<Vec<(i64, String, String)>> {
+        self.catalog().recent_events(limit)
+    }
+
+    /// Verifica agora os originais: offline/em falta/reconectados. As miniaturas que
+    /// ficaram por fazer com o disco desligado são geradas ao reconectar.
+    pub fn check_availability(&self) -> CoreResult<AvailabilitySummary> {
+        let originals = self.open_catalog()?.originals()?;
+        let now = crate::availability::scan(&originals);
+        let before: std::collections::HashMap<AssetId, momento_database::safety::Availability> =
+            originals.iter().map(|o| (o.id, o.status)).collect();
+        let changed: Vec<(AssetId, momento_database::safety::Availability)> =
+            now.iter().filter(|(id, a)| before.get(id) != Some(a)).cloned().collect();
+        let reconnected = changed
+            .iter()
+            .filter(|(_, a)| *a == momento_database::safety::Availability::Ok)
+            .count() as u64;
+        if !changed.is_empty() {
+            self.catalog().set_availability(&changed)?;
+            if reconnected > 0 {
+                let pending = self.catalog().pending_thumbnail_ids()?;
+                self.enqueue_thumbnails(pending);
+            }
+        }
+        let (ok, offline, missing) = self.catalog().availability_counts()?;
+        let s = AvailabilitySummary {
+            ok,
+            offline,
+            missing,
+            changed: changed.len() as u64,
+            reconnected,
+        };
+        if !changed.is_empty() {
+            tracing::info!(
+                offline,
+                em_falta = missing,
+                reconectadas = reconnected,
+                "disponibilidade dos originais mudou"
+            );
+            self.events.availability(&s);
+        }
+        Ok(s)
+    }
+
+    fn start_maintenance(self: &Arc<Self>) {
+        let weak = Arc::downgrade(self);
+        let stop = self.stop_maintenance.clone();
+        let h = std::thread::Builder::new().name("manutencao".into()).spawn(move || {
+            let mut last_check = std::time::Instant::now() - AVAILABILITY_EVERY;
+            let mut last_checkpoint = std::time::Instant::now();
+            loop {
+                {
+                    let (m, cv) = &*stop;
+                    let g = m.lock().unwrap_or_else(|e| e.into_inner());
+                    let (g, _) = cv
+                        .wait_timeout_while(g, std::time::Duration::from_secs(5), |s| !*s)
+                        .unwrap_or_else(|e| e.into_inner());
+                    if *g {
+                        return;
+                    }
+                }
+                let Some(s) = weak.upgrade() else { return };
+                if last_check.elapsed() >= AVAILABILITY_EVERY {
+                    last_check = std::time::Instant::now();
+                    if let Err(e) = s.check_availability() {
+                        tracing::warn!(erro = %e, "verificação dos originais falhou");
+                    }
+                }
+                if last_checkpoint.elapsed() >= CHECKPOINT_EVERY {
+                    last_checkpoint = std::time::Instant::now();
+                    if let Ok(c) = s.open_catalog() {
+                        let _ = c.checkpoint();
+                    }
+                    let minutes = s.backup_minutes();
+                    if let Ok(c) = s.open_catalog() {
+                        if let Err(e) = backup_if_due(&c, &s.paths, minutes) {
+                            tracing::warn!(erro = %e, "cópia de segurança automática falhou");
+                        }
+                    }
+                }
+            }
+        });
+        if let Ok(h) = h {
+            *self.maintenance.lock().unwrap_or_else(|e| e.into_inner()) = Some(h);
+        }
+    }
+
+    fn stop_maintenance(&self) {
+        {
+            let (m, cv) = &*self.stop_maintenance;
+            *m.lock().unwrap_or_else(|e| e.into_inner()) = true;
+            cv.notify_all();
+        }
+        if let Some(h) = self.maintenance.lock().unwrap_or_else(|e| e.into_inner()).take() {
+            if h.thread().id() != std::thread::current().id() {
+                let _ = h.join();
+            }
+        }
+    }
+}
+
+/// Resultado de uma verificação dos originais.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AvailabilitySummary {
+    pub ok: u64,
+    pub offline: u64,
+    pub missing: u64,
+    pub changed: u64,
+    pub reconnected: u64,
 }
 
 impl Drop for ProjectSession {

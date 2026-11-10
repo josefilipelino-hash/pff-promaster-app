@@ -69,13 +69,15 @@
     "availableIn": "Disponível na Fase {{phase}} do desenvolvimento",
     "albums": "Álbuns",
     "delivery": "Entrega",
-    "gallery": "Galeria…"
+    "gallery": "Galeria…",
+    "safety": "Segurança e cópias…"
   },
   "collection": {
     "all": "Todas",
     "picks": "Favoritas",
     "rejects": "Rejeitadas",
-    "unrated": "Sem classificação"
+    "unrated": "Sem classificação",
+    "unavailable": "Indisponíveis"
   },
   "filter": {
     "minStars": "Filtrar por estrelas",
@@ -106,7 +108,14 @@
     "busy": "Já existe uma importação em curso.",
     "imagesFilter": "Imagens e RAW",
     "filesShort": "+ Ficheiros",
-    "folderShort": "+ Pasta"
+    "folderShort": "+ Pasta",
+    "safetyLabel": "Segurança",
+    "backup": "Copiar também para um disco de segurança",
+    "backupHint": "ORIGINAL → Trabalho e ORIGINAL → Backup, ao mesmo tempo, verificados.",
+    "backupTo": "Para: {{path}}",
+    "backupChoose": "Escolher disco de segurança…",
+    "verify": "Verificar cada cópia (checksum)",
+    "verifyHint": "Relê cada ficheiro copiado e compara o BLAKE3 com o original. Mais lento; recomendado para cartões."
   },
   "report": {
     "title": "Importação concluída",
@@ -254,7 +263,9 @@
     "unsupportedFormat": "Formato não suportado.",
     "corrupt": "Ficheiro inválido ou corrompido.",
     "catalogTooNew": "Este projeto foi criado por uma versão mais recente da aplicação.",
-    "other": "Não foi possível concluir a operação."
+    "other": "Não foi possível concluir a operação.",
+    "projectInUse": "Este projeto já está aberto noutra janela ou noutra instância da aplicação.",
+    "unavailable": "O original não está acessível (disco desligado ou ficheiro em falta)."
   },
   "label": {
     "best": "Melhor",
@@ -1630,5 +1641,97 @@
       "repeated": "Fotografia repetida no álbum."
     },
     "openPdf": "Abrir PDF"
+  },
+  "safety": {
+    "title": "Segurança e cópias",
+    "tab": {
+      "status": "Estado",
+      "versions": "Versões",
+      "catalog": "Catálogo",
+      "log": "Registo"
+    },
+    "unclean": "A sessão anterior não fechou o projeto (falha, corte de energia ou aplicação terminada). O catálogo foi verificado por completo em {{ms}} ms: sem perda de dados.",
+    "tempRemoved_one": "Foi removido {{count}} ficheiro temporário de uma escrita interrompida.",
+    "tempRemoved_other": "Foram removidos {{count}} ficheiros temporários de escritas interrompidas.",
+    "restoredFrom": "O catálogo estava danificado e foi restaurado da versão de {{when}}. O catálogo danificado foi guardado (nunca é apagado). Alterações feitas depois dessa hora não estão nesta versão.",
+    "originals": "Originais",
+    "availability": "{{ok}} acessíveis · {{offline}} offline (disco desligado) · {{missing}} em falta",
+    "availabilityHint": "Discos externos desligados ficam offline: as referências não são apagadas e voltam sozinhas quando o disco for ligado (verificação a cada 30 s). Ficheiros movidos ou renomeados ficam “em falta”: use “Procurar numa pasta…”.",
+    "checkNow": "Verificar agora",
+    "relinkFolder": "Procurar numa pasta…",
+    "relinked_one": "{{count}} fotografia religada ({{left}} ainda indisponíveis).",
+    "relinked_other": "{{count}} fotografias religadas ({{left}} ainda indisponíveis).",
+    "pendingExports": "Exportações interrompidas",
+    "noPendingExports": "Nenhuma.",
+    "pendingExport": "{{name}}: {{done}} de {{total}} fotografias exportadas",
+    "resume": "Retomar",
+    "discard": "Descartar",
+    "versionsHint": "Cada versão é uma cópia completa e verificada do catálogo (classificações, edições, momentos, álbuns…). As fotografias não estão aqui: ficam nos originais.",
+    "schedule": "Cópia automática",
+    "scheduleOff": "Desligada",
+    "scheduleEvery_one": "A cada {{count}} minuto",
+    "scheduleEvery_other": "A cada {{count}} minutos",
+    "backupNow": "Criar versão agora",
+    "backupCreated": "Versão criada e verificada.",
+    "validate": "Validar catálogo",
+    "valid": "Catálogo íntegro.",
+    "invalid": "O catálogo tem problemas: restaure uma versão.",
+    "versions": "Versões do catálogo",
+    "restore": "Restaurar",
+    "kind": {
+      "auto": "automática",
+      "manual": "manual",
+      "antes-do-restauro": "antes de um restauro",
+      "danificado": "danificado (guardado)"
+    },
+    "catalogHint": "Exportar guarda uma cópia verificada do catálogo noutro sítio (ex.: outro disco). Importar substitui o catálogo deste projeto por um exportado — o atual é guardado primeiro.",
+    "exportCatalog": "Exportar catálogo…",
+    "exported": "Catálogo exportado e verificado.",
+    "importCatalog": "Importar catálogo…",
+    "imported": "Catálogo importado. O anterior ficou guardado nas versões.",
+    "restored": "Versão restaurada. O catálogo anterior ficou guardado nas versões.",
+    "confirmTitle": "Confirmar",
+    "confirmRestore": "Substituir o catálogo atual por esta versão? O atual é guardado primeiro (pode voltar a ele).",
+    "confirmImport": "Substituir o catálogo deste projeto pelo ficheiro escolhido? O atual é guardado primeiro (pode voltar a ele).",
+    "noEvents": "Sem eventos.",
+    "event": {
+      "sessao_interrompida": "Sessão anterior interrompida (catálogo verificado)",
+      "catalogo_restaurado": "Catálogo restaurado de uma versão",
+      "copia_manual": "Versão manual criada",
+      "catalogo_exportado": "Catálogo exportado",
+      "validacao": "Validação do catálogo",
+      "removidas_do_catalogo": "Removidas do catálogo",
+      "enviadas_para_o_lixo": "Originais enviados para o lixo",
+      "relink": "Originais religados"
+    },
+    "toastUnclean": "A sessão anterior não terminou corretamente. O catálogo foi verificado: nada se perdeu.",
+    "toastRestored": "O catálogo estava danificado e foi restaurado da última versão válida.",
+    "toastReconnected_one": "Disco ligado: {{count}} fotografia voltou a estar disponível.",
+    "toastReconnected_other": "Disco ligado: {{count}} fotografias voltaram a estar disponíveis.",
+    "toastUnavailable": "Originais indisponíveis: {{offline}} offline, {{missing}} em falta. As referências foram mantidas.",
+    "cellOffline": "Original offline (disco desligado)",
+    "cellMissing": "Original em falta",
+    "photoOffline": "Original offline: o disco onde está não está ligado. A referência foi mantida; ligue o disco para editar ou exportar.",
+    "photoMissing": "Original em falta: o ficheiro não está onde estava. Localize-o para o religar.",
+    "reveal": "Mostrar original",
+    "locate": "Localizar original…"
+  },
+  "delete": {
+    "title_one": "Remover {{count}} fotografia",
+    "title_other": "Remover {{count}} fotografias",
+    "question": "O que fazer?",
+    "catalog": "Remover só do catálogo",
+    "catalogHint": "Os ficheiros ficam onde estão, intactos. As classificações e edições destas fotografias saem do projeto.",
+    "trash": "Mover os originais para o lixo",
+    "trashHint": "Os ficheiros vão para o lixo do sistema (podem ser recuperados de lá) e saem do catálogo. A cópia de segurança da importação nunca é tocada.",
+    "understand_one": "Compreendo que {{count}} original vai para o lixo.",
+    "understand_other": "Compreendo que {{count}} originais vão para o lixo.",
+    "confirmRemove_one": "Remover {{count}} do catálogo",
+    "confirmRemove_other": "Remover {{count}} do catálogo",
+    "confirmTrash_one": "Mover {{count}} para o lixo",
+    "confirmTrash_other": "Mover {{count}} para o lixo",
+    "removed_one": "{{count}} fotografia removida do catálogo (o ficheiro ficou).",
+    "removed_other": "{{count}} fotografias removidas do catálogo (os ficheiros ficaram).",
+    "trashed": "{{count}} enviadas para o lixo; {{failed}} recusadas (ficaram no catálogo)."
   }
 }

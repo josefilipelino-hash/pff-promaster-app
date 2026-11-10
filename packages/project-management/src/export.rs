@@ -128,7 +128,25 @@ struct Job {
     paused: AtomicBool,
     cancelled: AtomicBool,
     progress: Mutex<ExportProgress>,
+    /// Registo no catálogo para retomar depois de uma interrupção (Fase 13).
+    journal: Option<String>,
+    /// Parada pelo fecho do projeto (o registo fica para retomar).
+    suspended: AtomicBool,
 }
+
+/// Exportação interrompida (encerramento, falha) que pode ser retomada.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PendingExport {
+    pub id: String,
+    pub name: String,
+    pub destination: String,
+    pub done: u64,
+    pub total: u64,
+}
+
+const JOURNAL_JOB: &str = "export_job:";
+const JOURNAL_NEXT: &str = "export_next:";
 
 #[derive(Default)]
 pub struct ExportQueue {
@@ -173,8 +191,10 @@ impl ExportQueue {
             .any(|p| matches!(p.state, JobState::Queued | JobState::Running | JobState::Paused))
     }
 
+    /// Fecho do projeto: para entre ficheiros; o registo fica para retomar.
     pub fn cancel_all(&self) {
         for j in self.jobs.lock().unwrap_or_else(|e| e.into_inner()).iter() {
+            j.suspended.store(true, Ordering::SeqCst);
             j.cancelled.store(true, Ordering::SeqCst);
         }
         if let Some(h) = self.worker.lock().unwrap_or_else(|e| e.into_inner()).take() {
@@ -278,9 +298,11 @@ impl ProjectSession {
                 folders: Vec::new(),
                 index: None,
             }),
+            journal: self.write_journal(id, &req),
             req,
             paused: AtomicBool::new(false),
             cancelled: AtomicBool::new(false),
+            suspended: AtomicBool::new(false),
         });
         q.jobs.lock().unwrap_or_else(|e| e.into_inner()).push(job.clone());
         self.emit_export(&job);
@@ -294,6 +316,96 @@ impl ProjectSession {
 
     pub fn export_jobs(&self) -> Vec<ExportProgress> {
         self.exports.list()
+    }
+
+    // ------------------------------------------------ exportações interrompidas (Fase 13)
+
+    fn write_journal(&self, id: u64, req: &ExportRequest) -> Option<String> {
+        // Galerias e álbuns têm partes definidas pela sessão (não serializáveis): voltam a
+        // ser geradas por inteiro; o resto é retomado.
+        if req.gallery.is_some() || req.album.is_some() {
+            return None;
+        }
+        let jid = format!("{}-{id}", momento_database::now_unix());
+        let json = serde_json::to_string(req).ok()?;
+        let cat = self.catalog();
+        cat.save_value(&format!("{JOURNAL_JOB}{jid}"), &json).ok()?;
+        cat.save_value(&format!("{JOURNAL_NEXT}{jid}"), "0").ok()?;
+        Some(jid)
+    }
+
+    fn drop_journal(&self, jid: Option<&str>) {
+        if let Some(j) = jid {
+            let cat = self.catalog();
+            let _ = cat.delete_value(&format!("{JOURNAL_JOB}{j}"));
+            let _ = cat.delete_value(&format!("{JOURNAL_NEXT}{j}"));
+        }
+    }
+
+    /// Exportações que ficaram a meio (encerramento inesperado ou fecho do projeto).
+    pub fn pending_exports(&self) -> CoreResult<Vec<PendingExport>> {
+        let running: HashSet<String> = self
+            .exports
+            .jobs
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+            .filter(|j| !j.cancelled.load(Ordering::SeqCst))
+            .filter_map(|j| j.journal.clone())
+            .collect();
+        let cat = self.catalog();
+        let mut out = Vec::new();
+        for (k, v) in cat.values_with_prefix(JOURNAL_JOB)? {
+            let jid = k.trim_start_matches(JOURNAL_JOB).to_string();
+            if running.contains(&jid) {
+                continue;
+            }
+            let Ok(req) = serde_json::from_str::<ExportRequest>(&v) else { continue };
+            let done = cat
+                .load_value(&format!("{JOURNAL_NEXT}{jid}"))?
+                .and_then(|n| n.parse::<u64>().ok())
+                .unwrap_or(0);
+            out.push(PendingExport {
+                id: jid,
+                name: req.name,
+                destination: req.destination,
+                done,
+                total: req.keys.len() as u64,
+            });
+        }
+        out.sort_by(|a, b| a.id.cmp(&b.id));
+        Ok(out)
+    }
+
+    /// Retoma uma exportação interrompida com as fotografias que faltavam.
+    pub fn resume_export(self: &Arc<Self>, jid: &str) -> CoreResult<u64> {
+        let (json, next) = {
+            let cat = self.catalog();
+            let json = cat
+                .load_value(&format!("{JOURNAL_JOB}{jid}"))?
+                .ok_or_else(|| CoreError::Other("exportação interrompida não encontrada".into()))?;
+            let next = cat
+                .load_value(&format!("{JOURNAL_NEXT}{jid}"))?
+                .and_then(|n| n.parse::<usize>().ok())
+                .unwrap_or(0);
+            (json, next)
+        };
+        let mut req: ExportRequest =
+            serde_json::from_str(&json).map_err(|e| CoreError::Other(e.to_string()))?;
+        // Temporários de escritas interrompidas no destino (só o padrão da aplicação).
+        crate::safety::remove_temp_files(Path::new(&req.destination), 4);
+        req.keys = req.keys.split_off(next.min(req.keys.len()));
+        if req.keys.is_empty() {
+            self.drop_journal(Some(jid));
+            return Err(CoreError::Other("esta exportação já estava completa".into()));
+        }
+        let id = self.start_export(req)?;
+        self.drop_journal(Some(jid));
+        Ok(id)
+    }
+
+    pub fn discard_export(&self, jid: &str) {
+        self.drop_journal(Some(jid));
     }
 
     pub fn pause_export(&self, id: u64, paused: bool) -> bool {
@@ -315,6 +427,8 @@ impl ProjectSession {
     pub fn cancel_export(&self, id: u64) -> bool {
         let Some(j) = self.exports.get(id) else { return false };
         j.cancelled.store(true, Ordering::SeqCst);
+        // Cancelada pelo utilizador: não é para retomar.
+        self.drop_journal(j.journal.as_deref());
         {
             let mut p = j.progress.lock().unwrap_or_else(|e| e.into_inner());
             if p.state == JobState::Queued {
@@ -732,6 +846,10 @@ impl ProjectSession {
                     })
                     .sum();
                 let elapsed = started.elapsed().as_secs_f64();
+                if let Some(j) = &job.journal {
+                    // Fotografia completa: uma retoma começa na seguinte.
+                    let _ = cat.save_value(&format!("{JOURNAL_NEXT}{j}"), &(pi + 1).to_string());
+                }
                 update(&mut |p| {
                     p.photos_done += 1;
                     p.bytes_estimated = p.bytes_written + remaining;
@@ -775,6 +893,10 @@ impl ProjectSession {
             };
             p.free_bytes = free_space(&dest);
         });
+        // O registo fica só se o projeto foi fechado a meio (para retomar).
+        if !job.suspended.load(Ordering::SeqCst) {
+            self.drop_journal(job.journal.as_deref());
+        }
         self.emit_export(job);
         Ok(())
     }

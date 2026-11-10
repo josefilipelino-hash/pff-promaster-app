@@ -105,6 +105,10 @@ interface State {
   // Exportação (Fase 9)
   exportDialog: boolean;
   galleryDialog: boolean;
+  /** Segurança e cópias (Fase 13). */
+  safetyDialog: boolean;
+  /** Fotografias a remover/enviar para o lixo (diálogo de confirmação). */
+  deleteRequest: number[] | null;
   /** Trabalhos da fila de exportação (atualizados pelos eventos). */
   exportJobs: ExportProgress[];
 }
@@ -145,6 +149,8 @@ interface Actions {
   setPresetDialog(o: boolean): void;
   setExportDialog(o: boolean): void;
   setGalleryDialog(o: boolean): void;
+  setSafetyDialog(o: boolean): void;
+  setDeleteRequest(keys: number[] | null): void;
   /** Atualiza (ou junta) um trabalho da fila de exportação. */
   upsertExportJob(p: ExportProgress): void;
   setExportJobs(j: ExportProgress[]): void;
@@ -231,6 +237,8 @@ export const useStore = create<State & Actions>((set, get) => ({
   presetDialog: false,
   exportDialog: false,
   galleryDialog: false,
+  safetyDialog: false,
+  deleteRequest: null,
   exportJobs: [],
 
 
@@ -269,6 +277,8 @@ export const useStore = create<State & Actions>((set, get) => ({
         autoDialog: false,
         exportDialog: false,
         galleryDialog: false,
+        safetyDialog: false,
+        deleteRequest: null,
         exportJobs: [],
       });
       return;
@@ -500,6 +510,14 @@ export const useStore = create<State & Actions>((set, get) => ({
     set({ galleryDialog: o });
   },
 
+  setSafetyDialog(o) {
+    set({ safetyDialog: o });
+  },
+
+  setDeleteRequest(keys) {
+    set({ deleteRequest: keys });
+  },
+
   upsertExportJob(p) {
     const jobs = get().exportJobs;
     const i = jobs.findIndex((j) => j.id === p.id);
@@ -522,7 +540,8 @@ export function errorText(e: unknown, t: (k: string) => string): string {
   if (e && typeof e === "object" && "code" in e) {
     const p = e as ErrorPayload;
     const base = t(p.code);
-    return p.detail ? `${base} ${p.detail}` : base;
+    // "Projeto em uso": o detalhe só repete a mensagem traduzida.
+    return p.detail && p.code !== "error.projectInUse" ? `${base} ${p.detail}` : base;
   }
   return e instanceof Error ? e.message : String(e);
 }

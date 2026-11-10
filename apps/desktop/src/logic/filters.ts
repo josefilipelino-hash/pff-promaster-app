@@ -1,6 +1,6 @@
 import type { Color, Label, PhotoRow, RecommendationBrief } from "../types";
 
-export type Collection = "all" | "picks" | "rejects" | "unrated";
+export type Collection = "all" | "picks" | "rejects" | "unrated" | "unavailable";
 
 export interface Filter {
   collection: Collection;
@@ -36,6 +36,8 @@ export function inCollection(p: PhotoRow, c: Collection): boolean {
       return p.flag === -1;
     case "unrated":
       return p.stars === 0 && p.flag === 0;
+    case "unavailable":
+      return (p.availability ?? "ok") !== "ok";
   }
 }
 
@@ -81,8 +83,9 @@ export function labelCounts(photos: PhotoRow[], recs: RecMap): Record<Label, num
 }
 
 export function collectionCounts(photos: PhotoRow[]): Record<Collection, number> {
-  const c = { all: photos.length, picks: 0, rejects: 0, unrated: 0 };
+  const c = { all: photos.length, picks: 0, rejects: 0, unrated: 0, unavailable: 0 };
   for (const p of photos) {
+    if ((p.availability ?? "ok") !== "ok") c.unavailable++;
     if (p.flag === 1) c.picks++;
     else if (p.flag === -1) c.rejects++;
     if (p.stars === 0 && p.flag === 0) c.unrated++;

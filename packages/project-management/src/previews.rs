@@ -49,7 +49,7 @@ pub fn ensure(
         .ok_or_else(|| CoreError::UnsupportedFormat(src.format.clone()))?;
     if level == CacheLevel::Full && matches!(format, FileFormat::Jpeg | FileFormat::Png) {
         if !std::path::Path::new(&src.path).is_file() {
-            return Err(CoreError::Other(format!("original não encontrado: {}", src.path)));
+            return Err(crate::availability::unavailable(&src.path));
         }
         return Ok(Servable { path: PathBuf::from(src.path), mime: mime(format) });
     }
@@ -57,8 +57,7 @@ pub fn ensure(
         crate::cache::touch(&cached);
         return Ok(Servable { path: cached, mime: "image/jpeg" });
     }
-    let data = std::fs::read(&src.path)
-        .map_err(|e| CoreError::Other(format!("original não encontrado: {} ({e})", src.path)))?;
+    let data = crate::availability::read_original(&src.path)?;
     let spec = if level == CacheLevel::Full { PreviewSpec::FULL } else { PreviewSpec::PREVIEW };
     let jpg = render_preview(registry, &data, format, src.orientation, spec)?;
     write_atomic(&cached, &jpg)?;

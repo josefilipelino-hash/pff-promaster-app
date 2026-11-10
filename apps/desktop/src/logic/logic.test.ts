@@ -31,7 +31,12 @@ describe("filtros", () => {
     expect(applyFilter(rows, { ...DEFAULT_FILTER, collection: "picks" }).map((p) => p.id)).toEqual([1]);
     expect(applyFilter(rows, { ...DEFAULT_FILTER, collection: "rejects" }).map((p) => p.id)).toEqual([2]);
     expect(applyFilter(rows, { ...DEFAULT_FILTER, collection: "unrated" }).map((p) => p.id)).toEqual([3, 5]);
-    expect(collectionCounts(rows)).toEqual({ all: 5, picks: 1, rejects: 1, unrated: 2 });
+    expect(collectionCounts(rows)).toEqual({ all: 5, picks: 1, rejects: 1, unrated: 2, unavailable: 0 });
+  });
+  it("indisponíveis (offline/em falta) — Fase 13", () => {
+    const r = [...rows.slice(0, 3), { ...rows[3]!, availability: "offline" as const }, { ...rows[4]!, availability: "missing" as const }];
+    expect(collectionCounts(r).unavailable).toBe(2);
+    expect(applyFilter(r, { collection: "unavailable", minStars: 0, color: null }).map((p) => p.id)).toEqual([rows[3]!.id, rows[4]!.id]);
   });
   it("estrelas mínimas e cor combinam-se", () => {
     expect(applyFilter(rows, { collection: "all", minStars: 3, color: null }).map((p) => p.id)).toEqual([1, 4]);

@@ -25,6 +25,8 @@ fn opts(mode: ImportMode, recursive: bool, e: &Env) -> ImportOptions {
         originals_dir: Some(e.root.join("originais")),
         project_dir: Some(e.root.join("proj.momento")),
         threads: 4,
+        verify: true,
+        backup_dir: None,
     }
 }
 

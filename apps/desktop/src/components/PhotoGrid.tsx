@@ -41,6 +41,8 @@ interface CellProps {
   onClick: (id: number, e: React.MouseEvent) => void;
   onOpen: (id: number) => void;
   failedLabel: string;
+  offlineLabel: string;
+  missingLabel: string;
   partialLabel: string;
     rec?: RecommendationBrief;
   editedLabel: string;
@@ -53,7 +55,7 @@ export function extLabel(fileName: string): string {
   return i >= 0 ? fileName.slice(i + 1).toUpperCase().slice(0, 5) : "";
 }
 
-const Cell = memo(function Cell({ photo, size, token, version, selected, focused, onClick, onOpen, failedLabel, partialLabel, rec, editedLabel, virtualLabel }: CellProps) {
+const Cell = memo(function Cell({ photo, size, token, version, selected, focused, onClick, onOpen, failedLabel, offlineLabel, missingLabel, partialLabel, rec, editedLabel, virtualLabel }: CellProps) {
   return (
     <div
       className={`cell${selected ? " selected" : ""}${focused ? " focused" : ""}${photo.flag === -1 ? " rejected" : ""}`}
@@ -78,6 +80,11 @@ const Cell = memo(function Cell({ photo, size, token, version, selected, focused
           <span className="cell-rec">
             <LabelChip label={rec.label} compact />
             {rec.groupSize > 1 && rec.label !== "duplicate" && <span className="cell-group">{`${rec.rank + 1}/${rec.groupSize}`}</span>}
+          </span>
+        )}
+        {photo.availability && photo.availability !== "ok" && (
+          <span className={`cell-offline ${photo.availability}`} title={photo.availability === "offline" ? offlineLabel : missingLabel} aria-label={photo.availability === "offline" ? offlineLabel : missingLabel}>
+            {photo.availability === "offline" ? "⏏" : "?"}
           </span>
         )}
         {photo.partial && (
@@ -217,6 +224,8 @@ export function PhotoGrid({
                         onClick={onCellDown}
             onOpen={onOpen}
             failedLabel={t("grid.thumbFailed")}
+            offlineLabel={t("safety.cellOffline")}
+            missingLabel={t("safety.cellMissing")}
             partialLabel={t("grid.partial")}
                         rec={recs.get(p.asset ?? p.id)}
             editedLabel={t("grid.edited")}

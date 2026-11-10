@@ -1,6 +1,13 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  AvailabilitySummary,
+  BackupInfo,
+  CatalogValidation,
+  ImportSafety,
+  RelinkReport,
+  RemoveReport,
+  SafetyStatus,
   Album,
   AlbumAutoReport,
   AlbumExportKind,
@@ -78,8 +85,23 @@ export const api = {
   setStars: (ids: number[], stars: number) => invoke<number>("set_stars", { ids, stars }),
   setFlag: (ids: number[], flag: number) => invoke<number>("set_flag", { ids, flag }),
   setColor: (ids: number[], color: Color | null) => invoke<number>("set_color", { ids, color }),
-  startImport: (paths: string[], mode: ImportMode, recursive: boolean) =>
-    invoke<number>("start_import", { request: { paths, mode, recursive } }),
+  startImport: (paths: string[], mode: ImportMode, recursive: boolean, safety?: ImportSafety) =>
+    invoke<number>("start_import", { request: { paths, mode, recursive }, safety: safety ?? null }),
+  safetyStatus: () => invoke<SafetyStatus>("safety_status"),
+  createBackup: () => invoke<BackupInfo>("create_backup"),
+  setBackupMinutes: (minutes: number) => invoke<void>("set_backup_minutes", { minutes }),
+  validateCatalog: () => invoke<CatalogValidation>("validate_catalog"),
+  exportCatalog: (dest: string) => invoke<void>("export_catalog", { dest }),
+  restoreBackup: (file: string) => invoke<ProjectInfo>("restore_backup", { file }),
+  importCatalog: (file: string) => invoke<ProjectInfo>("import_catalog", { file }),
+  checkAvailability: () => invoke<AvailabilitySummary>("check_availability"),
+  removeFromCatalog: (keys: number[], confirmed: boolean) => invoke<RemoveReport>("remove_from_catalog", { keys, confirmed }),
+  moveToTrash: (keys: number[], confirmed: boolean) => invoke<RemoveReport>("move_to_trash", { keys, confirmed }),
+  revealOriginal: (key: number) => invoke<void>("reveal_original", { key }),
+  relinkFile: (key: number, file: string) => invoke<RelinkReport>("relink_file", { key, file }),
+  relinkFolder: (folder: string) => invoke<RelinkReport>("relink_folder", { folder }),
+  resumeExport: (id: string) => invoke<number>("resume_export", { id }),
+  discardExport: (id: string) => invoke<void>("discard_export", { id }),
   cancelImport: () => invoke<void>("cancel_import"),
   prioritizeThumbnails: (ids: number[]) => invoke<void>("prioritize_thumbnails", { ids }),
   saveUiState: (json: string) => invoke<void>("save_ui_state", { json }),
@@ -219,6 +241,7 @@ export const events = {
   autoEdit: (cb: (p: AutoEditProgress) => void): Promise<UnlistenFn> => listen<AutoEditProgress>("auto-edit-progress", (e) => cb(e.payload)),
   aiDenoise: (cb: (p: AiDenoiseProgress) => void): Promise<UnlistenFn> => listen<AiDenoiseProgress>("ai-denoise", (e) => cb(e.payload)),
   exportProgress: (cb: (p: ExportProgress) => void): Promise<UnlistenFn> => listen<ExportProgress>("export-progress", (e) => cb(e.payload)),
+  availability: (cb: (s: AvailabilitySummary) => void): Promise<UnlistenFn> => listen<AvailabilitySummary>("availability", (e) => cb(e.payload)),
 };
 
 export type ImageLevel = "thumb" | "preview" | "full";

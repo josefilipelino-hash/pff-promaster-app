@@ -13,6 +13,7 @@
 pub mod album;
 pub mod analysis;
 pub mod auto_edit;
+pub mod availability;
 pub mod cache;
 pub mod codecs;
 pub mod consistency;
@@ -22,10 +23,12 @@ pub mod export_store;
 pub mod gallery;
 pub mod local_edit;
 pub mod organize;
+pub mod originals;
 pub mod paths;
 pub mod pool;
 pub mod preset_store;
 pub mod previews;
+pub mod safety;
 mod session;
 pub mod thumbnails;
 

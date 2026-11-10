@@ -1,6 +1,7 @@
+import { open } from "@tauri-apps/plugin-dialog";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { ImportMode, ImportSummary } from "../types";
+import type { ImportMode, ImportSafety, ImportSummary } from "../types";
 import { Modal } from "./Modal";
 
 export function ImportDialog({
@@ -12,11 +13,22 @@ export function ImportDialog({
   paths: string[];
   originalsDir: string | null;
   onCancel: () => void;
-  onStart: (mode: ImportMode, recursive: boolean) => void;
+  onStart: (mode: ImportMode, recursive: boolean, safety: ImportSafety) => void;
 }) {
   const { t } = useTranslation();
   const [mode, setMode] = useState<ImportMode>("reference");
   const [recursive, setRecursive] = useState(true);
+  const [verify, setVerify] = useState(true);
+  const [backup, setBackup] = useState(false);
+  const [backupDir, setBackupDir] = useState<string | null>(null);
+  const chooseBackup = async () => {
+    const d = await open({ directory: true, multiple: false, title: t("import.backupChoose") });
+    if (typeof d === "string") {
+      setBackupDir(d);
+      setBackup(true);
+    }
+  };
+  const blocked = backup && !backupDir;
   return (
     <Modal
       title={t("import.title")}
@@ -26,7 +38,7 @@ export function ImportDialog({
           <button type="button" className="btn" data-close onClick={onCancel}>
             {t("common.cancel")}
           </button>
-          <button type="button" className="btn primary" onClick={() => onStart(mode, recursive)}>
+          <button type="button" className="btn primary" disabled={blocked} onClick={() => onStart(mode, recursive, { verify, backupDir: backup ? backupDir : null })}>
             {t("import.start")}
           </button>
         </>
@@ -62,6 +74,28 @@ export function ImportDialog({
         <input type="checkbox" checked={recursive} onChange={(e) => setRecursive(e.target.checked)} />
         <span>{t("import.recursive")}</span>
       </label>
+      <fieldset className="options">
+        <legend>{t("import.safetyLabel")}</legend>
+        <label className="checkbox">
+          <input type="checkbox" checked={backup} onChange={(e) => (e.target.checked && !backupDir ? void chooseBackup() : setBackup(e.target.checked))} />
+          <span>
+            <strong>{t("import.backup")}</strong>
+            <small className="muted">{backupDir ? t("import.backupTo", { path: backupDir }) : t("import.backupHint")}</small>
+          </span>
+        </label>
+        {backup && (
+          <button type="button" className="btn small" onClick={() => void chooseBackup()}>
+            {t("import.backupChoose")}
+          </button>
+        )}
+        <label className="checkbox">
+          <input type="checkbox" checked={verify} onChange={(e) => setVerify(e.target.checked)} />
+          <span>
+            <strong>{t("import.verify")}</strong>
+            <small className="muted">{t("import.verifyHint")}</small>
+          </span>
+        </label>
+      </fieldset>
       <p className="muted small">{t("import.formatsNote")}</p>
     </Modal>
   );

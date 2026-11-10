@@ -67,6 +67,21 @@ const apiMock = {
   setFlag: vi.fn(async () => 1),
   setColor: vi.fn(async () => 1),
   startImport: vi.fn(async () => 1),
+  safetyStatus: vi.fn(async () => safetyFixture()),
+  createBackup: vi.fn(async () => ({ file: "/p/backups/catalog-manual-2.db", created: 1_794_300_000, bytes: 4096, kind: "manual" })),
+  setBackupMinutes: vi.fn(async () => {}),
+  validateCatalog: vi.fn(async () => ({ integrity: [], foreignKeys: 0 })),
+  exportCatalog: vi.fn(async () => {}),
+  restoreBackup: vi.fn(async () => ({ ...project, imageToken: 99 })),
+  importCatalog: vi.fn(async () => ({ ...project, imageToken: 98 })),
+  checkAvailability: vi.fn(async () => ({ ok: 4, offline: 1, missing: 0, changed: 0, reconnected: 0 })),
+  removeFromCatalog: vi.fn(async (keys: number[]) => ({ removed: keys.length, trashed: 0, failed: [] })),
+  moveToTrash: vi.fn(async (keys: number[]) => ({ removed: keys.length, trashed: keys.length, failed: [] })),
+  revealOriginal: vi.fn(async () => {}),
+  relinkFile: vi.fn(async () => ({ relinked: 3, stillUnavailable: 0 })),
+  relinkFolder: vi.fn(async () => ({ relinked: 2, stillUnavailable: 0 })),
+  resumeExport: vi.fn(async () => 31),
+  discardExport: vi.fn(async () => {}),
   cancelImport: vi.fn(async () => {}),
   prioritizeThumbnails: vi.fn(async () => {}),
   saveUiState: vi.fn(async () => {}),
@@ -180,6 +195,19 @@ const apiMock = {
   saveLabPreset: vi.fn(async (p: object) => ({ ...p, id: "l2" })),
   deleteLabPreset: vi.fn(async () => true),
 };
+function safetyFixture() {
+  return {
+    report: { previousUnclean: false, validatedFull: false, validationMs: 5, restoredFrom: null, damagedKept: null, tempFilesRemoved: 0 },
+    availability: { ok: 4, offline: 1, missing: 0, changed: 0, reconnected: 0 },
+    backups: [
+      { file: "/p/backups/catalog-1794290000.db", created: 1_794_290_000, bytes: 8192, kind: "auto" },
+      { file: "/p/backups/catalog-danificado-1794280000.db", created: 1_794_280_000, bytes: 8192, kind: "danificado" },
+    ],
+    backupMinutes: 60,
+    events: [[1_794_290_000, "sessao_interrompida", "validação completa em 40 ms"]] as [number, string, string][],
+    pendingExports: [] as { id: string; name: string; destination: string; done: number; total: number }[],
+  };
+}
 function albumFixture() {
   const spec = { format: "30x30", widthMm: 300, heightMm: 300, pages: 4, dpi: 300, bleedMm: 3, safeMm: 10, gutterMm: 16, color: "srgb", iccPath: "", intent: "perceptual", lab: "", confirmed: false, exportUnit: "spreads", minPages: 0, maxPages: 0, background: "#ffffff" };
   const crop = { zoom: 1, cx: 0.5, cy: 0.5 };
@@ -235,7 +263,7 @@ function analysisStatus(analyzed: number, total: number) {
 vi.mock("../api", async (orig) => {
   const real = await orig<typeof import("../api")>();
   const noop = async () => () => {};
-  return { ...real, api: apiMock, events: { importProgress: noop, importFinished: noop, thumbnails: noop, analysis: noop, editsChanged: noop, autoEdit: noop, aiDenoise: noop, exportProgress: noop } };
+  return { ...real, api: apiMock, events: { importProgress: noop, importFinished: noop, thumbnails: noop, analysis: noop, editsChanged: noop, autoEdit: noop, aiDenoise: noop, exportProgress: noop, availability: noop } };
 });
 vi.mock("@tauri-apps/api/webview", () => ({ getCurrentWebview: () => ({ onDragDropEvent: async () => () => {} }) }));
 vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ isFullscreen: async () => false, setFullscreen: vi.fn(async () => {}) }) }));
@@ -1450,6 +1478,96 @@ describe("álbuns (Fase 11)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Exportar álbum" }));
     await act(async () => {});
     expect(apiMock.startAlbumExport).toHaveBeenCalledWith("a1", "proofPdf", "/tmp/lab");
+  });
+});
+
+describe("segurança (Fase 13)", () => {
+  async function openProj(n = 4) {
+    apiMock.listPhotos.mockResolvedValue(rows(n).map((r, i) => (i === 1 ? { ...r, availability: "offline" as const } : r)));
+    act(() => useStore.getState().setProject(project));
+    render(<App />);
+    await screen.findByText("Casamento Ana & Pedro");
+    await act(async () => {});
+  }
+
+  it("Delete pede uma escolha explícita; remover só do catálogo nunca apaga ficheiros", async () => {
+    await openProj();
+    fireEvent.mouseDown(document.querySelector('[data-id="3"]')!);
+    fireEvent.keyDown(window, { key: "Delete" });
+    const dlg = await screen.findByRole("dialog", { name: "Remover 1 fotografia" });
+    const go = () => within(dlg).getAllByRole("button").at(-1) as HTMLButtonElement;
+    expect(go().disabled).toBe(true);
+    // Enter não faz nada sem escolha (o foco está numa opção, não num botão de ação).
+    fireEvent.keyDown(document.activeElement!, { key: "Enter" });
+    expect(apiMock.removeFromCatalog).not.toHaveBeenCalled();
+    // Lixo: exige a confirmação adicional.
+    fireEvent.click(within(dlg).getByRole("radio", { name: /Mover os originais para o lixo/ }));
+    expect(go().disabled).toBe(true);
+    fireEvent.click(within(dlg).getByRole("checkbox", { name: /Compreendo/ }));
+    expect(go().disabled).toBe(false);
+    // Muda de ideias: só do catálogo.
+    fireEvent.click(within(dlg).getByRole("radio", { name: /Remover só do catálogo/ }));
+    fireEvent.click(go());
+    await act(async () => {});
+    expect(apiMock.removeFromCatalog).toHaveBeenCalledWith([3], true);
+    expect(apiMock.moveToTrash).not.toHaveBeenCalled();
+  });
+
+  it("coleção Indisponíveis, distintivo offline e localizar o original", async () => {
+    await openProj();
+    expect(screen.getByRole("button", { name: /Indisponíveis\s*1/ })).toBeTruthy();
+    expect(screen.getByLabelText("Original offline (disco desligado)")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: /Indisponíveis/ }));
+    await act(async () => {});
+    expect(document.querySelectorAll(".cell").length).toBe(1);
+  });
+
+  it("diálogo de segurança: versões, restauro com confirmação, agendamento e retomar exportação", async () => {
+    apiMock.safetyStatus.mockResolvedValue({
+      ...safetyFixture(),
+      report: { ...safetyFixture().report, previousUnclean: true, validatedFull: true, validationMs: 40 },
+      pendingExports: [{ id: "17-3", name: "Exportar casamento", destination: "/tmp/e", done: 40, total: 120 }],
+    });
+    await openProj();
+    // Exportação interrompida → o diálogo abre sozinho; sessão interrompida explicada.
+    const dlg = await screen.findByRole("dialog", { name: "Segurança e cópias" });
+    expect(screen.getByText(/A sessão anterior não terminou corretamente/)).toBeTruthy();
+    expect(within(dlg).getByText(/verificado por completo em 40 ms/)).toBeTruthy();
+    expect(within(dlg).getByText("Exportar casamento: 40 de 120 fotografias exportadas")).toBeTruthy();
+    fireEvent.click(within(dlg).getByRole("button", { name: "Retomar" }));
+    await act(async () => {});
+    expect(apiMock.resumeExport).toHaveBeenCalledWith("17-3");
+    // Versões.
+    fireEvent.click(within(dlg).getByRole("tab", { name: "Versões" }));
+    fireEvent.change(within(dlg).getByRole("combobox", { name: "Cópia automática" }), { target: { value: "15" } });
+    await act(async () => {});
+    expect(apiMock.setBackupMinutes).toHaveBeenCalledWith(15);
+    fireEvent.click(within(dlg).getByRole("button", { name: "Criar versão agora" }));
+    await act(async () => {});
+    expect(apiMock.createBackup).toHaveBeenCalled();
+    // O catálogo danificado guardado não pode ser "restaurado"; a versão automática sim, com confirmação.
+    expect(within(dlg).getAllByRole("button", { name: "Restaurar" })).toHaveLength(1);
+    fireEvent.click(within(dlg).getByRole("button", { name: "Restaurar" }));
+    expect(apiMock.restoreBackup).not.toHaveBeenCalled();
+    const confirm = within(dlg).getByRole("alertdialog", { name: "Confirmar" });
+    fireEvent.click(within(confirm).getByRole("button", { name: "Restaurar" }));
+    await act(async () => {});
+    expect(apiMock.restoreBackup).toHaveBeenCalledWith("/p/backups/catalog-1794290000.db");
+    apiMock.safetyStatus.mockResolvedValue(safetyFixture());
+  });
+
+  it("importação com verificação e cópia para o disco de segurança", async () => {
+    const dialog = await import("@tauri-apps/plugin-dialog");
+    await openProj();
+    act(() => useStore.getState().setPendingImport({ paths: ["/cartao/DCIM"], hasFolders: true }));
+    const dlg = await screen.findByRole("dialog", { name: /Importar/ });
+    vi.mocked(dialog.open).mockResolvedValueOnce("/Volumes/Backup");
+    fireEvent.click(within(dlg).getByRole("checkbox", { name: /Copiar também para um disco de segurança/ }));
+    await act(async () => {});
+    expect(within(dlg).getByText("Para: /Volumes/Backup")).toBeTruthy();
+    fireEvent.click(within(dlg).getByRole("button", { name: /Importar$|Iniciar|Começar/ }));
+    await act(async () => {});
+    expect(apiMock.startImport).toHaveBeenCalledWith(["/cartao/DCIM"], "reference", true, { verify: true, backupDir: "/Volumes/Backup" });
   });
 });
 

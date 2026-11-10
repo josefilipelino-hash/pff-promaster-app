@@ -5,6 +5,29 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [0.13.0] — 2026-11-10 — Fase 13: fiabilidade
+
+### Adicionado
+- **Segurança e cópias** (barra lateral): estado dos originais, exportações interrompidas
+  (retomar/descartar), versões do catálogo (criar, restaurar com confirmação, cópia
+  automática a cada 15/30/60/240 min), validar, exportar e importar o catálogo, registo.
+- Deteção de sessão interrompida (falha, energia, processo terminado): validação completa,
+  limpeza de temporários, aviso e crash log; catálogo danificado restaurado da última
+  versão válida (o danificado é guardado).
+- Originais **offline** (disco desligado) e **em falta**, com reconexão automática,
+  coleção "Indisponíveis", localizar original e relink por ficheiro ou pasta.
+- Remover só do catálogo e mover para o lixo do sistema (Delete), sempre com confirmação.
+- Importação: verificação das cópias (checksum, opcional) e cópia simultânea para um disco
+  de segurança.
+- Crash logs locais sem fotografias nem dados pessoais.
+- `RELIABILITY.md`: comportamento em cada falha, com testes deliberados.
+
+### Alterado
+- Catálogo com `synchronous = FULL`; checkpoints a cada 5 minutos e no fecho.
+- Cópias da importação atómicas; a retoma reutiliza cópias completas (sem `_1` órfãos).
+- O mesmo projeto não pode ser aberto em duas janelas/instâncias.
+
+
 ## [0.12.0] — 2026-11-10 — Fase 12: desempenho
 
 ### Adicionado

@@ -69,6 +69,16 @@ plataforma, ecrã inicial, validação do formulário, grelha virtualizada com 3
 secções futuras desativadas, classificação por teclado e em seleção múltipla, filtro
 Favoritas + visualizador, reversão quando o núcleo recusa, paridade de traduções.
 
+## Fase 13 — fiabilidade
+
+| Teste | O que verifica |
+|---|---|
+| `tests/resilience.rs` (6) | **SIGKILL durante a importação** (cópia + backup + verificação): retoma sem duplicados, órfãos ou temporários, hashes certos; **SIGKILL durante a exportação**: nenhum ficheiro meio escrito, retoma só das restantes; **disco removido** → offline, miniatura servida, erro claro, exportação continua, reconexão; **ficheiro desaparecido** → relink por pasta, conteúdo diferente recusado; remover do catálogo não apaga; **base de dados bloqueada** 1,5 s → espera e grava; projeto aberto duas vezes → recusado; **RAW corrompido** fora sem pânico; **catálogo danificado** → restaurado, danificado guardado |
+| `safety` (2), `availability`, `database::safety` | nomes das versões e padrão de temporários; bloqueio (em uso / interrompida / fecho limpo); offline vs em falta; relink por conteúdo; remover/relink/validar no catálogo |
+| `core-types::redact`, `crash` (app) | caminhos Unix/Windows/UNC/`~` e emails removidos; relatório de encerramento sem caminhos; retenção de 20 |
+| Interface (+4) e lógica (+1) | Delete exige escolha (Enter não apaga), lixo exige confirmação extra; coleção Indisponíveis e distintivo; diálogo de segurança (sessão interrompida, retomar exportação, agendamento, criar versão, restaurar com confirmação; o danificado não se restaura); importação com verificação e disco de segurança |
+| Aplicação real (Xvfb) | disco desligado → 300 offline em 30 s; ligado → reconectadas em 22 s; Delete → remover do catálogo (ficheiro fica); versões; `kill -9` → aviso, alterações mantidas, crash log anonimizado; segunda instância recusada |
+
 ## Fase 12 — desempenho
 
 | Teste | O que verifica |

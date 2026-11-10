@@ -82,6 +82,10 @@ abaixo são requisitos de arquitetura, não opções.
 6d. **Diagnóstico de desempenho (Fase 12):** só com `MOMENTO_PERF=1`. Regista no log local
    tempos, contagens e memória (ex.: "grelha pronta em 242 ms, 15 000 fotografias") —
    nunca nomes de ficheiros, caminhos, imagens ou metadados. Nada é enviado.
+6e. **Fiabilidade (Fase 13):** versões do catálogo ficam em `backups/` dentro do projeto;
+   a cópia de segurança da importação vai para o disco que o utilizador escolher. Os crash
+   logs (`logs/crash-*.txt`) ficam só no computador e **não** contêm fotografias, metadados,
+   caminhos (substituídos por `<caminho>`) nem emails; nada é enviado.
 
 ## Eliminação
 

@@ -2,6 +2,7 @@
 //! Cada comando converte erros em `ErrorPayload` (chave de tradução + detalhe).
 
 mod commands;
+mod crash;
 mod protocol;
 mod state;
 
@@ -35,6 +36,10 @@ pub fn run() {
         .register_asynchronous_uri_scheme_protocol("momento", protocol::handle)
         .setup(|app| {
             init_logging(app);
+            // Falhas internas → relatório anonimizado em logs/ (Fase 13).
+            if let Ok(dir) = app.path().app_log_dir() {
+                crash::install(dir);
+            }
             let data_dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&data_dir)?;
             // LUT importadas (presets) — partilhadas por todos os projetos.
@@ -51,6 +56,21 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::perf_mode,
+            commands::safety_status,
+            commands::create_backup,
+            commands::set_backup_minutes,
+            commands::validate_catalog,
+            commands::export_catalog,
+            commands::restore_backup,
+            commands::import_catalog,
+            commands::check_availability,
+            commands::remove_from_catalog,
+            commands::move_to_trash,
+            commands::reveal_original,
+            commands::relink_file,
+            commands::relink_folder,
+            commands::resume_export,
+            commands::discard_export,
             commands::perf_log,
             commands::app_info,
             commands::export_capabilities,

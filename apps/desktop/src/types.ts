@@ -25,7 +25,11 @@ export interface PhotoRow {
   /** Suporte parcial (ex.: RAW só com preview embutida). */
   partial: boolean;
   format: string;
+  /** Original acessível, offline (disco desligado) ou em falta (Fase 13). */
+  availability?: Availability;
 }
+
+export type Availability = "ok" | "offline" | "missing";
 
 export interface PhotoDetails {
   id: number;
@@ -963,3 +967,67 @@ export interface AlbumFormat {
 }
 
 export type AlbumExportKind = "jpeg" | "tiff" | "printPdf" | "proofPdf";
+
+// ---------------------------------------------------------------- segurança (Fase 13)
+
+export interface ImportSafety {
+  verify: boolean;
+  backupDir: string | null;
+}
+
+export interface OpenReport {
+  previousUnclean: boolean;
+  validatedFull: boolean;
+  validationMs: number;
+  restoredFrom: number | null;
+  damagedKept: string | null;
+  tempFilesRemoved: number;
+}
+
+export interface AvailabilitySummary {
+  ok: number;
+  offline: number;
+  missing: number;
+  changed: number;
+  reconnected: number;
+}
+
+export interface BackupInfo {
+  file: string;
+  created: number;
+  bytes: number;
+  kind: string;
+}
+
+export interface PendingExport {
+  id: string;
+  name: string;
+  destination: string;
+  done: number;
+  total: number;
+}
+
+export interface SafetyStatus {
+  report: OpenReport;
+  availability: AvailabilitySummary;
+  backups: BackupInfo[];
+  backupMinutes: number;
+  events: [number, string, string][];
+  pendingExports: PendingExport[];
+}
+
+export interface RemoveReport {
+  removed: number;
+  trashed: number;
+  failed: [string, string][];
+}
+
+export interface RelinkReport {
+  relinked: number;
+  stillUnavailable: number;
+}
+
+export interface CatalogValidation {
+  integrity: string[];
+  foreignKeys: number;
+}

@@ -71,6 +71,8 @@ pub struct NewAsset {
     pub partial_note: Option<String>,
     /// Latitude/longitude (graus decimais).
     pub gps: Option<(f64, f64)>,
+    /// Cópia de segurança feita na importação (Fase 13).
+    pub backup_path: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -108,6 +110,9 @@ pub struct PhotoRow {
     /// Suporte parcial (ex.: RAW só com preview embutida).
     pub partial: bool,
     pub format: String,
+    /// Original acessível, offline (disco desligado) ou em falta (Fase 13).
+    #[serde(default = "crate::safety::default_availability")]
+    pub availability: crate::safety::Availability,
 }
 
 /// Detalhes completos para o painel de informação.
@@ -235,6 +240,13 @@ impl Catalog {
                 match res {
                     Ok(_) => {
                         let id = tx.last_insert_rowid();
+                        if let Some(b) = &a.backup_path {
+                            tx.execute(
+                                "UPDATE asset SET backup_path = ?1 WHERE id = ?2",
+                                params![b, id],
+                            )
+                            .map_err(db_err)?;
+                        }
                         var.execute(params![id, now]).map_err(db_err)?;
                         rat.execute(params![tx.last_insert_rowid(), now]).map_err(db_err)?;
                         out.push(InsertResult::Inserted(AssetId(id)));
@@ -318,7 +330,8 @@ impl Catalog {
                         a.file_name, {CORRECTED_TIME_SQL}, a.width, a.height, a.orientation,
                         r.stars, r.flag, r.color, a.thumb_state, a.support, a.format,
                         a.id, v.id, CASE WHEN v.is_master = 1 THEN NULL ELSE v.name END,
-                        EXISTS(SELECT 1 FROM edit e WHERE e.variant_id = v.id AND e.recipe != '{{\"v\":1}}')
+                        EXISTS(SELECT 1 FROM edit e WHERE e.variant_id = v.id AND e.recipe != '{{\"v\":1}}'),
+                        a.status
                  FROM asset a
                  JOIN variant v ON v.asset_id = a.id
                  JOIN rating r ON r.variant_id = v.id
@@ -345,6 +358,7 @@ impl Catalog {
                     variant: r.get(13)?,
                     virtual_copy: r.get(14)?,
                     edited: r.get::<_, i64>(15)? != 0,
+                    availability: crate::safety::Availability::parse(&r.get::<_, String>(16)?),
                 })
             })
             .map_err(db_err)?;

@@ -60,6 +60,7 @@ ainda **não** implementada (adiada para a Fase 2; as licenças diretas foram ve
 | zune-jpegxl + zune-core | 0.5.2 / 0.5.3 | MIT OR Apache-2.0 OR Zlib | JPEG XL sem perdas |
 | openjp2 (codificação) | 0.6.1 | BSD-2-Clause | JPEG 2000 |
 | fs4 | 1.1.0 | MIT OR Apache-2.0 | espaço livre no destino |
+| trash | 5.3.0 | MIT | mover originais para o lixo do sistema (macOS, Windows, Linux) — só com confirmação (Fase 13) |
 | ab_glyph | 0.2 | Apache-2.0 | texto da marca de água |
 | **Fonte Inter** (`packages/export-engine/assets/fonts`) | 4.0 | **OFL-1.1** (licença ao lado da fonte) | marca de água de texto |
 

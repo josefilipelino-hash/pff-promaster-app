@@ -132,9 +132,18 @@ previews, exportação em pipeline, curvas por tabela, redução rápida na aná
 índices em falta, caches LRU; modo de diagnóstico na aplicação (`MOMENTO_PERF=1`).
 **Por fazer:** medir em macOS/Windows e com GPU; RAW em resolução total paralelo.
 
-## Fase 13 — Distribuição
+## Fase 13 — Fiabilidade ✅ *(concluída 2026-11-10, ver RELIABILITY.md)*
 
-GPU (wgpu), otimização Apple Silicon, recuperação, assinatura de instaladores.
+Gravação contínua (`synchronous = FULL`), checkpoints, versões do catálogo validadas e
+programadas, validação e recuperação automática, sessões interrompidas, exportar/importar
+catálogo; remover do catálogo / lixo com confirmação, localizar, relink, offline e
+reconexão automática; importação com checksum opcional e cópia simultânea para backup;
+exportações retomáveis; crash logs anonimizados; testes deliberados de falhas.
+**Por fazer:** testar em macOS/Windows; avisar quando o catálogo está num disco de rede.
+
+## Fase 14 — Distribuição
+
+GPU (wgpu), otimização Apple Silicon, assinatura de instaladores.
 
 > **Windows** deixou de ser tarefa da fase de otimização: por decisão do utilizador (D-011), Windows e
 > macOS são plataformas-alvo desde a Fase 1 — CI, compilação cruzada e instalador NSIS.

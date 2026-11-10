@@ -55,8 +55,7 @@ fn generate(
         catalog.asset_source(id)?.ok_or_else(|| CoreError::Other("fotografia removida".into()))?;
     let format = format_from_id(&src.format)
         .ok_or_else(|| CoreError::UnsupportedFormat(src.format.clone()))?;
-    let data = std::fs::read(&src.path)
-        .map_err(|e| CoreError::Other(format!("original não encontrado ({e})")))?;
+    let data = crate::availability::read_original(&src.path)?;
     // RAW com preview embutida grande: numa única leitura gera a miniatura E a preview de
     // 2560 px, evitando voltar a ler um ficheiro de 40–60 MB quando a fotografia é aberta.
     let preview_path = paths.cached(CacheLevel::Preview, id);
@@ -110,6 +109,9 @@ impl ThumbnailService {
                             }));
                             let r = match r {
                                 Ok(Ok(())) => Ok(()),
+                                // Original offline/em falta: a miniatura fica por fazer (não
+                                // "falhada") e é gerada quando o disco voltar.
+                                Ok(Err(CoreError::Unavailable(_))) => continue,
                                 Ok(Err(e)) => Err(e.to_string()),
                                 Err(_) => Err("falha interna do descodificador".to_string()),
                             };

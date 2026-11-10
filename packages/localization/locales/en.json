@@ -69,13 +69,15 @@
     "availableIn": "Available in development Phase {{phase}}",
     "albums": "Albums",
     "delivery": "Delivery",
-    "gallery": "Gallery…"
+    "gallery": "Gallery…",
+    "safety": "Safety & backups…"
   },
   "collection": {
     "all": "All",
     "picks": "Picks",
     "rejects": "Rejected",
-    "unrated": "Unrated"
+    "unrated": "Unrated",
+    "unavailable": "Unavailable"
   },
   "filter": {
     "minStars": "Filter by stars",
@@ -106,7 +108,14 @@
     "busy": "An import is already running.",
     "imagesFilter": "Images and RAW",
     "filesShort": "+ Files",
-    "folderShort": "+ Folder"
+    "folderShort": "+ Folder",
+    "safetyLabel": "Safety",
+    "backup": "Also copy to a backup disk",
+    "backupHint": "ORIGINAL → Working and ORIGINAL → Backup, at the same time, verified.",
+    "backupTo": "To: {{path}}",
+    "backupChoose": "Choose backup disk…",
+    "verify": "Verify each copy (checksum)",
+    "verifyHint": "Re-reads every copied file and compares its BLAKE3 with the original. Slower; recommended for cards."
   },
   "report": {
     "title": "Import finished",
@@ -254,7 +263,9 @@
     "unsupportedFormat": "Unsupported format.",
     "corrupt": "Invalid or corrupted file.",
     "catalogTooNew": "This project was created by a newer version of the app.",
-    "other": "The operation could not be completed."
+    "other": "The operation could not be completed.",
+    "projectInUse": "This project is already open in another window or instance of the app.",
+    "unavailable": "The original is not accessible (disk disconnected or file missing)."
   },
   "label": {
     "best": "Best",
@@ -1630,5 +1641,97 @@
       "repeated": "Photo repeated in the album."
     },
     "openPdf": "Open PDF"
+  },
+  "safety": {
+    "title": "Safety & backups",
+    "tab": {
+      "status": "Status",
+      "versions": "Versions",
+      "catalog": "Catalogue",
+      "log": "Log"
+    },
+    "unclean": "The previous session did not close the project (crash, power cut or app killed). The catalogue was fully checked in {{ms}} ms: no data lost.",
+    "tempRemoved_one": "{{count}} temporary file from an interrupted write was removed.",
+    "tempRemoved_other": "{{count}} temporary files from interrupted writes were removed.",
+    "restoredFrom": "The catalogue was damaged and was restored from the version of {{when}}. The damaged catalogue was kept (never deleted). Changes made after that time are not in this version.",
+    "originals": "Originals",
+    "availability": "{{ok}} available · {{offline}} offline (disk disconnected) · {{missing}} missing",
+    "availabilityHint": "Disconnected external disks go offline: references are never deleted and come back automatically when the disk returns (checked every 30 s). Moved or renamed files are “missing”: use “Search a folder…”.",
+    "checkNow": "Check now",
+    "relinkFolder": "Search a folder…",
+    "relinked_one": "{{count}} photo relinked ({{left}} still unavailable).",
+    "relinked_other": "{{count}} photos relinked ({{left}} still unavailable).",
+    "pendingExports": "Interrupted exports",
+    "noPendingExports": "None.",
+    "pendingExport": "{{name}}: {{done}} of {{total}} photos exported",
+    "resume": "Resume",
+    "discard": "Discard",
+    "versionsHint": "Each version is a complete, verified copy of the catalogue (ratings, edits, moments, albums…). Photos are not here: they stay in the originals.",
+    "schedule": "Automatic backup",
+    "scheduleOff": "Off",
+    "scheduleEvery_one": "Every {{count}} minute",
+    "scheduleEvery_other": "Every {{count}} minutes",
+    "backupNow": "Create version now",
+    "backupCreated": "Version created and verified.",
+    "validate": "Validate catalogue",
+    "valid": "Catalogue is intact.",
+    "invalid": "The catalogue has problems: restore a version.",
+    "versions": "Catalogue versions",
+    "restore": "Restore",
+    "kind": {
+      "auto": "automatic",
+      "manual": "manual",
+      "antes-do-restauro": "before a restore",
+      "danificado": "damaged (kept)"
+    },
+    "catalogHint": "Export saves a verified copy of the catalogue elsewhere (e.g. another disk). Import replaces this project's catalogue with an exported one — the current one is kept first.",
+    "exportCatalog": "Export catalogue…",
+    "exported": "Catalogue exported and verified.",
+    "importCatalog": "Import catalogue…",
+    "imported": "Catalogue imported. The previous one was kept in versions.",
+    "restored": "Version restored. The previous catalogue was kept in versions.",
+    "confirmTitle": "Confirm",
+    "confirmRestore": "Replace the current catalogue with this version? The current one is kept first (you can go back).",
+    "confirmImport": "Replace this project's catalogue with the chosen file? The current one is kept first (you can go back).",
+    "noEvents": "No events.",
+    "event": {
+      "sessao_interrompida": "Previous session interrupted (catalogue checked)",
+      "catalogo_restaurado": "Catalogue restored from a version",
+      "copia_manual": "Manual version created",
+      "catalogo_exportado": "Catalogue exported",
+      "validacao": "Catalogue validation",
+      "removidas_do_catalogo": "Removed from catalogue",
+      "enviadas_para_o_lixo": "Originals moved to the trash",
+      "relink": "Originals relinked"
+    },
+    "toastUnclean": "The previous session did not end properly. The catalogue was checked: nothing was lost.",
+    "toastRestored": "The catalogue was damaged and was restored from the last valid version.",
+    "toastReconnected_one": "Disk connected: {{count}} photo is available again.",
+    "toastReconnected_other": "Disk connected: {{count}} photos are available again.",
+    "toastUnavailable": "Originals unavailable: {{offline}} offline, {{missing}} missing. References were kept.",
+    "cellOffline": "Original offline (disk disconnected)",
+    "cellMissing": "Original missing",
+    "photoOffline": "Original offline: its disk is not connected. The reference was kept; connect the disk to edit or export.",
+    "photoMissing": "Original missing: the file is no longer where it was. Locate it to relink.",
+    "reveal": "Show original",
+    "locate": "Locate original…"
+  },
+  "delete": {
+    "title_one": "Remove {{count}} photo",
+    "title_other": "Remove {{count}} photos",
+    "question": "What should happen?",
+    "catalog": "Remove from catalogue only",
+    "catalogHint": "Files stay where they are, untouched. Ratings and edits of these photos leave the project.",
+    "trash": "Move originals to the trash",
+    "trashHint": "Files go to the system trash (recoverable from there) and leave the catalogue. The import backup copy is never touched.",
+    "understand_one": "I understand that {{count}} original goes to the trash.",
+    "understand_other": "I understand that {{count}} originals go to the trash.",
+    "confirmRemove_one": "Remove {{count}} from catalogue",
+    "confirmRemove_other": "Remove {{count}} from catalogue",
+    "confirmTrash_one": "Move {{count}} to trash",
+    "confirmTrash_other": "Move {{count}} to trash",
+    "removed_one": "{{count}} photo removed from the catalogue (file kept).",
+    "removed_other": "{{count}} photos removed from the catalogue (files kept).",
+    "trashed": "{{count}} moved to the trash; {{failed}} refused (kept in catalogue)."
   }
 }

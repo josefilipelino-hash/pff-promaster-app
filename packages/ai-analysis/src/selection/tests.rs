@@ -250,7 +250,7 @@ fn performance_with_15000_photos() {
         let size = 1 + (g % 9) as usize;
         for k in 0..size {
             let id = photos.len() as i64;
-            let faces = if g % 3 == 0 {
+            let faces = if g.is_multiple_of(3) {
                 vec![]
             } else {
                 vec![

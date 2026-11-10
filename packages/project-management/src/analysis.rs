@@ -86,8 +86,7 @@ fn work_image(
                 .ok_or_else(|| CoreError::Other("fotografia removida".into()))?;
             let format = format_from_id(&src.format)
                 .ok_or_else(|| CoreError::UnsupportedFormat(src.format.clone()))?;
-            let data = std::fs::read(&src.path)
-                .map_err(|e| CoreError::Other(format!("original não encontrado ({e})")))?;
+            let data = crate::availability::read_original(&src.path)?;
             let p = registry.probe(&data, format)?;
             let (long, short) = (p.width.max(p.height), p.width.min(p.height));
             let min_short = ((WORK_EDGE as u64 * short as u64) / long.max(1) as u64).max(1) as u32;

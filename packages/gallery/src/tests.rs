@@ -153,8 +153,10 @@ fn protected_gallery_reveals_nothing_without_the_code() {
     .unwrap();
     let html = std::fs::read_to_string(root.join("index.html")).unwrap();
     let data = std::fs::read_to_string(root.join("data/gallery.js")).unwrap();
+    // O conteúdo cifrado (base64) pode conter "Ana" por acaso: procura-se fora dele.
+    let plain = strip_base64_blobs(&data);
     for leak in ["Ana", "Sintra", "img/", "IMG_", "Cerimónia", "og:image"] {
-        assert!(!html.contains(leak) && !data.contains(leak), "{leak} visível sem o código");
+        assert!(!html.contains(leak) && !plain.contains(leak), "{leak} visível sem o código");
     }
     assert!(html.contains("noindex"));
     assert!(read_manifest(root, Some("1357")).is_err(), "código errado");
@@ -219,4 +221,21 @@ fn downloads_off_and_web_size() {
         m["photos"][0]["d"].as_str().unwrap().starts_with("img/w/"),
         "download = imagem de ecrã"
     );
+}
+
+/// Substitui textos entre aspas que são blocos base64 (≥ 24 caracteres) por `"…"`.
+fn strip_base64_blobs(s: &str) -> String {
+    let mut out = String::new();
+    for (i, part) in s.split('"').enumerate() {
+        let blob = i % 2 == 1
+            && part.len() >= 24
+            && part.bytes().all(|b| {
+                b.is_ascii_alphanumeric() || matches!(b, b'+' | b'/' | b'=' | b'-' | b'_')
+            });
+        if i > 0 {
+            out.push('"');
+        }
+        out.push_str(if blob { "…" } else { part });
+    }
+    out
 }

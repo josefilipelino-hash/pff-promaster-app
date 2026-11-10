@@ -139,9 +139,13 @@ pub fn set_color(
 }
 
 #[tauri::command]
-pub fn start_import(state: State<'_, AppState>, request: ImportRequest) -> CmdResult<i64> {
+pub fn start_import(
+    state: State<'_, AppState>,
+    request: ImportRequest,
+    safety: Option<momento_project_management::ImportSafety>,
+) -> CmdResult<i64> {
     let s = state.session().map_err(err)?;
-    s.start_import(&request).map_err(err)
+    s.start_import_with(&request, &safety.unwrap_or_default()).map_err(err)
 }
 
 #[tauri::command]
@@ -1094,4 +1098,144 @@ pub fn perf_log(event: String, data: serde_json::Value) {
         })
         .map(|kb| kb / 1024);
     tracing::info!(target: "perf", evento = %event, desde_arranque_ms = since as u64, rss_mb = ?rss, dados = %data, "medição");
+}
+
+// ---------------------------------------------------------------- segurança (Fase 13)
+
+use momento_project_management::export::PendingExport;
+use momento_project_management::originals::{RelinkReport, RemoveReport};
+use momento_project_management::safety::{BackupInfo, OpenReport};
+use momento_project_management::AvailabilitySummary;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SafetyStatus {
+    report: OpenReport,
+    availability: AvailabilitySummary,
+    backups: Vec<BackupInfo>,
+    backup_minutes: u32,
+    /// (quando, tipo, detalhe), mais recentes primeiro.
+    events: Vec<(i64, String, String)>,
+    pending_exports: Vec<PendingExport>,
+}
+
+#[tauri::command]
+pub async fn safety_status(state: State<'_, AppState>) -> CmdResult<SafetyStatus> {
+    let s = state.session().map_err(err)?;
+    let availability = s.check_availability().map_err(err)?;
+    Ok(SafetyStatus {
+        report: s.open_report(),
+        availability,
+        backups: s.list_backups(),
+        backup_minutes: s.backup_minutes(),
+        events: s.safety_events(30).map_err(err)?,
+        pending_exports: s.pending_exports().map_err(err)?,
+    })
+}
+
+#[tauri::command]
+pub async fn create_backup(state: State<'_, AppState>) -> CmdResult<BackupInfo> {
+    state.session().and_then(|s| s.create_backup()).map_err(err)
+}
+
+#[tauri::command]
+pub fn set_backup_minutes(state: State<'_, AppState>, minutes: u32) -> CmdResult<()> {
+    state.session().and_then(|s| s.set_backup_minutes(minutes)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn validate_catalog(
+    state: State<'_, AppState>,
+) -> CmdResult<momento_database::safety::Validation> {
+    state.session().and_then(|s| s.validate_catalog()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn export_catalog(state: State<'_, AppState>, dest: String) -> CmdResult<()> {
+    state.session().and_then(|s| s.export_catalog(Path::new(&dest))).map_err(err)
+}
+
+/// Substitui o catálogo (versão ou catálogo importado): fecha, substitui e reabre.
+async fn replace_and_reopen(state: &AppState, file: &str) -> CmdResult<OpenedProject> {
+    let s = state.session().map_err(err)?;
+    let root = s.paths.root.clone();
+    let paths = s.paths.clone();
+    drop(s);
+    state.close_project();
+    let replaced = momento_project_management::safety::replace_catalog(&paths, Path::new(file));
+    // Reabre sempre (mesmo que a substituição tenha sido recusada).
+    let (session, token) = state.open(&root).map_err(err)?;
+    replaced.map_err(err)?;
+    tracing::info!("catálogo substituído (restauro/importação)");
+    Ok(OpenedProject { info: session.info().map_err(err)?, image_token: token })
+}
+
+#[tauri::command]
+pub async fn restore_backup(state: State<'_, AppState>, file: String) -> CmdResult<OpenedProject> {
+    replace_and_reopen(&state, &file).await
+}
+
+#[tauri::command]
+pub async fn import_catalog(state: State<'_, AppState>, file: String) -> CmdResult<OpenedProject> {
+    replace_and_reopen(&state, &file).await
+}
+
+#[tauri::command]
+pub async fn check_availability(state: State<'_, AppState>) -> CmdResult<AvailabilitySummary> {
+    state.session().and_then(|s| s.check_availability()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn remove_from_catalog(
+    state: State<'_, AppState>,
+    keys: Vec<i64>,
+    confirmed: bool,
+) -> CmdResult<RemoveReport> {
+    state.session().and_then(|s| s.remove_from_catalog(&keys, confirmed)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn move_to_trash(
+    state: State<'_, AppState>,
+    keys: Vec<i64>,
+    confirmed: bool,
+) -> CmdResult<RemoveReport> {
+    state.session().and_then(|s| s.move_to_trash(&keys, confirmed)).map_err(err)
+}
+
+/// Mostra o original no gestor de ficheiros (selecionado, quando o sistema o permite).
+#[tauri::command]
+pub async fn reveal_original(state: State<'_, AppState>, key: i64) -> CmdResult<()> {
+    let p = state.session().and_then(|s| s.original_path(key)).map_err(err)?;
+    #[cfg(target_os = "macos")]
+    let r = std::process::Command::new("open").arg("-R").arg(&p).spawn();
+    #[cfg(target_os = "windows")]
+    let r = std::process::Command::new("explorer").arg(format!("/select,{}", p.display())).spawn();
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    let r = std::process::Command::new("xdg-open").arg(p.parent().unwrap_or(&p)).spawn();
+    r.map(|_| ()).map_err(|e| err(momento_core_types::CoreError::Io(e)))
+}
+
+#[tauri::command]
+pub async fn relink_file(
+    state: State<'_, AppState>,
+    key: i64,
+    file: String,
+) -> CmdResult<RelinkReport> {
+    state.session().and_then(|s| s.relink_file(key, Path::new(&file))).map_err(err)
+}
+
+#[tauri::command]
+pub async fn relink_folder(state: State<'_, AppState>, folder: String) -> CmdResult<RelinkReport> {
+    state.session().and_then(|s| s.relink_folder(Path::new(&folder))).map_err(err)
+}
+
+#[tauri::command]
+pub fn resume_export(state: State<'_, AppState>, id: String) -> CmdResult<u64> {
+    state.session().and_then(|s| s.resume_export(&id)).map_err(err)
+}
+
+#[tauri::command]
+pub fn discard_export(state: State<'_, AppState>, id: String) -> CmdResult<()> {
+    state.session().map(|s| s.discard_export(&id)).map_err(err)
 }
