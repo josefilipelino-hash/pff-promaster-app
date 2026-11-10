@@ -9,6 +9,9 @@ import { ANCHORS, EXPORT_SPACES, SIZE_MODES, type ExportCaps, type ExportEstimat
 import { Modal } from "./Modal";
 import { momentName } from "./MomentsPanel";
 
+/** Estado de um trabalho → estado visual comum (Fase 14). */
+const JOB_STATE: Record<string, string> = { queued: "loading", running: "processing", paused: "offline", done: "completed", cancelled: "", failed: "failed" };
+
 const DEST_KEY = "momento.exportDestination";
 
 function loadDest(): string {
@@ -696,7 +699,7 @@ function JobRow({ j, expanded, onToggle, fail }: { j: ExportProgress; expanded: 
     <div className="export-job">
       <div className="dev-row">
         <span className="grow ellipsis">{j.name}</span>
-        <span className="muted small">{t(`export.state.${j.state}`)}</span>
+        <span className={`state ${JOB_STATE[j.state] ?? ""}`}>{t(`export.state.${j.state}`)}</span>
       </div>
       <div className="progress" role="progressbar" aria-valuemin={0} aria-valuemax={j.filesTotal} aria-valuenow={processed} aria-label={j.name}>
         <div className="progress-bar" style={{ width: `${pct}%` }} />

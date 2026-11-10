@@ -9,6 +9,12 @@ export function Histogram({ data }: { data: [Uint32Array, Uint32Array, Uint32Arr
     const c = ref.current;
     const ctx = c?.getContext?.("2d");
     if (!c || !ctx) return;
+    // HiDPI/Retina: o buffer acompanha o tamanho no ecrã × devicePixelRatio (nítido a 2×).
+    const dpr = window.devicePixelRatio || 1;
+    const cw = Math.round((c.clientWidth || 256) * dpr);
+    const ch = Math.round((c.clientHeight || 96) * dpr);
+    if (c.width !== cw) c.width = cw;
+    if (c.height !== ch) c.height = ch;
     const w = c.width;
     const h = c.height;
     ctx.clearRect(0, 0, w, h);

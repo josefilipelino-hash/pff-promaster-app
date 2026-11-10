@@ -5,6 +5,7 @@ import { defaultMatchOptions } from "../logic/develop";
 import { errorText, useStore } from "../store";
 import { CRITERIA, type Criterion, type LookGroup, type MatchOptions, type MomentRow } from "../types";
 import { momentName } from "./MomentsPanel";
+import { Icon } from "./Icon";
 
 const hhmm = (t: string | null) => (t ? t.slice(11, 16) : "");
 
@@ -183,6 +184,7 @@ export function ConsistencyView({ onEdit }: { onEdit: (key: number) => void }) {
           </>
         ) : (
           <div className="empty-state">
+            <span className="empty-icon" aria-hidden="true"><Icon name="balance" size={32} /></span>
             <p className="muted">{t("look.empty")}</p>
           </div>
         )}

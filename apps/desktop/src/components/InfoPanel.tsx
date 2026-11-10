@@ -111,8 +111,9 @@ export function InfoPanel({
           ))}
       </dl>
       {d && (
-        <div className="info-path">
-          <dt>{t("info.path")}</dt>
+        <>
+          <dl className="info-path">
+            <dt>{t("info.path")}</dt>
           <dd title={d.path}>{d.path}</dd>
           {d.sourcePath && (
             <>
@@ -120,8 +121,9 @@ export function InfoPanel({
               <dd title={d.sourcePath}>{d.sourcePath}</dd>
             </>
           )}
+          </dl>
           <OriginalActions photo={photo} />
-        </div>
+        </>
       )}
     </aside>
   );

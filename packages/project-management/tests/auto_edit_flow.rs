@@ -230,3 +230,31 @@ fn automatic_editing_end_to_end() {
     }
     s.close();
 }
+
+/// Fase 14: fechar o projeto (ou pausar/cancelar) sem fila de edição automática não anuncia
+/// nada — antes, a interface mostrava "Edição automática concluída: 0 fotografias".
+#[test]
+fn no_auto_edit_events_without_a_queue() {
+    let tmp = tempfile::tempdir().unwrap();
+    let paths = create_project(&NewProject {
+        name: "Sem fila".into(),
+        client_name: String::new(),
+        event_type: "wedding".into(),
+        event_date: None,
+        location: String::new(),
+        originals_dir: None,
+        work_dir: tmp.path().to_string_lossy().into_owned(),
+    })
+    .unwrap();
+    let rec = Arc::new(Rec::default());
+    let s = ProjectSession::open(&paths.root, rec.clone()).unwrap();
+    s.pause_auto_edit();
+    s.resume_auto_edit();
+    s.cancel_auto_edit();
+    s.close();
+    assert!(
+        rec.auto.lock().unwrap().is_empty(),
+        "eventos inesperados: {:?}",
+        rec.auto.lock().unwrap().len()
+    );
+}

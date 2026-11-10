@@ -646,6 +646,8 @@ impl ProjectSession {
     pub fn pause_auto_edit(&self) {
         if let Some(j) = self.auto_job.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
             j.control.set(|c| c.paused = true);
+        } else {
+            return;
         }
         self.events.auto_edit(&self.auto_progress(None, !self.auto_edit_running()));
     }
@@ -653,6 +655,8 @@ impl ProjectSession {
     pub fn resume_auto_edit(&self) {
         if let Some(j) = self.auto_job.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
             j.control.set(|c| c.paused = false);
+        } else {
+            return;
         }
         self.events.auto_edit(&self.auto_progress(None, !self.auto_edit_running()));
     }
@@ -663,6 +667,10 @@ impl ProjectSession {
         if let Some(j) = self.auto_job.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
             j.control.set(|c| c.cancelled = true);
             j.queue.lock().unwrap_or_else(|e| e.into_inner()).clear();
+        } else {
+            // Sem fila (p. ex. ao fechar o projeto): nada a anunciar — antes surgia
+            // "Edição automática concluída: 0 fotografias".
+            return;
         }
         self.events.auto_edit(&self.auto_progress(None, false));
     }

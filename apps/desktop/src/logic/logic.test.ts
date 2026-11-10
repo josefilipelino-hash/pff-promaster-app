@@ -227,3 +227,54 @@ describe("diagnóstico de desempenho (Fase 12)", async () => {
     expect(s.p95).toBe(80);
   });
 });
+
+describe("teclado e atalhos (Fase 14)", async () => {
+  const { focusRegion, installKeyboardNav } = await import("./keyboardNav");
+  const { shortcutLabel } = await import("./keys");
+  it("F6 percorre as regiões e as setas mudam de separador", () => {
+    document.body.innerHTML = `
+      <div class="toolbar"><button id="t1">a</button></div>
+      <nav class="sidebar"><button id="s1">b</button><button id="s2" class="active">c</button></nav>
+      <div class="main"><div class="grid-scroller" tabindex="-1"><div class="cell" tabindex="0" id="c1"></div></div></div>
+      <aside class="info-panel"><div role="tablist"><button role="tab" id="a" aria-selected="true">A</button><button role="tab" id="b">B</button></div></aside>`;
+    (document.getElementById("t1") as HTMLElement).focus();
+    focusRegion(1);
+    expect(document.activeElement?.id).toBe("s2");
+    focusRegion(1);
+    expect(document.activeElement?.closest(".grid-scroller")).toBeTruthy();
+    focusRegion(1);
+    expect(document.activeElement?.id).toBe("a");
+    focusRegion(1);
+    expect(document.activeElement?.id).toBe("t1");
+    focusRegion(-1);
+    expect(document.activeElement?.id).toBe("a");
+    installKeyboardNav();
+    let clicked = "";
+    document.getElementById("b")!.addEventListener("click", () => (clicked = "b"));
+    document.getElementById("a")!.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    expect(document.activeElement?.id).toBe("b");
+    expect(clicked).toBe("b");
+    document.body.innerHTML = "";
+  });
+  it("atalhos mostrados conforme o sistema", () => {
+    expect(shortcutLabel("Mod+Shift+E", true)).toBe("⇧⌘E");
+    expect(shortcutLabel("Mod+Shift+E", false)).toBe("Ctrl+Shift+E");
+    expect(shortcutLabel("D", true)).toBe("D");
+  });
+});
+
+describe("contraste dos temas (Fase 14)", async () => {
+  const { contrast, themeTokens } = await import("@momento/ui");
+  it("texto cumpre WCAG AA nos dois temas", () => {
+    for (const name of ["dark", "light"] as const) {
+      const t = themeTokens[name];
+      for (const bg of ["--bg", "--surface", "--surface-2"]) {
+        expect(contrast(t["--text"]!, t[bg]!), `${name} texto/${bg}`).toBeGreaterThanOrEqual(7);
+        expect(contrast(t["--text-muted"]!, t[bg]!), `${name} secundário/${bg}`).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(t["--text-faint"]!, t[bg]!), `${name} terciário/${bg}`).toBeGreaterThanOrEqual(4.5);
+      }
+      expect(contrast(t["--on-accent"]!, t["--accent"]!), `${name} botão principal`).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(t["--accent"]!, t["--bg"]!), `${name} destaque/fundo (foco, ≥ 3:1)`).toBeGreaterThanOrEqual(3);
+    }
+  });
+});

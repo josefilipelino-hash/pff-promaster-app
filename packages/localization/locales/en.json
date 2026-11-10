@@ -107,8 +107,8 @@
     "dropHere": "Drop here to import",
     "busy": "An import is already running.",
     "imagesFilter": "Images and RAW",
-    "filesShort": "+ Files",
-    "folderShort": "+ Folder",
+    "filesShort": "Files…",
+    "folderShort": "Folder…",
     "safetyLabel": "Safety",
     "backup": "Also copy to a backup disk",
     "backupHint": "ORIGINAL → Working and ORIGINAL → Backup, at the same time, verified.",
@@ -167,7 +167,8 @@
     "zoomOut": "Zoom out",
     "fullscreen": "Full screen",
     "loadFailed": "Could not open this photo.",
-    "loadingFull": "Loading full resolution…"
+    "loadingFull": "Loading full resolution…",
+    "zoom": "Zoom"
   },
   "info": {
     "none": "Select a photo to see its information.",
@@ -226,7 +227,11 @@
     "cancelImport": "Cancel",
     "scanning": "Looking for files…",
     "thumbnails": "Creating thumbnails ({{remaining}} left)",
-    "thumbSize": "Thumbnail size"
+    "thumbSize": "Thumbnail size",
+    "offline_one": "{{count}} offline (drive missing)",
+    "offline_other": "{{count}} offline (drive missing)",
+    "missing_one": "{{count}} missing",
+    "missing_other": "{{count}} missing"
   },
   "shortcuts": {
     "title": "Keyboard shortcuts",
@@ -286,7 +291,7 @@
   },
   "selection": {
     "title": "Smart selection",
-    "intro": "Analyses sharpness, exposure, faces and eyes on this computer to recommend the best of each moment. Nothing is uploaded and nothing is deleted.",
+    "intro": "Recommends the best of each moment (sharpness, exposure, faces, eyes). All on this computer; nothing is sent to the internet or deleted.",
     "analyze_one": "Analyse {{count}} photo",
     "analyze_other": "Analyse {{count}} photos",
     "analyzing": "Analysing {{done}} of {{total}}…",
@@ -347,7 +352,9 @@
     "reject": "Reject",
     "swap": "Select another…",
     "swapHint": "Swap for another photo from the same group",
-    "needTwo": "Select 2 to 4 photos (or one photo of a sequence) to compare."
+    "needTwo": "Select 2 to 4 photos (or one photo of a sequence) to compare.",
+    "keyPane": "panel",
+    "keyRate": "rate"
   },
   "analysis": {
     "title": "Analysis",
@@ -512,7 +519,7 @@
   },
   "people": {
     "title": "People",
-    "empty": "Analyse the photos to group faces (all on this computer).",
+    "empty": "Available after analysis (local).",
     "needRoles": "First identify the people with these roles in “Manage people”.",
     "unnamed": "Person {{id}}",
     "manage": "Manage people",
@@ -1536,6 +1543,7 @@
     "spread": "Spread",
     "canvas": "Spread area",
     "slot": "Frame",
+    "slotSelected": "Frame (selected)",
     "film": "Selected photos",
     "used": "already in album",
     "margin": "Margin (mm)",
@@ -1733,5 +1741,29 @@
     "removed_one": "{{count}} photo removed from the catalogue (file kept).",
     "removed_other": "{{count}} photos removed from the catalogue (files kept).",
     "trashed": "{{count}} moved to the trash; {{failed}} refused (kept in catalogue)."
+  },
+  "toolbar": {
+    "label": "Project actions",
+    "import": "Import",
+    "more": "More"
+  },
+  "theme": {
+    "title": "Theme",
+    "dark": "Dark",
+    "light": "Light",
+    "system": "Match system"
+  },
+  "filmstrip": {
+    "label": "Filmstrip ({{count}})"
+  },
+  "menu": {
+    "photo": "Photo actions",
+    "open": "Open in viewer",
+    "pick": "Mark as pick",
+    "reject": "Reject",
+    "unflag": "No flag",
+    "noStars": "No stars",
+    "remove_one": "Remove…",
+    "remove_other": "Remove {{count}}…"
   }
 }

@@ -1,3 +1,4 @@
+import { Icon } from "./Icon";
 import { perfViewerLoaded, perfViewerShown } from "../logic/perfProbe";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -37,6 +38,7 @@ export function Viewer({
   onClose,
   onFullscreen,
   handleRef,
+  filmstrip,
 }: {
   photo: PhotoRow;
   token: number;
@@ -47,6 +49,8 @@ export function Viewer({
   onClose: () => void;
   onFullscreen: () => void;
   handleRef: React.MutableRefObject<ViewerHandle | null>;
+  /** Tira de fotografias no fundo (fora do ecrã inteiro). */
+  filmstrip?: React.ReactNode;
 }) {
     const { t } = useTranslation();
   // Versões editadas mudam de URL a cada gravação (o protocolo serve ficheiros imutáveis).
@@ -152,36 +156,39 @@ export function Viewer({
   return (
     <div className="viewer">
       <div className="viewer-toolbar">
-        <button type="button" className="btn small" onClick={onClose} title={`${t("viewer.back")} (Esc)`}>
-          ← {t("viewer.back")}
+        <button type="button" className="btn small ghost" onClick={onClose} title={`${t("viewer.back")} (Esc)`}>
+          <Icon name="chevronLeft" />
+          {t("viewer.back")}
         </button>
         <span className="viewer-title" title={photo.fileName}>
           {photo.fileName} <span className="muted">· {t("viewer.position", { index: index + 1, total })}</span>
         </span>
         <span className="spacer" />
-        <button type="button" className="btn small" onClick={onPrev} disabled={index <= 0} title={`${t("viewer.prev")} (←)`}>
-          ‹ {t("viewer.prev")}
+        <button type="button" className="btn small icon-only" onClick={onPrev} disabled={index <= 0} title={`${t("viewer.prev")} (←)`} aria-label={t("viewer.prev")}>
+          <Icon name="chevronLeft" />
         </button>
-        <button type="button" className="btn small" onClick={onNext} disabled={index >= total - 1} title={`${t("viewer.next")} (→)`}>
-          {t("viewer.next")} ›
-        </button>
-        <span className="sep" />
-        <button type="button" className={`btn small${zoom === "fit" ? " active" : ""}`} onClick={() => zoomAround("fit")} title={`${t("viewer.fit")} (Z)`}>
-          {t("viewer.fit")}
-        </button>
-        <button type="button" className={`btn small${zoom === 1 ? " active" : ""}`} onClick={() => zoomAround(1)} title={`100 % (Z)`}>
-          100 %
-        </button>
-        <button type="button" className="btn small" onClick={() => zoomAround(stepZoom(scale, -1))} title={`${t("viewer.zoomOut")} (−)`}>
-          −
-        </button>
-        <span className="zoom-label">{zoomLabel}</span>
-        <button type="button" className="btn small" onClick={() => zoomAround(stepZoom(scale, 1))} title={`${t("viewer.zoomIn")} (+)`}>
-          +
+        <button type="button" className="btn small icon-only" onClick={onNext} disabled={index >= total - 1} title={`${t("viewer.next")} (→)`} aria-label={t("viewer.next")}>
+          <Icon name="chevronRight" />
         </button>
         <span className="sep" />
-        <button type="button" className="btn small" onClick={onFullscreen} title={`${t("viewer.fullscreen")} (F)`}>
-          ⛶ {t("viewer.fullscreen")}
+        <span className="segmented" role="group" aria-label={t("viewer.zoom")}>
+          <button type="button" className={`btn small${zoom === "fit" ? " active" : ""}`} aria-pressed={zoom === "fit"} onClick={() => zoomAround("fit")} title={`${t("viewer.fit")} (Z)`}>
+            {t("viewer.fit")}
+          </button>
+          <button type="button" className={`btn small${zoom === 1 ? " active" : ""}`} aria-pressed={zoom === 1} onClick={() => zoomAround(1)} title="100 % (Z)">
+            100 %
+          </button>
+        </span>
+        <button type="button" className="btn small ghost icon-only" onClick={() => zoomAround(stepZoom(scale, -1))} title={`${t("viewer.zoomOut")} (−)`} aria-label={t("viewer.zoomOut")}>
+          <Icon name="zoomOut" />
+        </button>
+        <span className="zoom-label" aria-live="polite">{zoomLabel}</span>
+        <button type="button" className="btn small ghost icon-only" onClick={() => zoomAround(stepZoom(scale, 1))} title={`${t("viewer.zoomIn")} (+)`} aria-label={t("viewer.zoomIn")}>
+          <Icon name="zoomIn" />
+        </button>
+        <span className="sep" />
+        <button type="button" className="btn small ghost icon-only" onClick={onFullscreen} title={`${t("viewer.fullscreen")} (F)`} aria-label={t("viewer.fullscreen")}>
+          <Icon name="expand" />
         </button>
       </div>
       <div
@@ -198,7 +205,7 @@ export function Viewer({
           {!previewFailed ? (
             <img src={`${imageUrl(token, "preview", photo.id)}?v=${version}`} alt={photo.fileName} draggable={false} onError={() => setPreviewFailed(true)} onLoad={() => perfViewerLoaded(photo.id)} />
           ) : (
-            <div className="viewer-error">{t("viewer.loadFailed")}</div>
+            <div className="viewer-error state failed" role="alert">{t("viewer.loadFailed")}</div>
           )}
           {needFull && (
             <img
@@ -211,8 +218,9 @@ export function Viewer({
             />
           )}
         </div>
-        {needFull && !fullLoaded && <div className="viewer-loading">{t("viewer.loadingFull")}</div>}
+        {needFull && !fullLoaded && <div className="viewer-loading state loading" role="status">{t("viewer.loadingFull")}</div>}
       </div>
+      {filmstrip}
     </div>
   );
 }

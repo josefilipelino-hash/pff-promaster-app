@@ -5,6 +5,7 @@ import { api, imageUrl } from "../api";
 import { align, bleedSlot, clampSlot, cm, cropWindow, distribute, panoramaSlot, photoCount, templateBoxes, type Align } from "../logic/album";
 import { errorText, useStore } from "../store";
 import { EXPORT_SPACES, type Album, type AlbumExportKind, type AlbumFormat, type AlbumIssue, type AlbumPhotoInfo, type AlbumSlot, type AlbumSpec, type AlbumSummary, type LabPreset } from "../types";
+import { Icon } from "./Icon";
 
 const NEW_SPEC: AlbumSpec = {
   format: "30x30", widthMm: 300, heightMm: 300, pages: 40, dpi: 300, bleedMm: 3, safeMm: 10, gutterMm: 16,
@@ -105,6 +106,7 @@ export function AlbumView() {
   if (!album) {
     return (
       <div className="album-empty">
+        <span className="empty-icon" aria-hidden="true"><Icon name="album" size={32} /></span>
         <h2>{t("album.title")}</h2>
         <p className="muted">{t("album.emptyHint")}</p>
         <button type="button" className="btn primary" onClick={() => void createAlbum()}>
@@ -426,8 +428,8 @@ export function AlbumView() {
                   className={`album-slot${sel.has(s.id) ? " selected" : ""}${s.photo == null ? " empty" : ""}${own.some((i) => i.severity === "error") ? " has-error" : own.length ? " has-warning" : ""}`}
                   style={{ left: px(s.x + b), top: px(s.y + b), width: px(s.w), height: px(s.h) }}
                   onPointerDown={(e) => onSlotDown(e, s)}
-                  aria-label={t("album.slot")}
-                  aria-selected={sel.has(s.id)}
+                  role="group"
+                  aria-label={sel.has(s.id) ? t("album.slotSelected") : t("album.slot")}
                 >
                   {img}
                   {s.photo == null && <span className="album-drop">{t("album.dropHere")}</span>}

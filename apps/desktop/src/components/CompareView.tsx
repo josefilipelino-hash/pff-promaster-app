@@ -1,3 +1,4 @@
+import { Icon } from "./Icon";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { imageUrl } from "../api";
@@ -149,7 +150,7 @@ function Pane({
           <img src={`${imageUrl(token, "preview", photo.id)}?v=${version}`} alt={photo.fileName} draggable={false} />
           {needFull && <img key={`full-${photo.id}`} className={`full${fullLoaded ? " loaded" : ""}`} src={`${imageUrl(token, "full", photo.id)}?v=${version}`} alt="" draggable={false} onLoad={() => setFullLoaded(true)} />}
         </div>
-        {needFull && !fullLoaded && <div className="viewer-loading">{t("viewer.loadingFull")}</div>}
+        {needFull && !fullLoaded && <div className="viewer-loading state loading" role="status">{t("viewer.loadingFull")}</div>}
       </div>
       <footer className="compare-pane-footer">
         <Stars value={photo.stars} onChange={(n) => onRate("stars", n)} />
@@ -230,11 +231,17 @@ export function CompareView({
   return (
     <div className="compare" role="region" aria-label={t("compare.title")}>
       <div className="viewer-toolbar">
-        <button type="button" className="btn small" onClick={onClose} title={`${t("viewer.back")} (Esc)`}>
-          ← {t("viewer.back")}
+        <button type="button" className="btn small ghost" onClick={onClose} title={`${t("viewer.back")} (Esc)`}>
+          <Icon name="chevronLeft" />
+          {t("viewer.back")}
         </button>
         <strong>{t("compare.title")}</strong>
-        <span className="muted small">{t("compare.hint")}</span>
+        <span className="kbd-hints" title={t("compare.hint")}>
+          <kbd>←</kbd>
+          <kbd>→</kbd> {t("compare.keyPane")} <kbd>P</kbd>
+          <kbd>X</kbd>
+          <kbd>0–5</kbd> {t("compare.keyRate")}
+        </span>
         <span className="spacer" />
         <label className="small">
           <input type="checkbox" checked={synced} onChange={(e) => setSynced(e.target.checked)} /> {t("compare.sync")}

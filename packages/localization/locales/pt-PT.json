@@ -107,8 +107,8 @@
     "dropHere": "Largue aqui para importar",
     "busy": "Já existe uma importação em curso.",
     "imagesFilter": "Imagens e RAW",
-    "filesShort": "+ Ficheiros",
-    "folderShort": "+ Pasta",
+    "filesShort": "Ficheiros…",
+    "folderShort": "Pasta…",
     "safetyLabel": "Segurança",
     "backup": "Copiar também para um disco de segurança",
     "backupHint": "ORIGINAL → Trabalho e ORIGINAL → Backup, ao mesmo tempo, verificados.",
@@ -167,7 +167,8 @@
     "zoomOut": "Reduzir",
     "fullscreen": "Ecrã completo",
     "loadFailed": "Não foi possível abrir esta fotografia.",
-    "loadingFull": "A carregar resolução total…"
+    "loadingFull": "A carregar resolução total…",
+    "zoom": "Ampliação"
   },
   "info": {
     "none": "Selecione uma fotografia para ver a informação.",
@@ -226,7 +227,11 @@
     "cancelImport": "Cancelar",
     "scanning": "A procurar ficheiros…",
     "thumbnails": "A gerar miniaturas ({{remaining}} em falta)",
-    "thumbSize": "Tamanho das miniaturas"
+    "thumbSize": "Tamanho das miniaturas",
+    "offline_one": "{{count}} offline (disco ausente)",
+    "offline_other": "{{count}} offline (disco ausente)",
+    "missing_one": "{{count}} em falta",
+    "missing_other": "{{count}} em falta"
   },
   "shortcuts": {
     "title": "Atalhos de teclado",
@@ -286,7 +291,7 @@
   },
   "selection": {
     "title": "Seleção automática",
-    "intro": "Analisa nitidez, exposição, rostos e olhos neste computador para recomendar as melhores de cada momento. Nada é enviado para a internet e nada é apagado.",
+    "intro": "Recomenda as melhores de cada momento (nitidez, exposição, rostos, olhos). Tudo neste computador; nada é enviado para a internet nem apagado.",
     "analyze_one": "Analisar {{count}} fotografia",
     "analyze_other": "Analisar {{count}} fotografias",
     "analyzing": "A analisar {{done}} de {{total}}…",
@@ -347,7 +352,9 @@
     "reject": "Rejeitar",
     "swap": "Selecionar outra…",
     "swapHint": "Trocar por outra fotografia do mesmo grupo",
-    "needTwo": "Selecione 2 a 4 fotografias (ou uma fotografia de uma sequência) para comparar."
+    "needTwo": "Selecione 2 a 4 fotografias (ou uma fotografia de uma sequência) para comparar.",
+    "keyPane": "painel",
+    "keyRate": "classificar"
   },
   "analysis": {
     "title": "Análise",
@@ -512,7 +519,7 @@
   },
   "people": {
     "title": "Pessoas",
-    "empty": "Analise as fotografias para agrupar rostos (tudo neste computador).",
+    "empty": "Disponível depois da análise (local).",
     "needRoles": "Identifique primeiro as pessoas com estes papéis em “Gerir pessoas”.",
     "unnamed": "Pessoa {{id}}",
     "manage": "Gerir pessoas",
@@ -897,7 +904,7 @@
   "presets": {
     "button": "Presets…",
     "applyHint": "Aplicar um preset à seleção, a um momento ou ao casamento completo",
-    "amount": "Amount (%)",
+    "amount": "Intensidade (%)",
     "create": "Criar preset",
     "createTitle": "Criar preset a partir desta fotografia",
     "name": "Nome",
@@ -1431,8 +1438,8 @@
     "showAll": "Mostrar todas",
     "theme": "Tema",
     "themeName": {
-      "light": "Light",
-      "dark": "Dark",
+      "light": "Claro",
+      "dark": "Escuro",
       "minimal": "Minimal",
       "editorial": "Editorial"
     },
@@ -1454,7 +1461,7 @@
     "language": "Idioma da galeria",
     "heroHint": "Escolha uma fotografia na grelha (fica em foco) e use \"Usar a fotografia em foco\". Sem hero, o topo mostra só os nomes.",
     "favorites": "Favoritas (o cliente marca com o coração e envia-lhe a lista)",
-    "downloads": "Downloads",
+    "downloads": "Transferências",
     "downloadsOption": {
       "none": "Sem downloads",
       "individual": "Fotografia a fotografia",
@@ -1536,6 +1543,7 @@
     "spread": "Spread",
     "canvas": "Área do spread",
     "slot": "Moldura",
+    "slotSelected": "Moldura (selecionada)",
     "film": "Fotografias da seleção",
     "used": "já no álbum",
     "margin": "Margem (mm)",
@@ -1550,7 +1558,7 @@
     },
     "distributeH": "Distribuir ↔",
     "distributeV": "Distribuir ↕",
-    "fullBleed": "Full bleed",
+    "fullBleed": "Sangria total",
     "panorama": "Panorâmica",
     "crop": "Recortar",
     "cropHint": "Arraste a fotografia dentro da moldura para reenquadrar (ou use Alt + arrastar)",
@@ -1733,5 +1741,29 @@
     "removed_one": "{{count}} fotografia removida do catálogo (o ficheiro ficou).",
     "removed_other": "{{count}} fotografias removidas do catálogo (os ficheiros ficaram).",
     "trashed": "{{count}} enviadas para o lixo; {{failed}} recusadas (ficaram no catálogo)."
+  },
+  "toolbar": {
+    "label": "Ações do projeto",
+    "import": "Importar",
+    "more": "Mais"
+  },
+  "theme": {
+    "title": "Tema",
+    "dark": "Escuro",
+    "light": "Claro",
+    "system": "Como o sistema"
+  },
+  "filmstrip": {
+    "label": "Tira de fotografias ({{count}})"
+  },
+  "menu": {
+    "photo": "Ações da fotografia",
+    "open": "Abrir no visualizador",
+    "pick": "Marcar como favorita",
+    "reject": "Rejeitar",
+    "unflag": "Sem marca",
+    "noStars": "Sem estrelas",
+    "remove_one": "Remover…",
+    "remove_other": "Remover {{count}}…"
   }
 }

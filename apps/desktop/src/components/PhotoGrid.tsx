@@ -40,6 +40,7 @@ interface CellProps {
   focused: boolean;
   onClick: (id: number, e: React.MouseEvent) => void;
   onOpen: (id: number) => void;
+  onMenu?: (id: number, x: number, y: number) => void;
   failedLabel: string;
   offlineLabel: string;
   missingLabel: string;
@@ -55,13 +56,17 @@ export function extLabel(fileName: string): string {
   return i >= 0 ? fileName.slice(i + 1).toUpperCase().slice(0, 5) : "";
 }
 
-const Cell = memo(function Cell({ photo, size, token, version, selected, focused, onClick, onOpen, failedLabel, offlineLabel, missingLabel, partialLabel, rec, editedLabel, virtualLabel }: CellProps) {
+const Cell = memo(function Cell({ photo, size, token, version, selected, focused, onClick, onOpen, onMenu, failedLabel, offlineLabel, missingLabel, partialLabel, rec, editedLabel, virtualLabel }: CellProps) {
   return (
     <div
       className={`cell${selected ? " selected" : ""}${focused ? " focused" : ""}${photo.flag === -1 ? " rejected" : ""}`}
       style={{ width: size }}
       onMouseDown={(e) => onClick(photo.id, e)}
       onDoubleClick={() => onOpen(photo.id)}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onMenu?.(photo.id, e.clientX, e.clientY);
+      }}
       title={photo.fileName}
       data-id={photo.id}
     >
@@ -108,11 +113,13 @@ export function PhotoGrid({
   photos,
   onClickPhoto,
   onOpen,
+  onMenu,
   layoutRef,
 }: {
   photos: PhotoRow[];
   onClickPhoto: (id: number, e: React.MouseEvent) => void;
   onOpen: (id: number) => void;
+  onMenu?: (id: number, x: number, y: number) => void;
   layoutRef: React.MutableRefObject<GridLayout>;
 }) {
   const { t } = useTranslation();
@@ -223,6 +230,7 @@ export function PhotoGrid({
             focused={selection.focus === p.id}
                         onClick={onCellDown}
             onOpen={onOpen}
+            onMenu={onMenu}
             failedLabel={t("grid.thumbFailed")}
             offlineLabel={t("safety.cellOffline")}
             missingLabel={t("safety.cellMissing")}

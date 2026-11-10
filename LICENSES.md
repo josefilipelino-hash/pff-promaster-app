@@ -92,6 +92,7 @@ devem acompanhar qualquer distribuição binária (a incluir no instalador na Fa
 | vitest | 4.1.12 | MIT |
 | @testing-library/react / dom | 16.3.3 / 10.4.2 | MIT |
 | jsdom | 27.4.0 | MIT |
+| axe-core (só testes, Fase 14; não é distribuído) | 4.10.2 | MPL-2.0 |
 | @types/react, @types/react-dom | 19.3.0 | MIT |
 | @tauri-apps/plugin-dialog | 2.8.4 | MIT OR Apache-2.0 |
 | zustand | 5.0.16 | MIT |

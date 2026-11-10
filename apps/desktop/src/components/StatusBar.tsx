@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { THUMB_MAX, THUMB_MIN, useStore } from "../store";
 import { COLORS } from "../types";
@@ -11,6 +12,18 @@ export function StatusBar({ total, visible, selected, onCancelImport, showSize }
   const setThumbSize = useStore((s) => s.setThumbSize);
   const filter = useStore((s) => s.filter);
   const setFilter = useStore((s) => s.setFilter);
+  const photos = useStore((s) => s.photos);
+  // Discos externos: quantas fotografias estão offline (disco ausente) ou em falta.
+  // Recalcula só quando a lista muda (15 000 linhas: < 1 ms).
+  const unavailable = useMemo(() => {
+    let offline = 0;
+    let missing = 0;
+    for (const p of photos) {
+      if (p.availability === "offline") offline++;
+      else if (p.availability === "missing") missing++;
+    }
+    return { offline, missing };
+  }, [photos]);
 
   return (
     <footer className="statusbar">
@@ -44,22 +57,26 @@ export function StatusBar({ total, visible, selected, onCancelImport, showSize }
         ))}
       </span>
       <span className="spacer" />
-      {running && progress && (
-        <span className="progress-item">
-          <span>{t("status.importing", { done: progress.processed, total: progress.total })}</span>
-          <progress max={Math.max(1, progress.total)} value={progress.processed} />
-          <button type="button" className="btn small ghost" onClick={onCancelImport}>
-            {t("status.cancelImport")}
-          </button>
-        </span>
-      )}
-      {running && !progress && <span className="progress-item">{t("status.scanning")}</span>}
-      {thumbs && (
-        <span className="progress-item">
-          <span>{t("status.thumbnails", { remaining: thumbs.remaining })}</span>
-          <progress max={Math.max(1, thumbs.total)} value={thumbs.done} />
-        </span>
-      )}
+      <span className="status-states" role="status" aria-live="polite">
+        {unavailable.offline > 0 && <span className="state offline">{t("status.offline", { count: unavailable.offline })}</span>}
+        {unavailable.missing > 0 && <span className="state failed">{t("status.missing", { count: unavailable.missing })}</span>}
+        {running && progress && (
+          <span className="progress-item">
+            <span className="state processing">{t("status.importing", { done: progress.processed, total: progress.total })}</span>
+            <progress max={Math.max(1, progress.total)} value={progress.processed} />
+            <button type="button" className="btn small ghost" onClick={onCancelImport}>
+              {t("status.cancelImport")}
+            </button>
+          </span>
+        )}
+        {running && !progress && <span className="progress-item state loading">{t("status.scanning")}</span>}
+        {thumbs && (
+          <span className="progress-item">
+            <span className="state processing">{t("status.thumbnails", { remaining: thumbs.remaining })}</span>
+            <progress max={Math.max(1, thumbs.total)} value={thumbs.done} />
+          </span>
+        )}
+      </span>
       {showSize && (
         <label className="size-slider" title={t("status.thumbSize")}>
           <span aria-hidden>▫</span>

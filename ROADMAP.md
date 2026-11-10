@@ -141,7 +141,16 @@ reconexão automática; importação com checksum opcional e cópia simultânea 
 exportações retomáveis; crash logs anonimizados; testes deliberados de falhas.
 **Por fazer:** testar em macOS/Windows; avisar quando o catálogo está num disco de rede.
 
-## Fase 14 — Distribuição
+## Fase 14 — UX/UI profissional ✅ *(concluída 2026-11-10, ver DESIGN.md)*
+
+Sistema de design com tokens, tema escuro principal e claro opcional, iconografia própria,
+estados uniformes, menus contextuais com atalhos visíveis, navegação por teclado completa
+(F6 entre regiões), tira de fotografias, barras compactas e adaptativas, estados claros,
+HiDPI verificado a 2×, auditoria de acessibilidade automática; desempenho sem regressão.
+**Por fazer:** verificar em Retina (macOS) e Windows 150/200 %; leitores de ecrã reais
+(VoiceOver, Narrador/NVDA); alternativa por teclado ao arrastar no álbum.
+
+## Fase 15 — Distribuição
 
 GPU (wgpu), otimização Apple Silicon, assinatura de instaladores.
 

@@ -7,7 +7,7 @@
 | Unitários Rust | `cargo test` | `#[cfg(test)]` em cada crate | ✅ 80 testes |
 | Integração do núcleo | `cargo test` com projetos temporários | `packages/project-management/tests/full_flow.rs` | ✅ 4 testes (até 625 ficheiros) |
 | **Ficheiros reais (Fase 2)** | `MOMENTO_SAMPLES_DIR` | `raw-engine/tests/real_samples.rs`, `project-management/tests/real_formats.rs` | ✅ 26 RAW reais + 65 ficheiros de 25 formatos (relatórios em `docs/reports/`) |
-| Unitários TS + componentes | Vitest + Testing Library (jsdom, núcleo simulado) | `apps/desktop/src/**/*.test.ts(x)`, `packages/localization` | ✅ 36 testes |
+| Unitários TS + componentes | Vitest + Testing Library (jsdom, núcleo simulado) | `apps/desktop/src/**/*.test.ts(x)`, `packages/localization` | ✅ 94 testes (88 desktop + 6 localização) |
 | Aplicação real (manual automatizada) | binário release + Xvfb + xdotool | ver “Verificação na aplicação real” | ✅ executada (Linux) |
 | Compilação para Windows | `cargo check --target x86_64-pc-windows-gnu` + executável release | todo o workspace, incluindo a LibRaw em C++ | ✅ (executável de 19,9 MB ligado) |
 | Compilação para macOS | `cargo check -p momento-image-codecs --target aarch64-apple-darwin` | adaptador ImageIO | ✅ (o resto, com C/C++, é compilado no CI macOS) |
@@ -68,6 +68,20 @@ macOS / Ctrl no Windows), formatação pt-PT, datas DD/MM/AAAA, URL de imagens p
 plataforma, ecrã inicial, validação do formulário, grelha virtualizada com 3 000 itens,
 secções futuras desativadas, classificação por teclado e em seleção múltipla, filtro
 Favoritas + visualizador, reversão quando o núcleo recusa, paridade de traduções.
+
+## Fase 14 — UX/UI profissional
+
+| Teste | O que verifica |
+|---|---|
+| Acessibilidade (3) — axe-core 4.10, WCAG 2.0/2.1 A e AA | início, grelha, menu contextual, visualizador com tira, Develop, comparação, pessoas, álbum, ajuda, exportar, galeria: **0 violações** (cada ecrã confirmado aberto antes da auditoria) |
+| UX profissional (3) | menu contextual com o rato e o teclado (Shift+F10, setas, primeira letra, Esc) a executar as ações reais; Mais → tema; Importar → diálogo; tira virtualizada com 3000 fotografias |
+| Estados claros (1) | barra de estado: offline e em falta com o estado certo, região `role="status"` |
+| Lógica (+3) | F6/Shift+F6 entre regiões e setas nos separadores; atalhos ⇧⌘ no macOS / Ctrl+Shift no Windows; **contraste WCAG dos dois temas** (texto ≥ 7, secundário ≥ 4,5, sobre o destaque ≥ 4,5, destaque ≥ 3) |
+| `auto_edit_flow::no_auto_edit_events_without_a_queue` | fechar/pausar/cancelar sem fila não anuncia "concluída: 0" |
+| Aplicação real (Xvfb) | todos os ecrãs nos dois temas; menu contextual; tira; **HiDPI** com `GDK_SCALE=2` (3200×2000): disposição igual, texto, ícones e histograma nítidos; **desempenho** com 15 000 fotografias sem regressão (`DESIGN.md`) |
+
+O contraste não é verificado pelo axe no jsdom (não há cores renderizadas); está coberto
+pelo teste dos tokens.
 
 ## Fase 13 — fiabilidade
 

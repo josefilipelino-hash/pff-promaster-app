@@ -5,6 +5,7 @@ import { errorText, useStore } from "../store";
 import { ROLES, type FaceRef, type PersonRow, type Role } from "../types";
 import { FaceThumb } from "./FaceThumb";
 import { personName } from "./PeoplePanel";
+import { Icon } from "./Icon";
 
 function PersonCard({ p, selected, onToggle, onShow, onChanged }: { p: PersonRow; selected: boolean; onToggle: () => void; onShow: () => void; onChanged: () => void }) {
   const { t } = useTranslation();
@@ -123,6 +124,7 @@ export function PeopleView({ onShowPerson }: { onShowPerson: (id: number) => voi
   if (persons.length === 0) {
     return (
       <div className="empty-state">
+        <span className="empty-icon" aria-hidden="true"><Icon name="people" size={32} /></span>
         <p className="muted">{t("people.emptyView")}</p>
       </div>
     );

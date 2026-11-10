@@ -18,7 +18,8 @@ export type Action =
   | { type: "help" }
     | { type: "compare" }
   | { type: "develop" }
-  | { type: "delete" };
+  | { type: "delete" }
+  | { type: "menu" };
 
 export interface KeyLike {
   key: string;
@@ -76,6 +77,10 @@ export function keyToAction(e: KeyLike, mac: boolean): Action | null {
     case "delete":
     case "backspace":
       return { type: "delete" };
+    case "contextmenu":
+      return { type: "menu" };
+    case "f10":
+      return e.shiftKey ? { type: "menu" } : null;
     case "arrowleft":
       return { type: "move", dx: -1, dy: 0, extend: e.shiftKey };
     case "arrowright":

@@ -29,7 +29,11 @@ import { PhotoGrid, type GridLayout } from "./PhotoGrid";
 import { Sidebar } from "./Sidebar";
 import { StatusBar } from "./StatusBar";
 import { Toolbar } from "./Toolbar";
+import { Filmstrip } from "./Filmstrip";
+import { Menu, type MenuEntry } from "./Menu";
+import { shortcutLabel } from "../logic/keys";
 import { Viewer, type ViewerHandle } from "./Viewer";
+import { Icon } from "./Icon";
 
 /** Extensões oferecidas no seletor de ficheiros (a deteção real é feita pelo conteúdo). */
 const BASE_EXTENSIONS = [
@@ -58,6 +62,8 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
   const [compareActive, setCompareActive] = useState(0);
   const [dragging, setDragging] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  /** Menu contextual de fotografias (Fase 14). */
+  const [photoMenu, setPhotoMenu] = useState<{ x: number; y: number } | null>(null);
   const mac = isMac();
 
     const org = useMemo(() => ({ photoPersons: s.photoPersons, photoMoment: s.photoMoment }), [s.photoPersons, s.photoMoment]);
@@ -148,7 +154,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
       events.autoEdit((p) => {
         const st = useStore.getState();
         st.setAutoProgress(p);
-        if (p.finished) {
+        if (p.finished && p.total > 0) {
           scheduleReload();
           if (p.kind === "sync") st.toast("info", t("sync.toastFinished", { count: p.done }));
           else st.toast("info", p.cancelled ? t("auto.toastCancelled", { count: p.done }) : t("auto.toastFinished", { count: p.done }));
@@ -352,8 +358,46 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
   );
 
   // Teclado.
+  const handleActionRef = useRef<((a: Action) => void) | null>(null);
+  const openPhotoMenu = useCallback((id: number, x: number, y: number) => {
+    const st = useStore.getState();
+    if (!st.selection.ids.has(id)) st.setSelection({ ids: new Set([id]), focus: id, anchor: id });
+    setPhotoMenu({ x, y });
+  }, []);
+  // Ações reais (as mesmas dos atalhos), com o atalho visível à direita.
+  const photoMenuEntries = (): MenuEntry[] => {
+    const st = useStore.getState();
+    const n = targets(st.selection).length;
+    const focus = st.selection.focus;
+    const ph = focus !== null ? st.photos[st.index.get(focus) ?? -1] : undefined;
+    const act = (a: Action) => () => handleActionRef.current?.(a);
+    return [
+      { label: t("menu.open"), icon: "eye", onSelect: act({ type: "open" }), shortcut: "↵" },
+      { label: t("view.develop"), icon: "sliders", onSelect: act({ type: "develop" }), shortcut: "D" },
+      { label: t("compare.open"), icon: "compare", onSelect: act({ type: "compare" }), shortcut: "C" },
+      { kind: "separator" },
+      { label: t("menu.pick"), icon: "heart", onSelect: act({ type: "flag", value: 1 }), shortcut: "P" },
+      { label: t("menu.reject"), icon: "reject", onSelect: act({ type: "flag", value: -1 }), shortcut: "X" },
+      { label: t("menu.unflag"), onSelect: act({ type: "flag", value: 0 }), shortcut: "U" },
+      { kind: "separator" },
+      ...[5, 4, 3, 2, 1].map((v) => ({ label: "★".repeat(v), onSelect: act({ type: "stars", value: v }), shortcut: String(v) })),
+      { label: t("menu.noStars"), onSelect: act({ type: "stars", value: 0 }), shortcut: "0" },
+      { kind: "separator" },
+      { label: t("safety.reveal"), icon: "folder", disabled: !ph || (ph.availability ?? "ok") !== "ok" || n !== 1, onSelect: () => focus !== null && api.revealOriginal(focus).catch(fail) },
+      { label: t("menu.remove", { count: n }), icon: "trash", danger: true, onSelect: act({ type: "delete" }), shortcut: shortcutLabel("Delete") },
+    ];
+  };
+
   const handleAction = useCallback(
     (a: Action) => {
+      if (a.type === "menu") {
+        const st0 = useStore.getState();
+        const f = st0.selection.focus;
+        if (f === null) return;
+        const r = document.querySelector(`[data-id="${f}"]`)?.getBoundingClientRect();
+        setPhotoMenu(r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : { x: window.innerWidth / 2, y: window.innerHeight / 2 });
+        return;
+      }
             const st = useStore.getState();
       // No editor: classificar, navegar e sair; o resto dos atalhos é do próprio editor.
       if (st.view === "develop") {
@@ -462,6 +506,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [order, rate, focusPhoto, fullscreen, toggleFullscreen, compareFromSelection],
   );
+  handleActionRef.current = handleAction;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -535,9 +580,15 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
         )}
         <div className="content">
                     {s.view === "develop" && developKey !== undefined ? (
-            <DevelopView photoKey={developKey} order={order} onNavigate={(k) => s.setSelection({ ids: new Set([k]), focus: k, anchor: k })} />
+            <DevelopView
+              photoKey={developKey}
+              order={order}
+              onNavigate={(k) => s.setSelection({ ids: new Set([k]), focus: k, anchor: k })}
+              filmstrip={<Filmstrip photos={visible} current={developKey} onSelect={(k) => s.setSelection({ ids: new Set([k]), focus: k, anchor: k })} onMenu={openPhotoMenu} />}
+            />
           ) : s.photos.length === 0 ? (
             <div className="empty-state">
+              <span className="empty-icon" aria-hidden="true"><Icon name="import" size={32} /></span>
               <h2>{t("project.emptyTitle")}</h2>
               <p className="muted">{t("project.emptyHint")}</p>
               <div className="home-actions">
@@ -569,10 +620,11 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
             <SequencesView onSelect={onClickPhoto} onOpen={(id) => s.openViewer(id)} onCompare={openCompare} onAcceptGroup={(g) => void acceptGroup(g)} />
           ) : visible.length === 0 ? (
             <div className="empty-state">
+              <span className="empty-icon" aria-hidden="true"><Icon name="search" size={32} /></span>
               <p className="muted">{t("project.noMatches")}</p>
             </div>
           ) : (
-            <PhotoGrid photos={visible} onClickPhoto={onClickPhoto} onOpen={(id) => s.openViewer(id)} layoutRef={layoutRef} />
+            <PhotoGrid photos={visible} onClickPhoto={onClickPhoto} onOpen={(id) => s.openViewer(id)} onMenu={openPhotoMenu} layoutRef={layoutRef} />
           )}
           {viewerPhoto && (
             <Viewer
@@ -585,6 +637,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
               onClose={() => s.openViewer(null)}
               onFullscreen={() => void toggleFullscreen()}
               handleRef={viewerRef}
+              filmstrip={fullscreen ? null : <Filmstrip photos={visible} current={viewerPhoto.id} onSelect={(id) => s.openViewer(id)} onMenu={openPhotoMenu} />}
             />
           )}
           {s.compare && (
@@ -641,6 +694,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
           }}
         />
       )}
+      {photoMenu && <Menu x={photoMenu.x} y={photoMenu.y} label={t("menu.photo")} entries={photoMenuEntries()} onClose={() => setPhotoMenu(null)} />}
       {s.deleteRequest && <DeleteDialog keys={s.deleteRequest} onClose={() => s.setDeleteRequest(null)} />}
       {s.galleryDialog && <GalleryDialog selected={order.filter((k) => s.selection.ids.has(k))} focus={s.selection.focus} onClose={() => s.setGalleryDialog(false)} />}
       <ExportQueue />

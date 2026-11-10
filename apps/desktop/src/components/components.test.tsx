@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import "../i18n";
+import axe from "axe-core";
 import { examplePath, fitToFormat, formatDuration, newRecipe, sanitize } from "../logic/exportRecipe";
 import type { DevelopSettings, PhotoRow, ProjectInfo } from "../types";
 
@@ -499,7 +500,7 @@ describe("seleção assistida (Fase 3)", () => {
     render(<App />);
     await screen.findByText("Casamento Ana & Pedro");
     await act(async () => {});
-    expect(screen.getByText(/Nada é enviado para a internet/)).toBeTruthy();
+    expect(screen.getByText(/nada é enviado para a internet/)).toBeTruthy();
     expect(apiMock.startAnalysis).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Analisar 10 fotografias" }));
     await act(async () => {});
@@ -938,7 +939,7 @@ describe("presets e consistência (Fase 7)", () => {
     const panel = screen.getByRole("complementary", { name: "Ajustes" });
     const sec = within(panel).getByRole("region", { name: "Presets" });
     expect(within(sec).getByText(/Preto e branco/)).toBeTruthy();
-    fireEvent.change(within(sec).getByRole("slider", { name: "Amount (%)" }), { target: { value: "60" } });
+    fireEvent.change(within(sec).getByRole("slider", { name: "Intensidade (%)" }), { target: { value: "60" } });
     apiMock.renderEdit.mockClear();
     fireEvent.mouseEnter(within(sec).getByRole("button", { name: "Natural Wedding" }));
     await act(async () => {});
@@ -996,7 +997,7 @@ describe("presets e consistência (Fase 7)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Presets…" }));
     const dlg = await screen.findByRole("dialog", { name: "Aplicar preset" });
     fireEvent.click(within(dlg).getByRole("button", { name: "B&W Classic" }));
-    fireEvent.change(within(dlg).getByRole("slider", { name: "Amount (%)" }), { target: { value: "80" } });
+    fireEvent.change(within(dlg).getByRole("slider", { name: "Intensidade (%)" }), { target: { value: "80" } });
     fireEvent.click(within(dlg).getByRole("button", { name: "Aplicar a 2 fotografias" }));
     await act(async () => {});
     expect(apiMock.applyPreset).toHaveBeenCalledWith([1, 2], "builtin:bw-classic", 80);
@@ -1176,9 +1177,9 @@ describe("edição automática em lote (Fase 6)", () => {
     render(<App />);
     await screen.findByText("Casamento Ana & Pedro");
     await act(async () => {});
-    expect((screen.getByRole("button", { name: /✦ Auto \(0\)/ }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: /Auto \(0\)/ }) as HTMLButtonElement).disabled).toBe(true);
     act(() => useStore.getState().setSelection({ ids: new Set([1, 3, 4]), focus: 1, anchor: 1 }));
-    fireEvent.click(screen.getByRole("button", { name: /✦ Auto \(3\)/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Auto \(3\)/ }));
     const dlg = await screen.findByRole("dialog", { name: "Editar automaticamente 3 fotografias" });
     fireEvent.click(within(dlg).getByRole("button", { name: "Equilibrada" }));
     fireEvent.change(within(dlg).getByRole("combobox", { name: "AI Denoise" }), { target: { value: "whenNeeded" } });
@@ -1568,6 +1569,169 @@ describe("segurança (Fase 13)", () => {
     fireEvent.click(within(dlg).getByRole("button", { name: /Importar$|Iniciar|Começar/ }));
     await act(async () => {});
     expect(apiMock.startImport).toHaveBeenCalledWith(["/cartao/DCIM"], "reference", true, { verify: true, backupDir: "/Volumes/Backup" });
+  });
+});
+
+describe("UX profissional (Fase 14)", () => {
+  async function openProj(n = 6) {
+    apiMock.listPhotos.mockResolvedValue(rows(n));
+    act(() => useStore.getState().setProject(project));
+    render(<App />);
+    await screen.findByText("Casamento Ana & Pedro");
+    await act(async () => {});
+  }
+
+  it("menu contextual: clique direito e teclado (Shift+F10), ações reais com atalhos visíveis", async () => {
+    await openProj();
+    fireEvent.contextMenu(document.querySelector('[data-id="2"]')!, { clientX: 100, clientY: 100 });
+    const menu = screen.getByRole("menu", { name: "Ações da fotografia" });
+    // Atalhos visíveis, discretos, à direita de cada ação.
+    expect(within(menu).getByRole("menuitem", { name: /Marcar como favorita\s*P/ })).toBeTruthy();
+    expect(document.activeElement).toBe(within(menu).getAllByRole("menuitem")[0]);
+    // Teclado: ↓ ↓ ↓ ↓ chega a "Marcar como favorita"; Enter executa a ação real.
+    for (let i = 0; i < 3; i++) fireEvent.keyDown(document.activeElement!, { key: "ArrowDown" });
+    expect(document.activeElement?.textContent).toContain("Marcar como favorita");
+    fireEvent.click(document.activeElement!);
+    await act(async () => {});
+    expect(apiMock.setFlag).toHaveBeenCalledWith([2], 1);
+    expect(screen.queryByRole("menu")).toBeNull();
+    // Shift+F10 abre para a fotografia com foco; Esc fecha.
+    fireEvent.keyDown(window, { key: "F10", shiftKey: true });
+    expect(screen.getByRole("menu", { name: "Ações da fotografia" })).toBeTruthy();
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    expect(screen.queryByRole("menu")).toBeNull();
+    // Letra salta para o item seguinte com essa inicial: "r" → Revelar, "r" → Rejeitar.
+    fireEvent.contextMenu(document.querySelector('[data-id="3"]')!, { clientX: 10, clientY: 10 });
+    fireEvent.keyDown(document.activeElement!, { key: "r" });
+    expect(document.activeElement?.textContent).toContain("Revelar");
+    fireEvent.keyDown(document.activeElement!, { key: "r" });
+    expect(document.activeElement?.textContent).toContain("Rejeitar");
+  });
+
+  it("barra numa linha: importar e mais num menu; tema escuro por omissão e claro opcional", async () => {
+    await openProj();
+    expect(document.documentElement.dataset.theme ?? "dark").toBe("dark");
+    fireEvent.click(screen.getByRole("button", { name: "Mais" }));
+    const more = screen.getByRole("menu", { name: "Mais" });
+    expect(within(more).getByRole("menuitemcheckbox", { name: /Escuro/ }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(within(more).getByRole("menuitemcheckbox", { name: /Claro/ }));
+    expect(document.documentElement.dataset.theme).toBe("light");
+    expect(document.documentElement.style.getPropertyValue("--bg")).toBe("#f3f3f3");
+    fireEvent.click(screen.getByRole("button", { name: "Mais" }));
+    fireEvent.click(within(screen.getByRole("menu", { name: "Mais" })).getByRole("menuitemcheckbox", { name: /Escuro/ }));
+    expect(document.documentElement.dataset.theme).toBe("dark");
+    const dialog = await import("@tauri-apps/plugin-dialog");
+    fireEvent.click(screen.getByRole("button", { name: "Importar" }));
+    fireEvent.click(within(screen.getByRole("menu", { name: "Importar" })).getByRole("menuitem", { name: /Pasta…/ }));
+    await act(async () => {});
+    expect(vi.mocked(dialog.open)).toHaveBeenCalledWith(expect.objectContaining({ directory: true }));
+  });
+
+  it("tira de fotografias virtualizada no visualizador: 3000 fotografias, poucos elementos, atual marcada", async () => {
+    await openProj(3000);
+    fireEvent.doubleClick(document.querySelector('[data-id="2"]')!);
+    const strip = await screen.findByRole("list", { name: "Tira de fotografias (3000)" });
+    expect(strip.querySelectorAll(".strip-cell").length).toBeLessThan(60);
+    expect(within(strip).getByRole("button", { name: "IMG_00002.jpg" }).getAttribute("aria-current")).toBe("true");
+    fireEvent.click(within(strip).getByRole("button", { name: "IMG_00003.jpg" }));
+    await act(async () => {});
+    expect(within(strip).getByRole("button", { name: "IMG_00003.jpg" }).getAttribute("aria-current")).toBe("true");
+  });
+});
+
+describe("estados claros (Fase 14)", () => {
+  it("barra de estado: offline e em falta visíveis, com estado e anúncio acessível", async () => {
+    const list = rows(5).map((r, i) => ({ ...r, availability: (i < 2 ? "offline" : i === 2 ? "missing" : "ok") as PhotoRow["availability"] }));
+    apiMock.listPhotos.mockResolvedValue(list);
+    act(() => useStore.getState().setProject(project));
+    render(<App />);
+    await screen.findByText("Casamento Ana & Pedro");
+    await act(async () => {});
+    const status = document.querySelector(".status-states")!;
+    expect(status.getAttribute("role")).toBe("status");
+    expect(within(status as HTMLElement).getByText("2 offline (disco ausente)").className).toContain("state offline");
+    expect(within(status as HTMLElement).getByText("1 em falta").className).toContain("state failed");
+  });
+});
+
+describe("acessibilidade (Fase 14)", () => {
+  // Auditoria axe-core (regras WCAG 2.x A/AA) aos ecrãs principais. O contraste é verificado
+  // à parte, nos tokens (o jsdom não calcula cores nem layout).
+  async function audit(label: string) {
+    const r = await axe.run(document.body, {
+      runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"] },
+      rules: { "color-contrast": { enabled: false } },
+    });
+    const v = r.violations.map((x) => `${label}: ${x.id} (${x.impact}) — ${x.nodes.slice(0, 3).map((n) => n.target.join(" ")).join(" | ")}`);
+    expect(v).toEqual([]);
+  }
+  async function openProj(n = 6) {
+    apiMock.listPhotos.mockResolvedValue(rows(n));
+    act(() => useStore.getState().setProject(project));
+    render(<App />);
+    await screen.findByText("Casamento Ana & Pedro");
+    await act(async () => {});
+  }
+
+  it("ecrã inicial sem violações", async () => {
+    render(<App />);
+    await screen.findByRole("button", { name: /Novo projeto/ });
+    await act(async () => {});
+    await audit("início");
+  });
+
+  it("grelha, menu contextual, visualizador com tira, comparação e revelação sem violações", async () => {
+    await openProj();
+    await audit("grelha");
+    fireEvent.contextMenu(document.querySelector('[data-id="2"]')!, { clientX: 100, clientY: 100 });
+    expect(screen.getByRole("menu")).toBeTruthy();
+    await audit("menu contextual");
+    fireEvent.keyDown(document.activeElement!, { key: "Escape" });
+    act(() => useStore.getState().openViewer(2));
+    await act(async () => {});
+    expect(document.querySelector(".filmstrip")).toBeTruthy();
+    await audit("visualizador");
+    act(() => useStore.getState().openViewer(null));
+    fireEvent.click(screen.getByRole("button", { name: "Revelar" }));
+    await act(async () => {});
+    expect(document.querySelector(".dev-histogram")).toBeTruthy();
+    await audit("revelação");
+  });
+
+  it("comparação, pessoas, álbum, ajuda e diálogos (exportar, galeria) sem violações", async () => {
+    await openProj();
+    act(() => useStore.getState().setSelection({ ids: new Set([1, 2, 3]), focus: 1, anchor: 1 }));
+    fireEvent.keyDown(window, { key: "c" });
+    await act(async () => {});
+    expect(screen.getByRole("region", { name: "Comparação" })).toBeTruthy();
+    await audit("comparação");
+    fireEvent.keyDown(window, { key: "Escape" });
+    await act(async () => {});
+    fireEvent.click(screen.getByRole("button", { name: "Pessoas" }));
+    await act(async () => {});
+    await audit("pessoas");
+    fireEvent.click(screen.getByRole("button", { name: "Álbum" }));
+    await act(async () => {});
+    expect(document.querySelector(".album-stage, .album-empty")).toBeTruthy();
+    await audit("álbum");
+    fireEvent.click(screen.getByRole("button", { name: "Grelha" }));
+    await act(async () => {});
+    fireEvent.keyDown(window, { key: "?" });
+    await act(async () => {});
+    expect(screen.getByRole("dialog", { name: /Atalhos/ })).toBeTruthy();
+    await audit("ajuda");
+    fireEvent.keyDown(window, { key: "Escape" });
+    await act(async () => {});
+    fireEvent.click(screen.getByRole("button", { name: /Exportar…/ }));
+    await screen.findByRole("dialog", { name: "Exportar" });
+    await act(async () => {});
+    await audit("exportar");
+    fireEvent.click(screen.getByRole("button", { name: "Cancelar" }));
+    await act(async () => {});
+    fireEvent.click(screen.getByRole("button", { name: "Galeria…" }));
+    await screen.findByRole("dialog", { name: "Galeria do cliente" });
+    await act(async () => {});
+    await audit("galeria");
   });
 });
 

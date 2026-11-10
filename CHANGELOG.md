@@ -5,6 +5,38 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [0.14.0] — 2026-11-10 — Fase 14: UX/UI profissional
+
+### Adicionado
+- **Sistema de design** (`packages/ui`): tokens de cor, tipografia, espaço, forma e
+  movimento; contraste WCAG verificado por teste. Referência em `DESIGN.md`.
+- **Tema escuro profissional** (principal) e **tema claro** opcional, ou o do sistema
+  (Mais ⋯ → Tema).
+- **Menus contextuais** na grelha e na tira (clique direito, tecla Menu, Shift+F10) com as
+  ações reais e o atalho de cada uma visível.
+- **Tira de fotografias** virtualizada no visualizador e no Develop.
+- **Navegação por teclado completa**: F6/Shift+F6 entre regiões, setas nos separadores,
+  menus com setas/Home/End/letra, foco devolvido ao fechar.
+- **48 ícones** próprios em SVG, nítidos em Retina/HiDPI; histograma desenhado à densidade
+  real do ecrã.
+- **Estados claros** (a carregar, a processar, offline, falhou, concluído) na barra de
+  estado, na fila de exportação e sobre a fotografia; estados vazios com ícone e ação.
+- Auditoria de acessibilidade automática (axe-core, WCAG 2.x A/AA) nos ecrãs principais.
+
+### Alterado
+- Barra superior numa linha que se adapta à largura (rótulos → ícones); Importar e opções
+  em menus. Barras do visualizador, comparação e Develop com ícones e dicas de teclado
+  discretas.
+- Estados hover/focus/selecionado/desativado uniformes; foco visível só com teclado; sem
+  animações decorativas (`prefers-reduced-motion` respeitado).
+- Textos por traduzir: "Amount" → "Intensidade", temas da galeria, "Transferências",
+  "Sangria total".
+
+### Corrigido
+- "Edição automática concluída: 0 fotografias" aparecia ao fechar um projeto sem fila.
+- Acessibilidade: tira com itens de lista, molduras do álbum sem `aria-selected` inválido,
+  caminho do ficheiro numa lista de definição válida.
+
 ## [0.13.0] — 2026-11-10 — Fase 13: fiabilidade
 
 ### Adicionado

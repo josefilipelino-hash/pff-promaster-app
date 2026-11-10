@@ -5,6 +5,7 @@ import { formatCaptureTime } from "../logic/format";
 import { useStore } from "../store";
 import type { GroupRow, PhotoRow } from "../types";
 import { LabelChip } from "./LabelChip";
+import { Icon } from "./Icon";
 
 const ROW_H = 178;
 const THUMB = 120;
@@ -51,6 +52,7 @@ export function SequencesView({
   if (groups.length === 0) {
     return (
       <div className="empty-state">
+        <span className="empty-icon" aria-hidden="true"><Icon name="stack" size={32} /></span>
         <p className="muted">{t("sequences.empty")}</p>
       </div>
     );

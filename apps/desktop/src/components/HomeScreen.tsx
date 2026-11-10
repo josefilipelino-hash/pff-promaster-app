@@ -6,6 +6,7 @@ import { formatDateTimeMillis, formatEventDate } from "../logic/format";
 import { errorText, useStore } from "../store";
 import type { AppInfo, ProjectInfo, RecentProject } from "../types";
 import { NewProjectDialog } from "./NewProjectDialog";
+import { Icon } from "./Icon";
 
 export function HomeScreen({ onOpened }: { onOpened: (p: ProjectInfo) => void }) {
   const { t, i18n } = useTranslation();
@@ -50,9 +51,11 @@ export function HomeScreen({ onOpened }: { onOpened: (p: ProjectInfo) => void })
         </div>
         <div className="home-actions">
           <button type="button" className="btn primary" onClick={() => setCreating(true)}>
+            <Icon name="plus" />
             {t("home.newProject")}
           </button>
           <button type="button" className="btn" onClick={pickProject}>
+            <Icon name="folder" />
             {t("home.openProject")}
           </button>
         </div>

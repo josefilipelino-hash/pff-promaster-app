@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, events, isMac } from "../../api";
+import { Icon } from "../Icon";
 import { ASPECTS, cloneSettings, DEFAULT_COPY_BLOCKS, defaultSettings, fitCropToAspect, parseFrame, sameSettings, type Frame } from "../../logic/develop";
 import { errorText, useStore } from "../../store";
 import { SETTINGS_BLOCKS, type AutoOptions, type AutoReport, type DevelopSettings, type EditView } from "../../types";
@@ -179,7 +180,7 @@ function CopyDialog({
   );
 }
 
-export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number; order: number[]; onNavigate: (key: number) => void }) {
+export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoKey: number; order: number[]; onNavigate: (key: number) => void; filmstrip?: React.ReactNode }) {
   const { t } = useTranslation();
   const toast = useStore((s) => s.toast);
   const photo = useStore((s) => s.photos[s.index.get(photoKey) ?? -1]);
@@ -868,40 +869,49 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
             <span className="muted"> · {t("viewer.position", { index: idx + 1, total: order.length })}</span>
           </span>
           <span className="spacer" />
-          <button type="button" className="btn small" disabled={idx <= 0} onClick={() => onNavigate(order[idx - 1]!)} title={`${t("viewer.prev")} (←)`}>
-            ‹
+          <button type="button" className="btn small icon-only" disabled={idx <= 0} onClick={() => onNavigate(order[idx - 1]!)} title={`${t("viewer.prev")} (←)`} aria-label={t("viewer.prev")}>
+            <Icon name="chevronLeft" />
           </button>
-          <button type="button" className="btn small" disabled={idx >= order.length - 1} onClick={() => onNavigate(order[idx + 1]!)} title={`${t("viewer.next")} (→)`}>
-            ›
-          </button>
-          <span className="sep" />
-          <button type="button" className="btn small" disabled={!view?.canUndo} onClick={() => void undo()} title={`${t("develop.undo")} (${mod}+Z)`}>
-            ↶ {t("develop.undo")}
-          </button>
-          <button type="button" className="btn small" disabled={!view?.canRedo} onClick={() => void redo()} title={`${t("develop.redo")} (${mod}+Shift+Z)`}>
-            ↷ {t("develop.redo")}
-          </button>
-          <button type="button" className="btn small" onClick={() => void reset()}>
-            {t("develop.reset")}
-          </button>
-          <button type="button" className={`btn small${before ? " active" : ""}`} aria-pressed={before} onClick={() => setBefore(!before)} title={`${t("develop.beforeAfter")} (\\)`}>
-            {before ? t("develop.before") : t("develop.after")}
-          </button>
-          <button type="button" className={`btn small${split ? " active" : ""}`} aria-pressed={split} onClick={() => setSplit(!split)} title={`${t("develop.splitHint")} (Y)`}>
-            ◧ {t("develop.split")}
+          <button type="button" className="btn small icon-only" disabled={idx >= order.length - 1} onClick={() => onNavigate(order[idx + 1]!)} title={`${t("viewer.next")} (→)`} aria-label={t("viewer.next")}>
+            <Icon name="chevronRight" />
           </button>
           <span className="sep" />
-          <button type="button" className="btn small" onClick={() => setDialog("copy")} title={`${mod}+Shift+C`}>
-            {t("develop.copy")}
+          <button type="button" className="btn small act" aria-label={t("develop.undo")} disabled={!view?.canUndo} onClick={() => void undo()} title={`${t("develop.undo")} (${mod}+Z)`}>
+            <Icon name="undo" />
+            <span className="act-label">{t("develop.undo")}</span>
           </button>
-          <button type="button" className="btn small" disabled={!clipboard} onClick={() => void paste()} title={`${mod}+Shift+V`}>
-            {t("develop.paste")}
+          <button type="button" className="btn small act" aria-label={t("develop.redo")} disabled={!view?.canRedo} onClick={() => void redo()} title={`${t("develop.redo")} (${mod}+Shift+Z)`}>
+            <Icon name="redo" />
+            <span className="act-label">{t("develop.redo")}</span>
           </button>
-          <button type="button" className="btn small" disabled={selection.ids.size < 2} onClick={() => setDialog("sync")} title={t("develop.syncHint")}>
-            {t("develop.sync")}
+          <button type="button" className="btn small act" onClick={() => void reset()} aria-label={t("develop.reset")} title={t("develop.reset")}>
+            <Icon name="reset" />
+            <span className="act-label">{t("develop.reset")}</span>
           </button>
-          <button type="button" className="btn small" onClick={() => void virtualCopy()} title={`${mod}+'`}>
-            {t("develop.makeVirtualCopy")}
+          <button type="button" className={`btn small act${before ? " active" : ""}`} aria-label={before ? t("develop.before") : t("develop.after")} aria-pressed={before} onClick={() => setBefore(!before)} title={`${t("develop.beforeAfter")} (\\)`}>
+            <Icon name="beforeAfter" />
+            <span className="act-label">{before ? t("develop.before") : t("develop.after")}</span>
+          </button>
+          <button type="button" className={`btn small act${split ? " active" : ""}`} aria-label={t("develop.split")} aria-pressed={split} onClick={() => setSplit(!split)} title={`${t("develop.splitHint")} (Y)`}>
+            <Icon name="compare" />
+            <span className="act-label">{t("develop.split")}</span>
+          </button>
+          <span className="sep" />
+          <button type="button" className="btn small act" aria-label={t("develop.copy")} onClick={() => setDialog("copy")} title={`${mod}+Shift+C`}>
+            <Icon name="copy" />
+            <span className="act-label">{t("develop.copy")}</span>
+          </button>
+          <button type="button" className="btn small act" aria-label={t("develop.paste")} disabled={!clipboard} onClick={() => void paste()} title={`${mod}+Shift+V`}>
+            <Icon name="paste" />
+            <span className="act-label">{t("develop.paste")}</span>
+          </button>
+          <button type="button" className="btn small act" aria-label={t("develop.sync")} disabled={selection.ids.size < 2} onClick={() => setDialog("sync")} title={t("develop.syncHint")}>
+            <Icon name="sync" />
+            <span className="act-label">{t("develop.sync")}</span>
+          </button>
+          <button type="button" className="btn small act" aria-label={t("develop.makeVirtualCopy")} onClick={() => void virtualCopy()} title={`${mod}+'`}>
+            <Icon name="duplicate" />
+            <span className="act-label">{t("develop.makeVirtualCopy")}</span>
           </button>
         </div>
         <div ref={stage} className={`develop-stage${wbPicking ? " picking" : ""}`}>
@@ -1009,7 +1019,7 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
               </div>
             )}
           </div>
-          {!frame && <div className="viewer-loading">{t("develop.loading")}</div>}
+          {!frame && <div className="viewer-loading state loading" role="status">{t("develop.loading")}</div>}
           {before && <div className="before-badge">{t("develop.before")}</div>}
           {preview && <div className="preview-badge">{t("presets.previewing")}</div>}
           {aiProgress !== null && settings.detail.aiDenoise > 0 && (
@@ -1018,6 +1028,7 @@ export function DevelopView({ photoKey, order, onNavigate }: { photoKey: number;
             </div>
           )}
         </div>
+        {filmstrip}
       </section>
       <DevelopPanel
         settings={settings}

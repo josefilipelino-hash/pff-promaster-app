@@ -152,3 +152,19 @@ Cada alteração partiu de uma medição; cada uma foi medida outra vez depois.
   revelação completa (~1,7–2,1 s), porque meia resolução fica abaixo dos 2560 px pedidos.
 - A preview a frio de 24 MP (~300 ms) é sobretudo descodificar o JPEG original.
 - Valores de macOS/Windows e de discos reais (HDD, rede, cartões) **não medidos**.
+
+## Fase 14 — verificação de não regressão (interface nova)
+
+Mesmo projeto de 15 000 fotografias, mesma máquina, `MOMENTO_PERF=1`, depois do sistema de
+design, tira de fotografias, menus e ícones:
+
+| Medição | Fase 12 | Fase 14 |
+|---|---|---|
+| Lançamento até à interface pronta (3×) | 778–800 ms | 767–804 ms |
+| Grelha pronta ao abrir (a quente, 3×) | 242 ms | 247–291 ms (a frio, 1.ª abertura: 439 ms) |
+| Scroll com a roda (janelas de 3 s) | 67–75 FPS, p95 18–25 ms | 59–97 FPS, p95 16–18 ms (uma janela no fim do scroll: p95 27) |
+| Frames > 50 ms no scroll | 0–1 | 0 |
+| RSS do núcleo durante o scroll | 181–192 MB | 195–197 MB |
+
+Sem regressão. A interface evita animações contínuas, filtros/blur, e só monta menus e
+fotografias visíveis (tira virtualizada). Ver `DESIGN.md`.
