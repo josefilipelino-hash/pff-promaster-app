@@ -81,7 +81,7 @@ pnpm -r test
 | Permissões (utilizador sem privilégios, `setpriv`) | ✅ |
 | `pnpm -r test` (Vitest) | ✅ 97 (desktop) + 6 (localização) |
 | `tsc --noEmit`, `cargo fmt --check`, `cargo clippy -D warnings` | ✅ limpos |
-| Pacote de produção (Linux) reconstruído com o nome e ícone novos | ver secção "Build" de `RELEASE_NOTES.md` |
+| Pacote de produção (Linux) reconstruído com o nome e ícone novos, instalado e executado | ✅ lançamento, registo anonimizado, abrir projeto real, Limpar cache, Eliminar projeto (Lixo) — `FINAL_AUDIT.md` §5b |
 
 ## Riscos
 

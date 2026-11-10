@@ -76,6 +76,20 @@ permissão do macOS, metadados "Software"/"Producer" nos ficheiros exportados, g
 documentação. Mantidos por compatibilidade (D-109): crates `momento-*`, extensão `.momento`
 dos projetos, `.momentopreset`, marcador `.momento-gallery`.
 
+## 5b. Verificação no pacote final
+
+Pacote `PFF ProMaster_1.0.0_amd64.deb` gerado por `scripts/build-release.sh` a partir do
+commit da auditoria, instalado com `dpkg -i` e executado (Linux, Xvfb):
+
+| Passo | Resultado |
+|---|---|
+| Lançamento | ✅ "PFF ProMaster 1.0.0-personal · núcleo 1.0.0-personal · esquema 9"; janela "PFF ProMaster"; dados em `pt.pffpromaster.desktop` |
+| Registo | ✅ `aplicação iniciada … dados=<caminho>` (caminho anonimizado) |
+| Abrir um projeto real (cópia de um catálogo v7) | ✅ 55 fotografias, miniaturas |
+| Segurança e cópias → Privacidade → Limpar cache | ✅ 61 ficheiros (4,8 MB) apagados; 55 miniaturas geradas de novo |
+| Eliminar projeto… (com confirmação) | ✅ pasta no Lixo, retirado dos recentes, volta ao início; originais intactos |
+| Nota | Num Linux onde o pacote de teste da Fase 16 (`momento-studio`) estava instalado, o `dpkg` recusa instalar por cima (ícone com o mesmo nome): desinstalar o antigo primeiro. Em macOS o `.app` muda de nome (`PFF ProMaster.app`); a pasta de dados nova começa vazia (não houve instalações anteriores em Mac). |
+
 ## 6. As três listas
 
 ### TOTALMENTE FUNCIONAL (processamento real, de ponta a ponta, com testes)
