@@ -68,7 +68,7 @@ Lista completa em **`KNOWN_LIMITATIONS.md`**. As principais:
 - **Não assinada nem notarizada** (uso pessoal): o macOS pede confirmação na primeira
   abertura. Passos para assinar: `docs/SIGNING.md`.
 - **O build macOS não foi executado neste ciclo de desenvolvimento** (ambiente Linux): o
-  `.app`/`.dmg` é gerado no Mac com `scripts/build-release.sh` ou pela CI (macos-14). O
+  `.app`/`.dmg` é gerado no Mac com `scripts/build-release.sh` ou pela CI (macos-15). O
   mesmo código foi compilado e testado em Linux (smoke test do pacote de produção,
   ver abaixo). Antes de um trabalho real, correr a secção 2 de `RELEASE_CHECKLIST.md` no Mac.
 - Fontes do sistema, Retina e controlos nativos verificados só por equivalência em Linux

@@ -164,7 +164,7 @@ leitura, permissões, Unicode, nomes longos, ficheiros corrompidos, fugas de rec
 Build de produção reproduzível (`scripts/build-release.sh`), atualização segura de
 catálogos (cópia antes de migrar), permissões do macOS, otimizações de tamanho, registos
 com retenção, smoke test do pacote final. Assinatura/notarização documentadas à parte.
-**Por fazer:** executar o build no Mac (ou CI macos-14) e a secção 2 de
+**Por fazer:** executar o build no Mac (ou CI macos-15) e a secção 2 de
 `RELEASE_CHECKLIST.md`; assinatura quando houver conta Apple Developer.
 
 ## Fase 17 — Distribuição

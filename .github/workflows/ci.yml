@@ -48,7 +48,7 @@ jobs:
       matrix:
         include:
           - name: macOS (Apple Silicon)
-            os: macos-14
+            os: macos-15
           - name: Windows
             os: windows-2022
           - name: Linux
@@ -95,7 +95,7 @@ jobs:
       matrix:
         include:
           - name: macOS
-            os: macos-14
+            os: macos-15
             args: --target universal-apple-darwin
             targets: aarch64-apple-darwin,x86_64-apple-darwin
           - name: Windows

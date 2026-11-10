@@ -1,4 +1,4 @@
-# PFF ProMaster *(nome provisório)*
+# PFF ProMaster
 
 Aplicação desktop local para gestão, seleção, edição, exportação e entrega de fotografia
 de casamentos e outros eventos. Pensada para trabalhos de 3 000 a 15 000 fotografias, com

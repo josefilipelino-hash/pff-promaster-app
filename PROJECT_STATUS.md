@@ -87,7 +87,7 @@ pnpm -r test
 
 | Risco | Impacto | Mitigação |
 |---|---|---|
-| Primeiro build/uso em macOS revelar problemas não vistos em Linux | Médio | Secção 2 de `RELEASE_CHECKLIST.md` antes de um trabalho real; CI macos-14 |
+| Primeiro build/uso em macOS revelar problemas não vistos em Linux | Médio | Secção 2 de `RELEASE_CHECKLIST.md` antes de um trabalho real; CI macos-15 |
 | Falha nativa da LibRaw num RAW malformado | Baixo | Catálogo íntegro e sessão recuperada; processo auxiliar fica para a Fase 17 |
 
 ## Histórico de fases
