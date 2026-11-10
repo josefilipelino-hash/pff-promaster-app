@@ -494,6 +494,7 @@ fn read_only_volumes() {
     s.close();
 }
 
+#[cfg(unix)]
 fn non_root() -> bool {
     std::fs::read_to_string("/proc/self/status")
         .ok()
@@ -506,7 +507,9 @@ fn non_root() -> bool {
 }
 
 /// Permissões negadas (como utilizador sem privilégios): original ilegível e pasta de
-/// destino sem escrita — erros claros, sem pânico, o resto continua.
+/// destino sem escrita — erros claros, sem pânico, o resto continua. Só Unix (macOS/Linux):
+/// usa permissões POSIX; no Windows as ACL são outro modelo.
+#[cfg(unix)]
 #[test]
 fn permissions() {
     if !non_root() {

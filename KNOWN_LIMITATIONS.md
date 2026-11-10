@@ -13,6 +13,7 @@ que têm impacto no uso real, por gravidade.
 | **Windows nunca foi testado** (a CI compilava; não há execução real). | Compatibilidade com Windows não confirmada. | Testar num PC antes de usar. |
 | Não assinada nem notarizada. | O macOS pede confirmação na primeira abertura (clique direito → Abrir). | `docs/SIGNING.md`. |
 | Sem atualização automática. | Atualizar = instalar a nova versão por cima (o catálogo é copiado antes de migrar). | `INSTALLATION.md`. |
+| **Instaladores gerados pela CI do GitHub (macOS .dmg, Windows .exe/.msi) usam modelos de IA convertidos na própria CI**, das mesmas fontes oficiais (verificadas por SHA-256) e com o mesmo script, mas que **não ficam byte a byte iguais** aos validados (`models/models.lock.json`) e não foram comparados com as respostas de referência. Decisão do utilizador. Os SHA-256 usados ficam em `BUILD_INFO.txt`. | Resultados da IA (rostos, cena, máscaras, denoise) podem diferir ligeiramente dos testados em Linux. | Para usar os validados: gerar no Mac com `scripts/build-release.sh` e a pasta `models/` validada. |
 | Leitores de ecrã (VoiceOver) não testados. | Acessibilidade só verificada com axe-core nos testes da interface. | — |
 
 ## 2. Fiabilidade e cor

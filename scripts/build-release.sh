@@ -58,6 +58,7 @@ say "Dependências JavaScript (lock exato)"
 pnpm install --frozen-lockfile
 
 say "Modelos de IA (SHA-256 contra models/models.lock.json)"
+rm -f .modelos-nao-validados
 python3 - <<'PY'
 import hashlib, json, os, sys
 lock = json.load(open("models/models.lock.json"))["models"]
@@ -70,10 +71,21 @@ for m in lock:
     h = hashlib.sha256(open(f, "rb").read()).hexdigest()
     if h != m["sha256"]:
         bad.append(f"{m['file']}: SHA-256 diferente")
+missing = [b for b in bad if b.endswith("em falta")]
+if missing:
+    print("\n".join(missing))
+    sys.exit("Modelos em falta: corra `python3 scripts/prepare-models.py` (ver models/README.md).")
 if bad:
     print("\n".join(bad))
-    sys.exit("Modelos em falta ou diferentes: corra `python3 scripts/prepare-models.py` (ver models/README.md).")
-print(f"{len(lock)} modelos verificados ({sum(m['bytes'] for m in lock) / 1e6:.0f} MB)")
+    if os.environ.get("MOMENTO_ALLOW_UNVALIDATED_MODELS") != "1":
+        sys.exit("Modelos diferentes dos validados: corra `python3 scripts/prepare-models.py` (ver models/README.md).")
+    # Só por pedido explícito (CI: os modelos convertidos lá não ficam byte a byte iguais).
+    print("AVISO: modelos convertidos nesta máquina, NÃO validados contra models.lock.json")
+    open(".modelos-nao-validados", "w").write("\n".join(
+        f"{m['file']} {hashlib.sha256(open(os.path.join('models', m['file']), 'rb').read()).hexdigest()}"
+        for m in lock) + "\n")
+else:
+    print(f"{len(lock)} modelos verificados ({sum(m['bytes'] for m in lock) / 1e6:.0f} MB)")
 PY
 
 say "Compilação de produção"
@@ -108,6 +120,10 @@ fi
   echo "rustc: $(rustc --version)"
   echo "node: $(node --version) · pnpm: $(pnpm --version)"
   [ "$OS" = "Darwin" ] && echo "macOS SDK: $(xcrun --show-sdk-version 2>/dev/null || echo '?')"
+  if [ -f .modelos-nao-validados ]; then
+    echo "MODELOS DE IA NÃO VALIDADOS (convertidos nesta máquina; ver KNOWN_LIMITATIONS.md):"
+    cat .modelos-nao-validados
+  fi
 } > "$BUNDLE/BUILD_INFO.txt"
 (
   cd "$BUNDLE"
