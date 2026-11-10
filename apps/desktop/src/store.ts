@@ -47,7 +47,7 @@ export interface UiState {
 }
 
 /** Vista principal: grelha de fotografias ou lista de sequências/grupos. */
-export type View = "grid" | "sequences" | "people" | "develop" | "consistency";
+export type View = "grid" | "sequences" | "people" | "develop" | "consistency" | "album";
 
 interface State {
   project: ProjectInfo | null;

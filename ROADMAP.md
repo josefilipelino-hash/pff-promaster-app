@@ -113,10 +113,16 @@ downloads (individual e ZIP), marca de água, PIN/palavra-passe, ocultar fotogra
 **Por fazer:** publicação direta (S3, R2, B2, SFTP — arquitetura pronta), expiração da
 galeria, estatísticas de visitas (exigem servidor).
 
-## Fase 11 — Álbuns
+## Fase 11 — Álbuns ✅ *(concluída 2026-11-10, ver PROJECT_STATUS.md)*
 
-Editor, templates, montagem automática, margens, sangria, perfis, validações, exportação
-PDF/JPEG/TIFF.
+Formatos 20×20 a 30×40 e personalizado; especificação completa (páginas, DPI, sangria, zona
+segura, dobra, ICC, laboratório) e presets de laboratório; editor com arrastar e largar,
+layouts de 1 a 6+ fotografias, full bleed, panorâmicas, alinhar, distribuir, margens,
+espaçamento, recorte e zoom; "Criar álbum automaticamente" com narrativa pelos momentos;
+alertas de DPI, zona segura e rostos na dobra; JPEG/TIFF por spread, PDF de impressão e
+PDF de prova.
+**Por fazer:** texto e grafismos nas páginas, capa, CMYK/PDF/X, desfazer no editor,
+encomendas diretas a laboratórios.
 
 ## Fase 12 — Otimização e distribuição
 

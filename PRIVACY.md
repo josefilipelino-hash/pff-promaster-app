@@ -74,6 +74,11 @@ abaixo são requisitos de arquitetura, não opções.
    nunca no catálogo, em ficheiros de texto ou no código.
 8. **Repositório:** fotografias, modelos e credenciais nunca são versionados (garantido
    pelo `.gitignore`).
+6c. **Álbuns (Fase 11):** os álbuns e os presets de laboratório ficam no catálogo local.
+   A exportação (JPEG, TIFF, PDF) grava apenas na pasta escolhida, sem metadados (nem
+   EXIF nem GPS) e sem ligações de rede; nada é enviado a laboratórios — o utilizador
+   envia os ficheiros como quiser. As caixas dos rostos servem só para o recorte e as
+   verificações, nunca são escritas nos ficheiros.
 
 ## Eliminação
 

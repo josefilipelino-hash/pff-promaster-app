@@ -745,7 +745,7 @@ function JobRow({ j, expanded, onToggle, fail }: { j: ExportProgress; expanded: 
         )}
         {j.state === "done" && j.index && (
           <button type="button" className="btn small primary" onClick={() => api.openGallery(j.index!).catch(fail)}>
-            {t("gallery.open")}
+            {t(j.index.endsWith(".pdf") ? "album.openPdf" : "gallery.open")}
           </button>
         )}
         {j.state === "done" && (

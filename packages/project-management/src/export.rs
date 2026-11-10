@@ -38,6 +38,9 @@ pub struct ExportRequest {
     /// Geração de uma galeria (definida pela sessão, nunca pela interface).
     #[serde(skip)]
     pub gallery: Option<Box<crate::gallery::GalleryJob>>,
+    /// Exportação de um álbum (definida pela sessão).
+    #[serde(skip)]
+    pub album: Option<Box<crate::album::AlbumExportJob>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -235,10 +238,10 @@ impl ProjectSession {
 
     /// Junta um pedido à fila e devolve o seu número.
     pub fn start_export(self: &Arc<Self>, req: ExportRequest) -> CoreResult<u64> {
-        if req.keys.is_empty() {
+        if req.keys.is_empty() && req.album.is_none() {
             return Err(CoreError::Other("nenhuma fotografia selecionada".into()));
         }
-        if req.recipes.is_empty() {
+        if req.recipes.is_empty() && req.album.is_none() {
             return Err(CoreError::Other("nenhuma receita escolhida".into()));
         }
         if req.destination.trim().is_empty() {
@@ -246,7 +249,10 @@ impl ProjectSession {
         }
         let q = &self.exports;
         let id = q.next_id.fetch_add(1, Ordering::SeqCst) + 1;
-        let files = (req.keys.len() * req.recipes.len()) as u64;
+        let files = match &req.album {
+            Some(a) => a.album.spreads.len() as u64,
+            None => (req.keys.len() * req.recipes.len()) as u64,
+        };
         let job = Arc::new(Job {
             id,
             progress: Mutex::new(ExportProgress {
@@ -255,7 +261,7 @@ impl ProjectSession {
                 destination: req.destination.clone(),
                 state: JobState::Queued,
                 paused_reason: None,
-                photos_total: req.keys.len() as u64,
+                photos_total: if req.album.is_some() { files } else { req.keys.len() as u64 },
                 photos_done: 0,
                 files_total: files,
                 files_done: 0,
@@ -400,6 +406,51 @@ impl ProjectSession {
         let paused = job.paused.load(Ordering::SeqCst);
         update(&mut |p| p.state = if paused { JobState::Paused } else { JobState::Running });
         self.emit_export(job);
+        if let Some(a) = &req.album {
+            // Álbum: um ficheiro por spread (ou página) ou um PDF, a partir dos originais.
+            let res =
+                self.run_album_export(a, Path::new(&req.destination), &|done, total, bytes| {
+                    while job.paused.load(Ordering::SeqCst) && !job.cancelled.load(Ordering::SeqCst)
+                    {
+                        std::thread::sleep(std::time::Duration::from_millis(200));
+                    }
+                    let elapsed = started.elapsed().as_secs_f64();
+                    update(&mut |p| {
+                        p.files_done = done as u64;
+                        p.photos_done = done as u64;
+                        if bytes > 0 {
+                            p.bytes_written = bytes;
+                            p.bytes_estimated = bytes;
+                        }
+                        p.current = (done < total).then(|| format!("spread {}", done + 1));
+                        p.eta_seconds =
+                            (done > 0).then(|| elapsed / done as f64 * (total - done) as f64);
+                    });
+                    self.emit_export(job);
+                    !job.cancelled.load(Ordering::SeqCst)
+                });
+            update(&mut |p| {
+                p.current = None;
+                p.free_bytes = free_space(Path::new(&req.destination));
+                match &res {
+                    Ok(files) => {
+                        p.state = JobState::Done;
+                        p.folders = vec![req.destination.clone()];
+                        p.index = files.iter().find(|f| f.ends_with(".pdf")).cloned();
+                    }
+                    Err(e) if job.cancelled.load(Ordering::SeqCst) => {
+                        let _ = e;
+                        p.state = JobState::Cancelled;
+                    }
+                    Err(e) => {
+                        p.state = JobState::Failed;
+                        p.errors.push(ExportError { file: String::new(), message: e.to_string() });
+                    }
+                }
+            });
+            self.emit_export(job);
+            return Ok(());
+        }
         // Receitas preparadas uma vez (perfil ICC, marca de água, normalização).
         let mut prepared = Vec::new();
         for r in &req.recipes {

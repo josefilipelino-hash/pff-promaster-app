@@ -630,21 +630,35 @@ Ver `EXPORT_FORMATS.md`.
 
 ---
 
-## 16. Editor de álbuns **[definido]**
+## 16. Editor de álbuns **[implementado na Fase 11 — D-071 a D-077]**
 
-- **Modelo:** álbum → páginas duplas (spreads) → slots (retângulos em mm com recorte da
-  fotografia em coordenadas normalizadas) + elementos (texto, grafismos SVG).
-- Configuração: formato (presets 20×20 … 30×40 e personalizado), páginas, DPI, sangria,
-  margens, zona segura, dobra central, perfil ICC, papel, laboratório.
-- **Motor de layout em Rust:** templates JSON; montagem automática por momentos e ordem
-  cronológica; recorte inteligente que evita cortar rostos (usa as caixas de
-  `face-analysis`) e evita rostos na dobra.
-- **Validações:** DPI efetivo por slot, rostos na dobra, elementos fora da zona segura,
-  falta de sangria.
-- **Editor:** React + SVG (precisão vetorial, zoom, guias, alinhamento, distribuição);
-  imagens via protocolo de previews.
-- **Exportação:** PDF com perfil de saída ICC (objetivo PDF/X-4 quando o laboratório
-  aceitar), JPEG/TIFF por página ou spread, renderizados pelo mesmo pipeline de cor.
+- Crate `momento-album`: `spec` (formatos 20×20, 25×25, 30×30, 35×35, 20×30, 25×35, 30×40
+  e personalizado; largura, altura, orientação, páginas, DPI, sangria, zona segura, dobra,
+  cor/ICC e intenção, laboratório, unidade de exportação), `model` (álbum → spreads →
+  slots em **mm**, origem no corte superior esquerdo da página esquerda, dobra em
+  x = largura; recorte normalizado com zoom), `layouts`, `auto`, `preflight`, `compose`,
+  `pdf`, `export`.
+- **Sem medidas universais (D-072):** a especificação nasce **por confirmar**; só um
+  preset de laboratório (biblioteca global, tabela `album_lab`) ou a confirmação explícita
+  retira o aviso.
+- **Layouts (D-073):** gerados (não ficheiros JSON): panorâmica `P` e por página
+  `-` (vazia), `B` (a sangrar), `F` (uma, com margens), `Gn` (linhas justificadas pelas
+  proporções; o espaçamento é fixo, escalam-se as fotografias). 1 a 6+ fotografias.
+- **Automático (D-074):** seleção final (escolhidas, senão não rejeitadas) → filtro de
+  resolução (≥ 80 % do DPI do laboratório) → sem duplicados (grupos da análise e rajadas
+  < 3 s) → capítulos pelos momentos (senão pelo mais próximo no tempo) → abertura (melhor
+  horizontal do casal/cerimónia) → orçamento por capítulo pela relevância → layout que
+  evita rostos na dobra; recorte centrado nos rostos.
+- **Verificações:** DPI efetivo (erro < 50 %, aviso < 80 %), rostos na dobra e fora da
+  zona segura, bordas entre o corte e a zona segura, molduras vazias, demasiadas
+  fotografias por spread (> 8), repetidas, número de páginas.
+- **Editor:** React (HTML posicionado em mm × escala, guias SVG), arrastar e largar com
+  eventos de rato (D-033), mover, redimensionar, recortar (arrastar dentro da moldura),
+  zoom, alinhar, distribuir, margens, espaçamento, full bleed, panorâmica, teclado.
+- **Exportação (D-075, D-076):** pela fila, a partir dos originais (`render_linear` +
+  receita): JPEG q95 ou TIFF LZW por spread/página; PDF de impressão (uma página por
+  spread/página, `MediaBox` com sangria, `BleedBox`, `TrimBox`, imagens `ICCBased` com o
+  perfil escolhido); PDF de prova a 120 DPI com guias e marca "PROVA".
 
 ---
 
@@ -784,3 +798,10 @@ ficheiros a partir do frontend (caminhos sempre resolvidos e verificados no núc
 | D-068 | 2026-11-10 | Mosaico calculado em JS a partir das proporções do índice (coluna mais curta), sem deslocar a página ao carregar; grelha em CSS | `columns` CSS | Ordem de leitura por linhas e zero saltos de layout |
 | D-069 | 2026-11-10 | Favoritas só no navegador do cliente; o regresso é uma **lista de nomes** (copiar/email) importada na aplicação | Servidor para guardar favoritas | Sem servidor nem serviços externos nesta fase |
 | D-070 | 2026-11-10 | Publicação direta adiada: só a arquitetura (plano de envio, incremental, configuração sem segredos) | Integrar já S3/R2/B2/SFTP | Pedido do utilizador: não integrar serviços cloud sem necessidade nesta fase |
+| D-071 | 2026-11-10 | Álbuns guardados no catálogo do projeto (`catalog_info`, JSON) e presets de laboratório na biblioteca global | Ficheiros soltos por álbum | Cópia de segurança e transporte com o projeto; presets partilhados entre casamentos |
+| D-072 | 2026-11-10 | Sangria, zona segura e dobra **por confirmar** até haver preset ou confirmação | Valores "típicos" silenciosos | Pedido: não assumir dimensões ou sangrias universais |
+| D-073 | 2026-11-10 | Layouts gerados por código (P, B, F, Gn com linhas justificadas) | Biblioteca de templates JSON | Funciona para qualquer formato/proporção sem centenas de ficheiros |
+| D-074 | 2026-11-10 | Montagem automática determinística por regras (momentos, tempo, relevância, rostos) | Modelo de IA de paginação | Explicável, rápida, sem dados de treino nem rede |
+| D-075 | 2026-11-10 | PDF escrito diretamente (JPEG q95 + ICCBased + Trim/BleedBox) | Biblioteca PDF externa | Sem dependências novas; os laboratórios pedem precisamente isto |
+| D-076 | 2026-11-10 | Exportação em RGB (perfil do laboratório como ICC de saída), sem conversão CMYK | CMYK com lcms2 | Laboratórios fotográficos imprimem em RGB; CMYK fica para quando um laboratório o exigir |
+| D-077 | 2026-11-10 | Exportação de álbuns pela mesma fila (pausa, cancelamento, progresso) | Fila própria | Uma só fila para exportação, galeria e álbum |

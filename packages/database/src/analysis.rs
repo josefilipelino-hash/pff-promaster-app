@@ -691,6 +691,16 @@ impl Catalog {
         Ok(n)
     }
 
+    /// Pontuação global (0–1) de cada fotografia analisada (álbum automático).
+    pub fn overall_scores(&self) -> CoreResult<std::collections::HashMap<AssetId, f32>> {
+        let c = self.connection();
+        let mut st = c.prepare("SELECT asset_id, overall FROM recommendation").map_err(db_err)?;
+        let rows = st
+            .query_map([], |r| Ok((AssetId(r.get(0)?), r.get::<_, f64>(1)? as f32)))
+            .map_err(db_err)?;
+        rows.collect::<Result<_, _>>().map_err(db_err)
+    }
+
     pub fn load_setting(&self, key: &str) -> CoreResult<Option<String>> {
         self.connection()
             .query_row("SELECT value FROM catalog_info WHERE key = ?1", [key], |r| r.get(0))

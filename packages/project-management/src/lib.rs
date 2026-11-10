@@ -10,6 +10,7 @@
 //! - [`auto_edit`]: edição automática por fotografia e fila em segundo plano (Fase 6);
 //! - [`ProjectSession`]: projeto aberto — catálogo, importações e eventos.
 
+pub mod album;
 pub mod analysis;
 pub mod auto_edit;
 pub mod cache;

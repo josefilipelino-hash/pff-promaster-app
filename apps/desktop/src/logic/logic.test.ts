@@ -161,3 +161,52 @@ describe("datas DD/MM/AAAA", () => {
     expect(maskPtDate("150620269")).toBe("15/06/2026");
   });
 });
+
+describe("álbum: geometria do editor (Fase 11)", async () => {
+  const { align, bleedSlot, clampSlot, cropWindow, distribute, effectiveDpi, panoramaSlot, templateBoxes } = await import("./album");
+  const spec = { format: "30x30", widthMm: 300, heightMm: 300, pages: 40, dpi: 300, bleedMm: 3, safeMm: 10, gutterMm: 16, color: "srgb", iccPath: "", intent: "perceptual", lab: "", confirmed: true, exportUnit: "spreads", minPages: 0, maxPages: 0, background: "#fff" } as const;
+  const crop = { zoom: 1, cx: 0.5, cy: 0.5 };
+  const slot = (id: string, x: number, y: number, w = 50, h = 40) => ({ id, x, y, w, h, photo: 1, crop });
+
+  it("recorte e DPI efetivo iguais ao núcleo", () => {
+    // 3:2 numa moldura quadrada: janela 2/3 da largura, centrada.
+    const [u0, v0, u1, v1] = cropWindow(6000, 4000, 100, 100, crop);
+    expect(u1 - u0).toBeCloseTo(2 / 3);
+    expect([v0, v1]).toEqual([0, 1]);
+    // O centro não deixa a janela sair da imagem; o zoom reduz a janela.
+    expect(cropWindow(6000, 4000, 100, 100, { zoom: 1, cx: 0, cy: 0.5 })[0]).toBe(0);
+    expect(cropWindow(6000, 4000, 100, 100, { zoom: 2, cx: 0.5, cy: 0.5 })[3]).toBeCloseTo(0.75);
+    // 4000 px em 254 mm (10") = 400 DPI; com zoom 2 → 200.
+    expect(effectiveDpi(6000, 4000, { ...slot("a", 0, 0, 254, 254) })).toBeCloseTo(400);
+    expect(effectiveDpi(6000, 4000, { ...slot("a", 0, 0, 254, 254), crop: { zoom: 2, cx: 0.5, cy: 0.5 } })).toBeCloseTo(200);
+  });
+
+  it("full bleed na página certa, panorâmica e limites", () => {
+    expect(bleedSlot(spec, slot("a", 20, 20))).toMatchObject({ x: -3, y: -3, w: 303, h: 306 });
+    expect(bleedSlot(spec, slot("a", 400, 20))).toMatchObject({ x: 300, y: -3, w: 303, h: 306 });
+    expect(panoramaSlot(spec, slot("a", 400, 20))).toMatchObject({ x: -3, y: -3, w: 606, h: 306 });
+    expect(clampSlot(spec, slot("a", 700, -50, 5, 5))).toMatchObject({ x: 603 - 10, y: -3, w: 10, h: 10 });
+  });
+
+  it("alinhar e distribuir", () => {
+    const ss = [slot("a", 10, 10), slot("b", 100, 30, 50, 80), slot("c", 400, 20, 20, 20), slot("z", 0, 0)];
+    const ids = new Set(["a", "b", "c"]);
+    expect(align(ss, ids, "top").filter((s) => ids.has(s.id)).map((s) => s.y)).toEqual([10, 10, 10]);
+    expect(align(ss, ids, "right").map((s) => s.x + s.w)).toEqual([420, 420, 420, 50]);
+    const d = distribute(ss, ids, "h");
+    // Espaços iguais entre a, b e c (o primeiro e o último ficam).
+    const gap1 = d[1]!.x - (d[0]!.x + d[0]!.w);
+    const gap2 = d[2]!.x - (d[1]!.x + d[1]!.w);
+    expect(gap1).toBeCloseTo(gap2);
+    expect(d[0]!.x).toBe(10);
+    expect(d[2]!.x).toBe(400);
+    expect(d[3]).toBe(ss[3]);
+  });
+
+  it("miniaturas dos layouts", () => {
+    expect(templateBoxes("P")).toEqual([[0, 0, 1, 1]]);
+    expect(templateBoxes("B|-")).toEqual([[0, 0, 0.5, 1]]);
+    expect(templateBoxes("G4|G6")).toHaveLength(10);
+    expect(templateBoxes("-|F")[0]![0]).toBeGreaterThan(0.5);
+  });
+});

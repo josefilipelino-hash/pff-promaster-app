@@ -894,11 +894,16 @@ pub async fn import_client_favorites(
 #[tauri::command]
 pub async fn open_gallery(path: String) -> CmdResult<()> {
     let p = std::path::PathBuf::from(&path);
-    let ok = p.file_name().is_some_and(|n| n == "index.html")
+    // Só abre o que o Momento gerou: a galeria (pasta marcada) ou o PDF de um álbum.
+    let gallery = p.file_name().is_some_and(|n| n == "index.html")
         && p.parent().is_some_and(|d| d.join(momento_gallery::site::MARKER).is_file());
-    if !ok {
+    let album_pdf = p.is_file()
+        && p.file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| n.ends_with("-impressao.pdf") || n.ends_with("-prova.pdf"));
+    if !gallery && !album_pdf {
         return Err(err(momento_core_types::CoreError::Other(
-            "não é uma galeria do Momento".into(),
+            "não é uma galeria nem um álbum do Momento".into(),
         )));
     }
     #[cfg(target_os = "macos")]
@@ -912,4 +917,145 @@ pub async fn open_gallery(path: String) -> CmdResult<()> {
     #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
     let mut cmd = std::process::Command::new("xdg-open");
     cmd.arg(&p).spawn().map(|_| ()).map_err(|e| err(momento_core_types::CoreError::Io(e)))
+}
+
+// ---------------------------------------------------------------- álbuns (Fase 11)
+
+use momento_album::auto::AutoOptions as AlbumAutoOptions;
+use momento_album::export::ExportKind as AlbumExportKind;
+use momento_album::preflight::{Issue as AlbumIssue, PhotoInfo as AlbumPhotoInfo};
+use momento_album::{Album, AlbumSpec, LabPreset};
+use momento_project_management::album::{AlbumSummary, AutoReport, LabStore};
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AlbumFormat {
+    name: &'static str,
+    width_cm: f32,
+    height_cm: f32,
+}
+
+#[tauri::command]
+pub async fn album_formats() -> CmdResult<Vec<AlbumFormat>> {
+    Ok(momento_album::FORMATS
+        .iter()
+        .map(|(n, w, h)| AlbumFormat { name: n, width_cm: *w, height_cm: *h })
+        .collect())
+}
+
+#[tauri::command]
+pub async fn album_templates(count: usize) -> CmdResult<Vec<String>> {
+    Ok(momento_album::layouts::templates_for(count))
+}
+
+#[tauri::command]
+pub async fn list_albums(state: State<'_, AppState>) -> CmdResult<Vec<AlbumSummary>> {
+    state.session().and_then(|s| s.list_albums()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn get_album(state: State<'_, AppState>, id: String) -> CmdResult<Album> {
+    state.session().and_then(|s| s.get_album(&id)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn create_album(
+    state: State<'_, AppState>,
+    name: String,
+    spec: AlbumSpec,
+) -> CmdResult<Album> {
+    state.session().and_then(|s| s.create_album(&name, spec)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn save_album(state: State<'_, AppState>, album: Album) -> CmdResult<()> {
+    state.session().and_then(|s| s.save_album(&album)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn delete_album(state: State<'_, AppState>, id: String) -> CmdResult<bool> {
+    state.session().and_then(|s| s.delete_album(&id)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn auto_album(
+    state: State<'_, AppState>,
+    id: String,
+    options: AlbumAutoOptions,
+) -> CmdResult<AutoReport> {
+    let s = state.session().map_err(err)?;
+    tauri::async_runtime::spawn_blocking(move || s.auto_album(&id, options))
+        .await
+        .map_err(|e| err(momento_core_types::CoreError::Other(e.to_string())))?
+        .map_err(err)
+}
+
+#[tauri::command]
+pub async fn apply_album_layout(
+    state: State<'_, AppState>,
+    album: Album,
+    spread: usize,
+    template: String,
+    margin: f32,
+    spacing: f32,
+    extra: Vec<i64>,
+) -> CmdResult<Album> {
+    state
+        .session()
+        .and_then(|s| s.apply_album_layout(&album, spread, &template, margin, spacing, &extra))
+        .map_err(err)
+}
+
+#[tauri::command]
+pub async fn album_preflight(
+    state: State<'_, AppState>,
+    album: Album,
+) -> CmdResult<Vec<AlbumIssue>> {
+    let s = state.session().map_err(err)?;
+    tauri::async_runtime::spawn_blocking(move || s.album_preflight(&album))
+        .await
+        .map_err(|e| err(momento_core_types::CoreError::Other(e.to_string())))?
+        .map_err(err)
+}
+
+#[tauri::command]
+pub async fn album_photo_infos(state: State<'_, AppState>) -> CmdResult<Vec<AlbumPhotoInfo>> {
+    let s = state.session().map_err(err)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        s.album_photo_infos().map(|m| m.into_values().collect())
+    })
+    .await
+    .map_err(|e| err(momento_core_types::CoreError::Other(e.to_string())))?
+    .map_err(err)
+}
+
+#[tauri::command]
+pub async fn start_album_export(
+    state: State<'_, AppState>,
+    id: String,
+    kind: AlbumExportKind,
+    destination: String,
+) -> CmdResult<u64> {
+    state.session().and_then(|s| s.start_album_export(&id, kind, &destination)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn lab_presets(state: State<'_, AppState>) -> CmdResult<Vec<LabPreset>> {
+    let lib = state.library();
+    LabStore { lib: &lib }.list().map_err(err)
+}
+
+#[tauri::command]
+pub async fn save_lab_preset(
+    state: State<'_, AppState>,
+    preset: LabPreset,
+) -> CmdResult<LabPreset> {
+    let lib = state.library();
+    LabStore { lib: &lib }.save(&preset).map_err(err)
+}
+
+#[tauri::command]
+pub async fn delete_lab_preset(state: State<'_, AppState>, id: String) -> CmdResult<bool> {
+    let lib = state.library();
+    LabStore { lib: &lib }.delete(&id).map_err(err)
 }

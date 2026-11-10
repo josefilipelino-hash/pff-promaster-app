@@ -54,6 +54,11 @@ impl Prepared {
         self.recipe.format.caps().extension
     }
 
+    /// Perfil ICC de saída (para embutir noutros contentores, ex.: PDF de álbum).
+    pub fn icc(&self) -> &[u8] {
+        self.color.icc()
+    }
+
     pub fn color_description(&self) -> &str {
         &self.color.description
     }

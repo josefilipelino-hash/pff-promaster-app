@@ -161,7 +161,39 @@ const apiMock = {
   detectPortrait: vi.fn(async () => [faceRegions()]),
   mapPoints: vi.fn(async (_k: number, _s: unknown, pts: [number, number][]) => pts),
   suggestHealSource: vi.fn(async (_k: number, x: number, y: number) => [x + 0.1, y] as [number, number]),
+  albumFormats: vi.fn(async () => [{ name: "20x20", widthCm: 20, heightCm: 20 }, { name: "30x30", widthCm: 30, heightCm: 30 }, { name: "30x40", widthCm: 40, heightCm: 30 }]),
+  albumTemplates: vi.fn(async (n: number) => (n <= 1 ? ["P", "-|B", "B|-"] : ["B|B", "F|F", "-|G2"])),
+  listAlbums: vi.fn(async () => [{ id: "a1", name: "Álbum Ana & Pedro", format: "30x30", pages: 4, updatedAt: "" }]),
+  getAlbum: vi.fn(async () => albumFixture()),
+  createAlbum: vi.fn(async (name: string, spec: unknown) => ({ ...albumFixture(), id: "a2", name, spec })),
+  saveAlbum: vi.fn(async () => {}),
+  deleteAlbum: vi.fn(async () => true),
+  autoAlbum: vi.fn(async () => ({ album: { ...albumFixture(), notes: ["abertura:1", "cerimonia:1"] }, used: 3, candidates: 4, skippedLowRes: 1, skippedDuplicates: 0 })),
+  applyAlbumLayout: vi.fn(async (album: { spreads: { template: string }[] }, idx: number, tpl: string) => ({ ...album, spreads: album.spreads.map((s, i) => (i === idx ? { ...s, template: tpl } : s)) })),
+  albumPreflight: vi.fn(async () => [
+    { spread: null, slot: null, severity: "warning", code: "album.issue.unconfirmed", value: null },
+    { spread: 0, slot: "s1", severity: "error", code: "album.issue.lowDpi", value: 120 },
+  ]),
+  albumPhotoInfos: vi.fn(async () => [1, 2, 3, 4].map((key) => ({ key, width: 6000, height: 4000, time: null, moment: null, flag: 1, stars: 4, score: 0.8, faces: key === 2 ? [[0.4, 0.2, 0.1, 0.15]] : [], persons: [], group: null }))),
+  startAlbumExport: vi.fn(async () => 21),
+  labPresets: vi.fn(async () => [{ id: "l1", name: "Lab Porto", notes: "", dpi: 300, bleedMm: 5, safeMm: 15, gutterMm: 20, color: null, iccPath: "", intent: "perceptual", exportUnit: "pages", minPages: 20, maxPages: 80 }]),
+  saveLabPreset: vi.fn(async (p: object) => ({ ...p, id: "l2" })),
+  deleteLabPreset: vi.fn(async () => true),
 };
+function albumFixture() {
+  const spec = { format: "30x30", widthMm: 300, heightMm: 300, pages: 4, dpi: 300, bleedMm: 3, safeMm: 10, gutterMm: 16, color: "srgb", iccPath: "", intent: "perceptual", lab: "", confirmed: false, exportUnit: "spreads", minPages: 0, maxPages: 0, background: "#ffffff" };
+  const crop = { zoom: 1, cx: 0.5, cy: 0.5 };
+  return {
+    id: "a1",
+    name: "Álbum Ana & Pedro",
+    spec,
+    notes: [] as string[],
+    spreads: [
+      { id: "sp1", template: "B|F", marginMm: 12, spacingMm: 4, slots: [{ id: "s1", x: -3, y: -3, w: 303, h: 306, photo: 1, crop }, { id: "s2", x: 330, y: 60, w: 240, h: 160, photo: null, crop }] },
+      { id: "sp2", template: "", marginMm: 12, spacingMm: 4, slots: [] as unknown[] },
+    ],
+  };
+}
 function faceRegions() {
   const sq = (x: number, y: number, d: number): [number, number][] => [[x, y], [x + d, y], [x + d, y + d], [x, y + d]];
   return { oval: sq(0.4, 0.2, 0.2), leftEye: sq(0.45, 0.25, 0.02), rightEye: sq(0.52, 0.25, 0.02), leftBrow: [], rightBrow: [], lipsOuter: sq(0.47, 0.33, 0.06), lipsInner: sq(0.48, 0.34, 0.04), underLeft: sq(0.45, 0.28, 0.02), underRight: sq(0.52, 0.28, 0.02), leftIris: [0.46, 0.26, 0.005], rightIris: [0.53, 0.26, 0.005] };
@@ -327,12 +359,10 @@ describe("ecrã de projeto", () => {
     expect(cells.length).toBeLessThan(200);
   });
 
-  it("secções futuras estão desativadas e identificadas", async () => {
+  it("já não há secções futuras desativadas (os álbuns são uma vista)", async () => {
     await openProject(5);
-        for (const name of [/Álbuns/]) {
-      const b = screen.getByRole("button", { name }) as HTMLButtonElement;
-      expect(b.disabled).toBe(true);
-    }
+    expect(screen.queryByText("Brevemente")).toBeNull();
+    expect(screen.getByRole("button", { name: "Álbum" })).toBeTruthy();
   });
 
   it("atalhos classificam a fotografia com foco e gravam no núcleo", async () => {
@@ -1313,6 +1343,113 @@ describe("galeria (Fase 10)", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Abrir galeria" }));
     expect(apiMock.openGallery).toHaveBeenCalledWith("/tmp/pub/g/index.html");
+  });
+});
+
+describe("álbuns (Fase 11)", () => {
+  async function openAlbum() {
+    apiMock.listPhotos.mockResolvedValue(rows(4));
+    act(() => useStore.getState().setProject(project));
+    render(<App />);
+    await screen.findByText("Casamento Ana & Pedro");
+    await act(async () => {});
+    fireEvent.click(screen.getByRole("button", { name: "Álbum" }));
+    await waitFor(() => expect((screen.getByRole("textbox", { name: "Nome" }) as HTMLInputElement).value).toBe("Álbum Ana & Pedro"));
+    await act(async () => {});
+  }
+
+  it("editor: alertas, layout, arrastar e largar, automático e preset de laboratório", async () => {
+    await openAlbum();
+    // Alertas de DPI e especificação por confirmar; exportar bloqueado com erros.
+    expect(screen.getByText("Spread 1: Resolução efetiva baixa: 120 DPI.")).toBeTruthy();
+    expect(screen.getByText(/Não existem valores universais/)).toBeTruthy();
+    expect(screen.getByText("1 erro por corrigir")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Exportar álbum" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(document.querySelector('[data-slot="s1"]')!.className).toContain("has-error");
+    // Layouts para 1 fotografia; aplicar a panorâmica.
+    fireEvent.click(await screen.findByRole("button", { name: "Aplicar layout P" }));
+    await act(async () => {});
+    expect(apiMock.applyAlbumLayout).toHaveBeenCalledWith(expect.objectContaining({ id: "a1" }), 0, "P", 12, 4, []);
+    // Arrastar a fotografia 2 da tira para a moldura vazia.
+    const slot2 = document.querySelector<HTMLElement>('[data-slot="s2"]')!;
+    const efp = vi.fn(() => slot2);
+    Object.defineProperty(document, "elementFromPoint", { value: efp, configurable: true });
+    const item = screen.getAllByRole("button", { name: /IMG_0000?2/ })[0]!;
+    fireEvent.pointerDown(item, { clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(document.querySelector(".album-view")!, { clientX: 300, clientY: 200 });
+    expect(document.querySelector(".album-ghost")).toBeTruthy();
+    fireEvent.pointerUp(document.querySelector(".album-view")!, { clientX: 300, clientY: 200 });
+    expect(efp).toHaveBeenCalled();
+    await waitFor(() => expect(apiMock.saveAlbum).toHaveBeenCalledWith(expect.objectContaining({ spreads: expect.arrayContaining([expect.objectContaining({ slots: expect.arrayContaining([expect.objectContaining({ id: "s2", photo: 2 })]) })]) })));
+    // A fotografia 2 tem um rosto: o recorte centra-se nele.
+    const saved = apiMock.saveAlbum.mock.calls.at(-1) as unknown as [{ spreads: { slots: { id: string; crop: { cx: number } }[] }[] }];
+    expect(saved[0].spreads[0]!.slots.find((x) => x.id === "s2")!.crop.cx).toBeCloseTo(0.45);
+    // Seleção + teclado: mover 10 mm e apagar.
+    fireEvent.pointerDown(slot2);
+    fireEvent.pointerUp(document.querySelector(".album-view")!);
+    fireEvent.keyDown(screen.getByLabelText("Spread", { selector: ".album-stage" }), { key: "ArrowRight", shiftKey: true });
+    await waitFor(() => {
+      const c = apiMock.saveAlbum.mock.calls.at(-1) as unknown as [{ spreads: { slots: { id: string; x: number }[] }[] }];
+      expect(c[0].spreads[0]!.slots.find((x) => x.id === "s2")!.x).toBe(340);
+    });
+    // As teclas do editor não classificam fotografias da grelha (invisível).
+    fireEvent.keyDown(window, { key: "5" });
+    fireEvent.keyDown(window, { key: "x" });
+    expect(apiMock.setStars).not.toHaveBeenCalled();
+    expect(apiMock.setFlag).not.toHaveBeenCalled();
+    // Automático com confirmação (já há fotografias no álbum).
+    fireEvent.click(screen.getByRole("button", { name: /Criar álbum automaticamente/ }));
+    expect(screen.getByText("Isto substitui as fotografias de todos os spreads.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Substituir" }));
+    await act(async () => {});
+    expect(apiMock.autoAlbum).toHaveBeenCalledWith("a1", { maxPerPage: 3, marginMm: 12, spacingMm: 4, keepPages: true });
+    expect(screen.getByText(/Usadas 3 de 4 fotografias/)).toBeTruthy();
+    expect(screen.getByText("Abertura (1) → Cerimónia (1)")).toBeTruthy();
+    // Especificação: aplicar o preset do laboratório (nada de valores universais).
+    fireEvent.click(screen.getByRole("tab", { name: "Especificação" }));
+    fireEvent.change(screen.getByRole("combobox", { name: "Preset de laboratório" }), { target: { value: "l1" } });
+    await waitFor(() =>
+      expect(apiMock.saveAlbum).toHaveBeenCalledWith(expect.objectContaining({ spec: expect.objectContaining({ lab: "Lab Porto", bleedMm: 5, safeMm: 15, gutterMm: 20, exportUnit: "pages", confirmed: true }) })),
+    );
+    expect((screen.getByRole("checkbox", { name: /Medidas confirmadas/ }) as HTMLInputElement).checked).toBe(true);
+    // Formato 30x40 (horizontal) e personalizado.
+    fireEvent.change(screen.getByRole("combobox", { name: "Formato" }), { target: { value: "30x40" } });
+    expect((screen.getByRole("spinbutton", { name: "Largura da página (cm)" }) as HTMLInputElement).value).toBe("40");
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Largura da página (cm)" }), { target: { value: "27.5" } });
+    expect((screen.getByRole("combobox", { name: "Formato" }) as HTMLSelectElement).value).toBe("custom");
+    fireEvent.change(screen.getByRole("spinbutton", { name: "Páginas" }), { target: { value: "9" } });
+    expect((screen.getByRole("spinbutton", { name: "Páginas" }) as HTMLInputElement).value).toBe("10");
+  });
+
+  it("fila: álbum concluído oferece abrir o PDF", async () => {
+    apiMock.listPhotos.mockResolvedValue(rows(2));
+    act(() => useStore.getState().setProject(project));
+    render(<App />);
+    await screen.findByText("Casamento Ana & Pedro");
+    act(() =>
+      useStore.getState().upsertExportJob({
+        id: 21, name: "Álbum", destination: "/tmp/lab", state: "done", pausedReason: null, photosTotal: 10, photosDone: 10, filesTotal: 10, filesDone: 10,
+        filesFailed: 0, filesSkipped: 0, bytesWritten: 5e6, bytesEstimated: 5e6, freeBytes: 1e9, elapsedSeconds: 3, etaSeconds: 0, current: null,
+        errors: [], notes: [], folders: [], index: "/tmp/lab/album-impressao.pdf",
+      } as never),
+    );
+    expect(screen.queryByRole("button", { name: "Abrir galeria" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Abrir PDF" }));
+    expect(apiMock.openGallery).toHaveBeenCalledWith("/tmp/lab/album-impressao.pdf");
+  });
+
+  it("exportar o PDF de prova para a pasta escolhida", async () => {
+    apiMock.albumPreflight.mockResolvedValue([{ spread: null, slot: null, severity: "warning", code: "album.issue.unconfirmed", value: null }]);
+    const dialog = await import("@tauri-apps/plugin-dialog");
+    vi.mocked(dialog.open).mockResolvedValueOnce("/tmp/lab");
+    await openAlbum();
+    expect(screen.getByText("Sem erros. Reveja os avisos antes de enviar.")).toBeTruthy();
+    fireEvent.click(screen.getAllByRole("button", { name: "Escolher…" }).at(-1)!);
+    await waitFor(() => expect((screen.getByRole("textbox", { name: "Pasta de destino" }) as HTMLInputElement).value).toBe("/tmp/lab"));
+    fireEvent.change(screen.getByRole("combobox", { name: "Formato de exportação" }), { target: { value: "proofPdf" } });
+    fireEvent.click(screen.getByRole("button", { name: "Exportar álbum" }));
+    await act(async () => {});
+    expect(apiMock.startAlbumExport).toHaveBeenCalledWith("a1", "proofPdf", "/tmp/lab");
   });
 });
 

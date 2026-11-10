@@ -260,6 +260,34 @@ impl Library {
     }
 }
 
+impl Library {
+    /// Presets de laboratório (JSON do `momento-album`), por nome.
+    pub fn lab_presets(&self) -> CoreResult<Vec<(String, String, String)>> {
+        let mut st = self
+            .conn
+            .prepare("SELECT id, name, body FROM album_lab ORDER BY name")
+            .map_err(db_err)?;
+        let rows = st.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).map_err(db_err)?;
+        rows.collect::<Result<_, _>>().map_err(db_err)
+    }
+
+    pub fn save_lab_preset(&self, id: &str, name: &str, body: &str) -> CoreResult<()> {
+        self.conn
+            .execute(
+                "INSERT INTO album_lab(id, name, body, updated_at) VALUES(?1, ?2, ?3, ?4)
+                 ON CONFLICT(id) DO UPDATE SET name = ?2, body = ?3, updated_at = ?4",
+                params![id, name, body, now_millis()],
+            )
+            .map_err(db_err)?;
+        Ok(())
+    }
+
+    pub fn delete_lab_preset(&self, id: &str) -> CoreResult<bool> {
+        Ok(self.conn.execute("DELETE FROM album_lab WHERE id = ?1", params![id]).map_err(db_err)?
+            > 0)
+    }
+}
+
 #[cfg(test)]
 mod export_preset_tests {
     use super::*;

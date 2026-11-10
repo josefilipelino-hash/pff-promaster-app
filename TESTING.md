@@ -69,6 +69,16 @@ plataforma, ecrã inicial, validação do formulário, grelha virtualizada com 3
 secções futuras desativadas, classificação por teclado e em seleção múltipla, filtro
 Favoritas + visualizador, reversão quando o núcleo recusa, paridade de traduções.
 
+## Fase 11 — álbuns
+
+| Teste | O que verifica |
+|---|---|
+| `album::spec`, `album::layouts` (3) | formatos e orientação, problemas da especificação, preset de laboratório; layouts de 1 a 12 fotografias dentro do spread, sangria só nos lados exteriores, margem interior ≥ metade da dobra, linhas justificadas com espaçamento fixo |
+| `album::tests` (5) | **narrativa automática** (abertura, preparação → cerimónia → casal → receção → festa; sem duplicados nem rajadas; baixa resolução fora; máximo por página); **sem rostos na dobra** e recorte centrado nos rostos; verificações (DPI 50 %/80 %, rosto na dobra/fora da zona segura, borda perto do corte, vazio, repetida, por confirmar); composição (sangria, posição em píxeis, guias da prova) e exportação JPEG/TIFF/PDF (páginas, `TrimBox`/`BleedBox`, ICC, prova a 120 DPI); **fotografias pequenas nunca ampliadas** além do DPI do laboratório (regressão do teste real) |
+| `album_flow` | caminho real: momentos → criar 20×20 → automático com 12 fotografias pela ordem da narrativa, sem erros → mudar o layout mantém as fotografias → JPEG por spread com a largura exata (sangria incluída) e PDF de impressão pela fila → presets de laboratório → originais intactos |
+| Interface (+3) e lógica (+4) | alertas de DPI e por confirmar, exportar bloqueado com erros, aplicar layout, **arrastar da tira para a moldura** (recorte no rosto), teclado, automático com confirmação e narrativa, preset de laboratório, formato 30×40 e personalizado, páginas pares, exportar prova; atalhos da grelha desligados no álbum; "Abrir PDF" na fila; recorte/DPI iguais ao núcleo, full bleed, panorâmica, limites, alinhar, distribuir |
+| Aplicação real (Xvfb) + `pypdf` | editor com um casamento de 55 fotografias, automático, arrastar, exportação do PDF de impressão e de prova validados por um leitor PDF independente (páginas, `TrimBox`, `BleedBox`) |
+
 ## Fase 10 — galerias
 
 | Teste | O que verifica |

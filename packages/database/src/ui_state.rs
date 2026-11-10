@@ -42,6 +42,24 @@ impl Catalog {
             .map_err(db_err)
     }
 
+    /// Valores cujas chaves começam por `prefix` (ex.: "album:").
+    pub fn values_with_prefix(&self, prefix: &str) -> CoreResult<Vec<(String, String)>> {
+        let c = self.connection();
+        let mut st = c
+            .prepare("SELECT key, value FROM catalog_info WHERE substr(key, 1, length(?1)) = ?1 ORDER BY key")
+            .map_err(db_err)?;
+        let rows = st.query_map([prefix], |r| Ok((r.get(0)?, r.get(1)?))).map_err(db_err)?;
+        rows.collect::<Result<_, _>>().map_err(db_err)
+    }
+
+    pub fn delete_value(&self, key: &str) -> CoreResult<bool> {
+        Ok(self
+            .connection()
+            .execute("DELETE FROM catalog_info WHERE key = ?1", [key])
+            .map_err(db_err)?
+            > 0)
+    }
+
     pub fn save_value(&self, key: &str, value: &str) -> CoreResult<()> {
         if value.len() > 4 * 1024 * 1024 {
             return Err(momento_core_types::CoreError::Other("valor demasiado grande".into()));

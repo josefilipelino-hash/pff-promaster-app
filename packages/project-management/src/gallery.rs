@@ -340,6 +340,7 @@ impl ProjectSession {
             name: if cfg.settings.english() { "Gallery".into() } else { "Galeria".into() },
             moment_names,
             gallery: Some(Box::new(GalleryJob { config: cfg, folder, chapters, tokens, names })),
+            album: None,
         };
         self.start_export(req)
     }

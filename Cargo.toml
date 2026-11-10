@@ -23,7 +23,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.10.0"
+version = "0.11.0"
 edition = "2021"
 rust-version = "1.85"
 license = "UNLICENSED"
@@ -89,6 +89,7 @@ momento-ai-analysis = { path = "packages/ai-analysis" }
 momento-color-management = { path = "packages/color-management" }
 momento-export-engine = { path = "packages/export-engine" }
 momento-gallery = { path = "packages/gallery" }
+momento-album = { path = "packages/album" }
 
 [profile.dev.package."*"]
 # Dependências optimizadas mesmo em debug: descodificação de imagem em debug puro é demasiado lenta.

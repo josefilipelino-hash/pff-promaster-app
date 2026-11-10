@@ -12,6 +12,7 @@ import type { Color, GroupRow, ImportMode, Label } from "../types";
 import { AutoEditDialog, AutoEditQueue } from "./AutoEdit";
 import { ExportDialog, ExportQueue } from "./Export";
 import { GalleryDialog } from "./Gallery";
+import { AlbumView } from "./AlbumView";
 import { ConsistencyView } from "./ConsistencyView";
 import { ApplyPresetDialog } from "./Presets";
 import { ClockDialog } from "./ClockDialog";
@@ -442,9 +443,12 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const st = useStore.getState();
-            if (isTyping(e.target) || st.pendingImport || st.importSummary || st.helpOpen || st.clockOpen || st.autoDialog || st.presetDialog || st.exportDialog || st.galleryDialog) return;
+      if (isTyping(e.target) || st.pendingImport || st.importSummary || st.helpOpen || st.clockOpen || st.autoDialog || st.presetDialog || st.exportDialog || st.galleryDialog) return;
       const a = keyToAction(e, mac);
       if (!a) return;
+      // No álbum, as teclas são do editor: nada de classificar ou mover a seleção da
+      // grelha (invisível) por engano.
+      if (st.view === "album" && a.type !== "help" && a.type !== "develop") return;
       e.preventDefault();
       handleAction(a);
     };
@@ -452,7 +456,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [handleAction, mac]);
 
-    const immersive = (fullscreen && viewerPhoto !== null) || s.view === "develop";
+    const immersive = (fullscreen && viewerPhoto !== null) || s.view === "develop" || s.view === "album";
   const developKey = s.view === "develop" ? (s.selection.focus !== null && order.includes(s.selection.focus) ? s.selection.focus : order[0]) : undefined;
 
   return (
@@ -488,7 +492,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
         />
       )}
       <section className="main">
-                {(!immersive || s.view === "develop") && (
+                {(!immersive || s.view === "develop" || s.view === "album") && (
           <Toolbar
             project={project}
             importBusy={s.importRunning}
@@ -521,7 +525,9 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
                 </button>
               </div>
             </div>
-                    ) : s.view === "consistency" ? (
+                    ) : s.view === "album" ? (
+            <AlbumView />
+          ) : s.view === "consistency" ? (
             <ConsistencyView
               onEdit={(k) => {
                 s.setSelection({ ids: new Set([k]), focus: k, anchor: k });

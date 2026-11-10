@@ -2799,7 +2799,7 @@ dependencies = [
 
 [[package]]
 name = "momento-ai-analysis"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "image",
  "momento-test-fixtures",
@@ -2809,11 +2809,21 @@ dependencies = [
 
 [[package]]
 name = "momento-album"
-version = "0.10.0"
+version = "0.11.0"
+dependencies = [
+ "getrandom 0.3.4",
+ "image",
+ "momento-color-management",
+ "momento-core-types",
+ "momento-export-engine",
+ "momento-image-processing",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "momento-color-management"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "lcms2",
  "momento-core-types",
@@ -2823,7 +2833,7 @@ dependencies = [
 
 [[package]]
 name = "momento-core-types"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2832,7 +2842,7 @@ dependencies = [
 
 [[package]]
 name = "momento-database"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "momento-core-types",
  "rusqlite",
@@ -2843,8 +2853,9 @@ dependencies = [
 
 [[package]]
 name = "momento-desktop"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
+ "momento-album",
  "momento-color-management",
  "momento-core-types",
  "momento-database",
@@ -2864,7 +2875,7 @@ dependencies = [
 
 [[package]]
 name = "momento-export-engine"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "ab_glyph",
  "avif-serialize",
@@ -2894,7 +2905,7 @@ dependencies = [
 
 [[package]]
 name = "momento-face-analysis"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "image",
@@ -2907,7 +2918,7 @@ dependencies = [
 
 [[package]]
 name = "momento-gallery"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "aes-gcm",
  "base64 0.22.1",
@@ -2925,7 +2936,7 @@ dependencies = [
 
 [[package]]
 name = "momento-image-codecs"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "image",
  "jpeg-decoder",
@@ -2942,7 +2953,7 @@ dependencies = [
 
 [[package]]
 name = "momento-image-processing"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "blake3",
  "image",
@@ -2958,7 +2969,7 @@ dependencies = [
 
 [[package]]
 name = "momento-import-engine"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "blake3",
  "image",
@@ -2977,7 +2988,7 @@ dependencies = [
 
 [[package]]
 name = "momento-libraw-sys"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "cc",
  "libz-sys",
@@ -2985,7 +2996,7 @@ dependencies = [
 
 [[package]]
 name = "momento-metadata"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "kamadak-exif",
  "momento-test-fixtures",
@@ -2994,7 +3005,7 @@ dependencies = [
 
 [[package]]
 name = "momento-presets"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "image",
  "momento-image-processing",
@@ -3004,13 +3015,14 @@ dependencies = [
 
 [[package]]
 name = "momento-project-management"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "blake3",
  "fs4",
  "image",
  "kamadak-exif",
  "momento-ai-analysis",
+ "momento-album",
  "momento-color-management",
  "momento-core-types",
  "momento-database",
@@ -3036,7 +3048,7 @@ dependencies = [
 
 [[package]]
 name = "momento-raw-engine"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "image",
  "momento-core-types",
@@ -3048,7 +3060,7 @@ dependencies = [
 
 [[package]]
 name = "momento-task-queue"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3056,7 +3068,7 @@ dependencies = [
 
 [[package]]
 name = "momento-test-fixtures"
-version = "0.10.0"
+version = "0.11.0"
 dependencies = [
  "image",
  "rayon",

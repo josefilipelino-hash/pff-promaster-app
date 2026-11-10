@@ -847,3 +847,119 @@ export interface FavoritesImport {
   matched: number;
   unmatched: string[];
 }
+
+// ---------------------------------------------------------------- álbuns (Fase 11)
+
+export interface AlbumSpec {
+  format: string;
+  widthMm: number;
+  heightMm: number;
+  pages: number;
+  dpi: number;
+  bleedMm: number;
+  safeMm: number;
+  gutterMm: number;
+  color: ExportColorSpace;
+  iccPath: string;
+  intent: "perceptual" | "relativeColorimetric";
+  lab: string;
+  confirmed: boolean;
+  exportUnit: "spreads" | "pages";
+  minPages: number;
+  maxPages: number;
+  background: string;
+}
+
+export interface AlbumCrop {
+  zoom: number;
+  cx: number;
+  cy: number;
+}
+
+export interface AlbumSlot {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  photo: number | null;
+  crop: AlbumCrop;
+}
+
+export interface AlbumSpread {
+  id: string;
+  template: string;
+  marginMm: number;
+  spacingMm: number;
+  slots: AlbumSlot[];
+}
+
+export interface Album {
+  id: string;
+  name: string;
+  spec: AlbumSpec;
+  spreads: AlbumSpread[];
+  notes: string[];
+}
+
+export interface AlbumSummary {
+  id: string;
+  name: string;
+  format: string;
+  pages: number;
+  photos: number;
+}
+
+export interface AlbumIssue {
+  spread: number | null;
+  slot: string | null;
+  severity: "error" | "warning";
+  code: string;
+  value: number | null;
+}
+
+export interface AlbumPhotoInfo {
+  key: number;
+  width: number;
+  height: number;
+  time: string | null;
+  moment: string | null;
+  flag: number;
+  stars: number;
+  score: number;
+  faces: [number, number, number, number][];
+  persons: number[];
+  group: number | null;
+}
+
+export interface LabPreset {
+  id: string;
+  name: string;
+  notes: string;
+  dpi: number;
+  bleedMm: number;
+  safeMm: number;
+  gutterMm: number;
+  color: ExportColorSpace | null;
+  iccPath: string;
+  intent: "perceptual" | "relativeColorimetric";
+  exportUnit: "spreads" | "pages";
+  minPages: number;
+  maxPages: number;
+}
+
+export interface AlbumAutoReport {
+  album: Album;
+  used: number;
+  candidates: number;
+  skippedLowRes: number;
+  skippedDuplicates: number;
+}
+
+export interface AlbumFormat {
+  name: string;
+  widthCm: number;
+  heightCm: number;
+}
+
+export type AlbumExportKind = "jpeg" | "tiff" | "printPdf" | "proofPdf";

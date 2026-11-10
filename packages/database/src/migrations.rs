@@ -344,6 +344,15 @@ pub const LIBRARY: &[&str] = &[
         updated_at INTEGER NOT NULL
     ) STRICT;
     "#,
+    // v4 — Fase 11: presets de laboratório dos álbuns.
+    r#"
+    CREATE TABLE album_lab (
+        id         TEXT PRIMARY KEY NOT NULL,
+        name       TEXT NOT NULL,
+        body       TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+    ) STRICT;
+    "#,
 ];
 
 pub fn user_version(conn: &Connection) -> CoreResult<u32> {

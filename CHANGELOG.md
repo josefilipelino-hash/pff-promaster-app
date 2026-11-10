@@ -5,6 +5,30 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [0.11.0] — 2026-11-10 — Fase 11: álbuns
+
+### Adicionado
+- **Álbuns fotográficos** por projeto (vista "Álbum"): formatos 20×20, 25×25, 30×30,
+  35×35, 20×30, 25×35, 30×40 cm e personalizado; largura, altura, orientação, páginas,
+  DPI, sangria, zona segura, dobra/centro, espaço de cor/ICC, laboratório e exportação
+  por spread ou por página.
+- **Presets de laboratório** personalizados (guardados na biblioteca, para todos os
+  projetos). As medidas ficam **por confirmar** até haver preset ou confirmação: não se
+  assumem sangrias nem margens universais.
+- **Editor:** arrastar e largar da tira de fotografias, layouts de 1 a 6+ fotografias,
+  full bleed, panorâmicas, alinhar, distribuir, margens, espaçamento, mover,
+  redimensionar, recortar e zoom; guias de sangria, corte, zona segura e dobra; teclado.
+- **"Criar álbum automaticamente":** usa a seleção final, momentos, cronologia,
+  classificação, orientação, pessoas e relevância; narrativa abertura → preparação →
+  cerimónia → casal → família → receção → festa → encerramento; evita repetições,
+  páginas cheias, rostos na dobra, maus recortes e baixa resolução.
+- **Verificações:** DPI efetivo por fotografia, zona segura, rostos na dobra, bordas
+  perto do corte, molduras vazias, repetidas.
+- **Exportação** pela fila, a partir dos originais: JPEG por spread/página, TIFF, PDF de
+  impressão (sangria, `TrimBox`/`BleedBox`, perfil ICC) e PDF de prova (baixa resolução,
+  guias, "PROVA").
+
+
 ## [0.10.0] — 2026-11-10 — Fase 10: galerias
 
 ### Adicionado

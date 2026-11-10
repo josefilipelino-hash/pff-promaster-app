@@ -1,6 +1,15 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  Album,
+  AlbumAutoReport,
+  AlbumExportKind,
+  AlbumFormat,
+  AlbumIssue,
+  AlbumPhotoInfo,
+  AlbumSpec,
+  AlbumSummary,
+  LabPreset,
   FavoritesImport,
   GalleryConfig,
   GalleryPreview,
@@ -176,6 +185,23 @@ export const api = {
   setGalleryHidden: (keys: number[], hidden: boolean) => invoke<GalleryConfig>("set_gallery_hidden", { keys, hidden }),
   importClientFavorites: (text: string) => invoke<FavoritesImport>("import_client_favorites", { text }),
   openGallery: (path: string) => invoke<void>("open_gallery", { path }),
+  // Álbuns.
+  albumFormats: () => invoke<AlbumFormat[]>("album_formats"),
+  albumTemplates: (count: number) => invoke<string[]>("album_templates", { count }),
+  listAlbums: () => invoke<AlbumSummary[]>("list_albums"),
+  getAlbum: (id: string) => invoke<Album>("get_album", { id }),
+  createAlbum: (name: string, spec: AlbumSpec) => invoke<Album>("create_album", { name, spec }),
+  saveAlbum: (album: Album) => invoke<void>("save_album", { album }),
+  deleteAlbum: (id: string) => invoke<boolean>("delete_album", { id }),
+  autoAlbum: (id: string, options: { maxPerPage: number; marginMm: number; spacingMm: number; keepPages: boolean }) => invoke<AlbumAutoReport>("auto_album", { id, options }),
+  applyAlbumLayout: (album: Album, spread: number, template: string, margin: number, spacing: number, extra: number[]) =>
+    invoke<Album>("apply_album_layout", { album, spread, template, margin, spacing, extra }),
+  albumPreflight: (album: Album) => invoke<AlbumIssue[]>("album_preflight", { album }),
+  albumPhotoInfos: () => invoke<AlbumPhotoInfo[]>("album_photo_infos"),
+  startAlbumExport: (id: string, kind: AlbumExportKind, destination: string) => invoke<number>("start_album_export", { id, kind, destination }),
+  labPresets: () => invoke<LabPreset[]>("lab_presets"),
+  saveLabPreset: (preset: LabPreset) => invoke<LabPreset>("save_lab_preset", { preset }),
+  deleteLabPreset: (id: string) => invoke<boolean>("delete_lab_preset", { id }),
 };
 
 export const events = {
