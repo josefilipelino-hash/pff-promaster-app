@@ -158,9 +158,18 @@ leitura, permissões, Unicode, nomes longos, ficheiros corrompidos, fugas de rec
 `RELEASE_CHECKLIST.md`.
 **Por fazer:** CI e verificação em macOS/Windows; discos de rede; leitores de ecrã.
 
-## Fase 16 — Distribuição
+## Fase 16 — Versão instalável (uso pessoal) ✅ *(concluída 2026-11-10 — v1.0.0-personal)*
 
-GPU (wgpu), otimização Apple Silicon, assinatura de instaladores.
+Build de produção reproduzível (`scripts/build-release.sh`), atualização segura de
+catálogos (cópia antes de migrar), permissões do macOS, otimizações de tamanho, registos
+com retenção, smoke test do pacote final. Assinatura/notarização documentadas à parte.
+**Por fazer:** executar o build no Mac (ou CI macos-14) e a secção 2 de
+`RELEASE_CHECKLIST.md`; assinatura quando houver conta Apple Developer.
+
+## Fase 17 — Distribuição
+
+Assinatura e notarização, menu nativo do macOS, GPU (wgpu), otimização Apple Silicon,
+atualizações automáticas.
 
 > **Windows** deixou de ser tarefa da fase de otimização: por decisão do utilizador (D-011), Windows e
 > macOS são plataformas-alvo desde a Fase 1 — CI, compilação cruzada e instalador NSIS.

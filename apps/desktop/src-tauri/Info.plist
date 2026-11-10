@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Fase 16 — juntado pelo Tauri ao Info.plist da aplicação (macOS).
+  A aplicação não usa sandbox: lê cartões, discos externos e pastas escolhidas pelo
+  utilizador diretamente. O macOS (TCC) pede autorização na primeira vez que se acede às
+  pastas protegidas abaixo e mostra estas explicações. ~/Pictures não é uma pasta
+  protegida (só a fototeca do Fotos, que a aplicação não usa).
+-->
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>pt-PT</string>
+  <key>CFBundleLocalizations</key>
+  <array>
+    <string>pt-PT</string>
+    <string>en</string>
+  </array>
+  <key>NSRemovableVolumesUsageDescription</key>
+  <string>O Momento Studio lê as fotografias dos cartões de memória e discos externos que escolher para importar, e grava cópias de segurança e exportações nos discos que indicar. Os originais nunca são alterados.</string>
+  <key>NSNetworkVolumesUsageDescription</key>
+  <string>O Momento Studio acede às pastas de rede que escolher para importar ou exportar fotografias.</string>
+  <key>NSDocumentsFolderUsageDescription</key>
+  <string>O Momento Studio acede às fotografias e projetos que escolher na pasta Documentos.</string>
+  <key>NSDesktopFolderUsageDescription</key>
+  <string>O Momento Studio acede às fotografias e projetos que escolher na Secretária.</string>
+  <key>NSDownloadsFolderUsageDescription</key>
+  <string>O Momento Studio acede às fotografias e projetos que escolher na pasta Transferências.</string>
+</dict>
+</plist>

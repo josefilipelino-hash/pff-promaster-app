@@ -166,7 +166,7 @@ export function SafetyDialog({ onClose, onReopened }: { onClose: () => void; onR
             {st.backups.map((b) => (
               <li key={b.file}>
                 <span className="grow">{when(b.created, i18n.language)}</span>
-                <span className="small muted">{t(`safety.kind.${b.kind}`, { defaultValue: b.kind })}</span>
+                <span className="small muted">{b.kind.startsWith("antes-da-atualizacao") ? t("safety.kind.update", { version: b.kind.split("-v")[1] ?? "?" }) : t(`safety.kind.${b.kind}`, { defaultValue: b.kind })}</span>
                 <span className="small muted">{formatBytes(b.bytes)}</span>
                 {b.kind !== "danificado" && (
                   <button type="button" className="btn small" disabled={busy} onClick={() => setConfirm({ kind: "restore", file: b.file })}>

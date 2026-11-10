@@ -5,6 +5,34 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [1.0.0-personal] — 2026-11-10 — Fase 16: versão instalável para uso pessoal
+
+Sem funcionalidades novas. Ver `RELEASE_NOTES.md`.
+
+### Adicionado
+- **Atualização segura:** cópia completa do catálogo em `backups/` antes de qualquer
+  migração (sem cópia, nada é alterado); visível em "Segurança e cópias" como "antes da
+  atualização". Testado com catálogos reais das versões v3 e v7.
+- `Info.plist` com as explicações dos pedidos de acesso do macOS (volumes amovíveis,
+  Documentos, Secretária, Transferências, rede); informações da aplicação (editor,
+  copyright, descrições, janela do `.dmg`).
+- `scripts/build-release.sh`: build de produção reproduzível (toolchain fixa, locks,
+  modelos verificados por SHA-256, `SOURCE_DATE_EPOCH`, `BUILD_INFO.txt`, `SHA256SUMS.txt`);
+  CI gera o `.dmg` universal em cada tag `v*`.
+- `RELEASE_NOTES.md`, `docs/SIGNING.md` (assinatura/notarização, separado).
+
+### Alterado
+- Versão 1.0.0-personal (pacotes 1.0.0: o macOS e o Windows exigem versão numérica).
+- Produção sem source maps (−2,3 MB) e sem informação de depuração (nomes de funções
+  mantidos para os relatórios de falhas).
+- Registos limitados aos últimos 14 dias.
+- Rust fixado em 1.97.0 (`rust-toolchain.toml`).
+
+### Corrigido (encontrado no smoke test do pacote final)
+- Miniatura concluída durante o recarregar da lista ficava "pendente" no ecrã.
+- "Analisar 0 fotografias" depois de uma importação (contagem não recarregada).
+- Dicas com o atalho repetido ("(Mod + Shift + E) (Ctrl+Shift+E)").
+
 ## [0.15.0] — 2026-11-10 — Fase 15: estabilização
 
 Sem funcionalidades grandes novas: auditoria dos 18 módulos, casamento completo como

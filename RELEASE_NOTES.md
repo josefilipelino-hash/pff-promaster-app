@@ -1,0 +1,77 @@
+# Momento Studio 1.0.0-personal
+
+**Data:** 2026-11-10 · **Tipo:** versão para uso pessoal (não assinada) · **Tag:** `v1.0.0-personal`
+
+Primeira versão instalável. Fluxo completo de um casamento, local e sem internet:
+cartão → importação segura → seleção → edição → exportação → galeria do cliente → álbum
+para o laboratório.
+
+## O que faz
+
+| Área | |
+|---|---|
+| Projetos | Um projeto por trabalho (pasta `.momento`), catálogo SQLite gravado a cada alteração (sem "Guardar"), versões automáticas, recuperação de sessões interrompidas |
+| Importação | Cartões/pastas, cópia verificada (BLAKE3) para a pasta dos originais **e** para um disco de segurança em simultâneo; duplicados pelo conteúdo; relatório de tudo o que não entrou |
+| Formatos | RAW de câmara via LibRaw (testado com 15 fabricantes), JPEG, TIFF, PNG, WebP, JPEG XL, JPEG 2000, PSD, EXR, HEIC/AVIF (macOS) |
+| Library / Culling | Grelha virtualizada (15 000 fotografias), estrelas, favoritas, rejeitadas, cores, comparação, menus contextuais, atalhos de teclado |
+| Seleção assistida | Nitidez, olhos fechados, exposição, rajadas e duplicados — sugestões que nunca se sobrepõem às decisões do utilizador |
+| Pessoas e momentos | Rostos agrupados localmente; momentos do casamento por cena e hora, várias câmaras sincronizadas |
+| Develop | Revelação não destrutiva de alta precisão, curvas, HSL, máscaras (pincel, gradientes, sujeito/céu por IA), retrato, retoque, AI Denoise, histórico, instantâneos, cópias virtuais |
+| Auto edit e presets | Edição automática por fotografia ou em lote, presets e LUTs, consistência entre fotografias |
+| Exportação | JPEG, JPEG XL, JPEG 2000, PNG, TIFF/BigTIFF (8–32 bits), WebP, AVIF, HEIF/HEIC, OpenEXR, DNG, PDF, PSD (ver `EXPORT_FORMATS.md` para o suporte por sistema); perfis de cor; redimensionar, nitidez de saída, marca de água, metadados (GPS removível); planos com várias receitas numa operação |
+| Galeria | Site estático para o cliente, com PIN/palavra-passe (AES-256-GCM), capítulos por momento, transferências |
+| Álbum | Formatos de laboratório, layouts automáticos pela narrativa do dia, verificação (DPI, rostos na dobra), PDF de impressão com sangria e JPEG/TIFF por spread |
+
+## Novo nesta versão (Fase 16)
+
+- **Atualização segura:** antes de mudar o formato de um catálogo existente, a aplicação
+  guarda uma cópia completa em `backups/catalog-antes-da-atualizacao-v<N>-<data>.db`; sem
+  essa cópia não altera nada. Uma versão antiga recusa abrir um catálogo mais recente.
+- Pedidos de acesso do macOS com explicações (cartões e discos externos, Documentos,
+  Secretária, Transferências, rede).
+- Build de produção reproduzível (`scripts/build-release.sh`): ferramentas fixadas,
+  dependências pelos locks, modelos de IA verificados por SHA-256, `BUILD_INFO.txt` e
+  `SHA256SUMS.txt`.
+- Mais pequeno: sem source maps (−2,3 MB), sem informação de depuração.
+- Registos limitados aos últimos 14 dias.
+
+Correções e estabilização das fases anteriores: ver `CHANGELOG.md` (0.13–0.15) e
+`docs/reports/fase15-auditoria.md`.
+
+## Requisitos
+
+macOS 12+ (Apple Silicon recomendado; Intel suportado pelo build universal), 8 GB de
+memória (16 GB recomendado), ~200 MB para a aplicação. Projetos em disco local. Compilar:
+ver `INSTALLATION.md`.
+
+## Instalar, atualizar, backup
+
+Ver `INSTALLATION.md` → "Versão 1.0.0-personal no Mac": instalar (primeira abertura com
+clique direito → Abrir), permissões, atualizar sem perder catálogos, backup, desinstalar.
+
+## Limitações conhecidas
+
+- **Não assinada nem notarizada** (uso pessoal): o macOS pede confirmação na primeira
+  abertura. Passos para assinar: `docs/SIGNING.md`.
+- **O build macOS não foi executado neste ciclo de desenvolvimento** (ambiente Linux): o
+  `.app`/`.dmg` é gerado no Mac com `scripts/build-release.sh` ou pela CI (macos-14). O
+  mesmo código foi compilado e testado em Linux (smoke test do pacote de produção,
+  ver abaixo). Antes de um trabalho real, correr a secção 2 de `RELEASE_CHECKLIST.md` no Mac.
+- Fontes do sistema, Retina e controlos nativos verificados só por equivalência em Linux
+  (escala 2×).
+- Leitores de ecrã (VoiceOver) não testados.
+- Catálogo em disco de rede não suportado (SQLite WAL).
+- Nomes de ficheiro com mais de 255 bytes falham individualmente com o erro do sistema.
+- Reimportar um cartão já importado lê todos os ficheiros (decide pelo conteúdo — mais
+  lento, nunca perde fotografias).
+- Tamanho: ~102 MB são modelos de IA (9 modelos, todos usados; mantidos em precisão total
+  para manter os resultados validados).
+
+## Verificação desta versão
+
+- Testes automáticos: núcleo Rust (com RAW reais, modelos e rostos, discos cheios/só de
+  leitura) e interface — ver `PROJECT_STATUS.md`.
+- Casamento completo de ponta a ponta com reinício (`wedding_e2e`).
+- Smoke test do pacote de produção (Linux): lançamento, criação de projeto, importação,
+  edição, reinício, exportação, recuperação depois de terminar o processo à força.
+- Checksums dos pacotes: `SHA256SUMS.txt` gerado pelo build.

@@ -87,7 +87,7 @@
   },
   "import": {
     "files": "Importar ficheiros…",
-    "filesHint": "Importar um ou vários ficheiros (Mod+Shift+I)",
+    "filesHint": "Importar um ou vários ficheiros",
     "folder": "Importar pasta…",
     "folderHint": "Importar uma ou várias pastas, com subpastas",
     "title": "Importar fotografias",
@@ -1171,7 +1171,7 @@
   "export": {
     "title": "Exportar",
     "button": "Exportar…",
-    "buttonHint": "Exportar a seleção ou as fotografias visíveis (Mod + Shift + E)",
+    "buttonHint": "Exportar a seleção ou as fotografias visíveis",
     "photos": "Fotografias",
     "scopeSelected_one": "Seleção ({{count}})",
     "scopeSelected_other": "Seleção ({{count}})",
@@ -1692,7 +1692,8 @@
       "auto": "automática",
       "manual": "manual",
       "antes-do-restauro": "antes de um restauro",
-      "danificado": "danificado (guardado)"
+      "danificado": "danificado (guardado)",
+      "update": "antes da atualização (esquema {{version}})"
     },
     "catalogHint": "Exportar guarda uma cópia verificada do catálogo noutro sítio (ex.: outro disco). Importar substitui o catálogo deste projeto por um exportado — o atual é guardado primeiro.",
     "exportCatalog": "Exportar catálogo…",

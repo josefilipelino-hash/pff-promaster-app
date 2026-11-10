@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Momento Studio",
-  "version": "0.15.0",
+  "version": "1.0.0",
   "identifier": "pt.momentostudio.desktop",
   "build": {
     "beforeDevCommand": "pnpm dev",
@@ -46,7 +46,25 @@
       "icons/icon.ico"
     ],
     "macOS": {
-      "minimumSystemVersion": "12.0"
-    }
+      "minimumSystemVersion": "12.0",
+      "dmg": {
+        "windowSize": {
+          "width": 540,
+          "height": 380
+        },
+        "appPosition": {
+          "x": 140,
+          "y": 180
+        },
+        "applicationFolderPosition": {
+          "x": 400,
+          "y": 180
+        }
+      }
+    },
+    "publisher": "Momento Studio (uso pessoal)",
+    "copyright": "© 2026 Momento Studio — uso pessoal",
+    "shortDescription": "Gestão, seleção, edição e entrega de fotografia de casamentos",
+    "longDescription": "Aplicação local para fotógrafos de casamentos e eventos: importação segura de cartões, seleção assistida, edição RAW não destrutiva, exportação, galeria do cliente e álbum para o laboratório. Funciona sem internet; nada é enviado sem pedido."
   }
 }

@@ -1702,6 +1702,22 @@ describe("estados claros (Fase 14)", () => {
   });
 });
 
+describe("smoke test (Fase 16)", () => {
+  it("miniatura concluída enquanto a lista é recarregada não fica 'pendente'", async () => {
+    let resolve: (v: PhotoRow[]) => void = () => {};
+    apiMock.listPhotos.mockImplementationOnce(() => new Promise<PhotoRow[]>((r) => (resolve = r)));
+    const p = useStore.getState().reloadPhotos();
+    // O núcleo gravou a miniatura e avisou ANTES de a lista (lida antes) chegar.
+    act(() => useStore.getState().applyThumbBatch({ ready: [2], failed: [], remaining: 0, done: 1, total: 1 } as never));
+    resolve(rows(3).map((r) => ({ ...r, thumb: "pending" as const })));
+    await act(async () => {
+      await p;
+    });
+    expect(useStore.getState().photos.find((x) => x.id === 2)!.thumb).toBe("ready");
+    expect(useStore.getState().photos.find((x) => x.id === 1)!.thumb).toBe("pending");
+  });
+});
+
 describe("culling seguro (Fase 15)", () => {
   async function openProj(n = 6) {
     apiMock.listPhotos.mockResolvedValue(rows(n).map((r) => ({ ...r, flag: 0, stars: 0 })));

@@ -195,6 +195,9 @@ export function parseUiState(json: string | null): Partial<UiState> {
   }
 }
 
+/** Estados de miniaturas que chegam durante um `reloadPhotos` em curso. */
+const lateThumbs = new Set<Map<number, "ready" | "failed">>();
+
 export const useStore = create<State & Actions>((set, get) => ({
   project: null,
   photos: [],
@@ -305,7 +308,18 @@ export const useStore = create<State & Actions>((set, get) => ({
   async reloadPhotos() {
     const t0 = performance.now();
     const first = get().photos.length === 0;
-    const rows = await api.listPhotos();
+    // Miniaturas concluídas enquanto a lista vem do núcleo: a lista pode ter sido lida antes
+    // de o estado ser gravado — sem isto, a miniatura ficava "pendente" para sempre no ecrã
+    // (encontrado no smoke test da Fase 16).
+    const late = new Map<number, "ready" | "failed">();
+    lateThumbs.add(late);
+    let rows: PhotoRow[];
+    try {
+      rows = await api.listPhotos();
+    } finally {
+      lateThumbs.delete(late);
+    }
+    if (late.size > 0) rows = rows.map((r) => (r.thumb === "pending" && late.has(r.id) ? { ...r, thumb: late.get(r.id)! } : r));
     const t1 = performance.now();
     get().setPhotos(rows);
     perfMark("lista_fotografias", { fotografias: rows.length, ipc_ms: Math.round(t1 - t0), estado_ms: Math.round(performance.now() - t1) });
@@ -368,6 +382,7 @@ export const useStore = create<State & Actions>((set, get) => ({
       [b.failed, "failed"],
     ] as const) {
       for (const id of ids) {
+        for (const late of lateThumbs) late.set(id, state);
         const i = index.get(id);
         if (i === undefined) continue;
         next[i] = { ...next[i]!, thumb: state };

@@ -846,3 +846,8 @@ ficheiros a partir do frontend (caminhos sempre resolvidos e verificados no núc
 | D-101 | 2026-11-10 | Exportação: destino testado (escrita) antes da espera por espaço; edição com recursos em falta não é exportada | Pausar sempre / exportar sem o recurso | Sem pausas eternas; nunca uma entrega com outras cores |
 | D-102 | 2026-11-10 | Editor ignora respostas assíncronas de outra fotografia e grava o pendente ao sair dela | Recriar o editor por fotografia | Mantém o estado da interface e o desempenho; corrige a mistura de ajustes |
 | D-103 | 2026-11-10 | Condições adversas testadas com sistemas de ficheiros reais (tmpfs cheio, montagem só de leitura, utilizador sem privilégios) | Simulações com erros injetados | Exercita os erros reais do sistema (ENOSPC, EROFS, EACCES) |
+| D-104 | 2026-11-10 | Cópia completa do catálogo antes de cada migração; sem cópia não se migra | Confiar nas versões automáticas | Atualizar a aplicação nunca deixa um catálogo sem caminho de volta |
+| D-105 | 2026-11-10 | Versão 1.0.0-personal na aplicação/núcleo/tag; 1.0.0 nos pacotes | Pré-release nos pacotes | `CFBundleShortVersionString` e o instalador Windows exigem números |
+| D-106 | 2026-11-10 | Sem sandbox do macOS; explicações TCC no `Info.plist` | App Sandbox com bookmarks | Acesso direto a cartões, discos e pastas escolhidas; menos complexidade para uso pessoal |
+| D-107 | 2026-11-10 | Símbolos mantidos no binário (só a debug info removida) | `strip = "symbols"` (−9 MB) | Relatórios de falhas legíveis (nomes de funções) |
+| D-108 | 2026-11-10 | Modelos de IA em precisão total (102 MB) | Quantizar para FP16/INT8 | Resultados iguais aos validados nos testes de referência |

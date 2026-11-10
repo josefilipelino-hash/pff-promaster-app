@@ -61,8 +61,41 @@ pub fn now_millis() -> i64 {
 pub(crate) fn open_with_migrations(path: &Path, list: &[&str]) -> CoreResult<Connection> {
     let conn = Connection::open(path).map_err(db_err)?;
     configure(&conn)?;
+    let current = migrations::user_version(&conn)?;
+    if current > 0 && (current as usize) < list.len() {
+        // Atualização da aplicação (Fase 16): antes de mudar o esquema de um catálogo
+        // existente, uma cópia completa fica em `backups/` ao lado dele. Sem cópia, não
+        // se migra — o catálogo fica intacto e o erro é mostrado.
+        let copy = backup_before_migration(&conn, path, current).map_err(|e| {
+            CoreError::Other(format!(
+                "não foi possível guardar uma cópia do catálogo antes de o atualizar ({e}); nada foi alterado"
+            ))
+        })?;
+        tracing::info!(de = current, para = list.len(), copia = %copy.display(), "catálogo atualizado; cópia anterior guardada");
+    }
     migrations::apply(&conn, list)?;
     Ok(conn)
+}
+
+/// Copia o catálogo (instantâneo consistente, inclui o WAL) para
+/// `backups/<nome>-antes-da-atualizacao-v<versão>-<segundos>.db`.
+fn backup_before_migration(conn: &Connection, path: &Path, version: u32) -> CoreResult<PathBuf> {
+    let dir = path.parent().unwrap_or(Path::new(".")).join("backups");
+    std::fs::create_dir_all(&dir)?;
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("catalog");
+    let dest = dir.join(format!("{stem}-antes-da-atualizacao-v{version}-{}.db", now_unix()));
+    let tmp = dest.with_extension("db.tmp");
+    {
+        let mut out = Connection::open(&tmp).map_err(db_err)?;
+        let b = rusqlite::backup::Backup::new(conn, &mut out).map_err(db_err)?;
+        b.run_to_completion(256, std::time::Duration::from_millis(0), None).map_err(db_err)?;
+        drop(b);
+        // Ficheiro único e autónomo (sem -wal/-shm ao lado quando for aberto).
+        out.execute_batch("PRAGMA journal_mode = DELETE;").map_err(db_err)?;
+    }
+    std::fs::File::open(&tmp)?.sync_all()?;
+    std::fs::rename(&tmp, &dest)?;
+    Ok(dest)
 }
 
 fn configure(conn: &Connection) -> CoreResult<()> {
@@ -180,6 +213,45 @@ mod tests {
             )
             .unwrap();
         assert_eq!(n, 1);
+    }
+
+    /// Fase 16: um catálogo de uma versão anterior é copiado para `backups/` antes da
+    /// migração; a cópia abre e mantém o esquema e os dados antigos.
+    #[test]
+    fn older_catalog_is_backed_up_before_migration() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("catalog.db");
+        let old = (migrations::CATALOG.len() - 2) as u32;
+        {
+            let c = Connection::open(&path).unwrap();
+            configure(&c).unwrap();
+            migrations::apply(&c, &migrations::CATALOG[..old as usize]).unwrap();
+            c.execute("INSERT INTO catalog_info(key, value) VALUES('marca', 'antes')", []).unwrap();
+        }
+        let cat = Catalog::open(&path).unwrap();
+        assert_eq!(cat.schema_version().unwrap(), SCHEMA_VERSION);
+        let copies: Vec<_> = std::fs::read_dir(dir.path().join("backups"))
+            .unwrap()
+            .flatten()
+            .map(|e| e.path())
+            .collect();
+        assert_eq!(copies.len(), 1, "{copies:#?}");
+        let name = copies[0].file_name().unwrap().to_string_lossy().into_owned();
+        assert!(
+            name.starts_with(&format!("catalog-antes-da-atualizacao-v{old}-"))
+                && name.ends_with(".db"),
+            "{name}"
+        );
+        let c = Connection::open(&copies[0]).unwrap();
+        assert_eq!(migrations::user_version(&c).unwrap(), old, "a cópia tem o esquema anterior");
+        let v: String = c
+            .query_row("SELECT value FROM catalog_info WHERE key = 'marca'", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(v, "antes");
+        // Abrir de novo (já atualizado) não faz mais cópias.
+        drop(cat);
+        Catalog::open(&path).unwrap();
+        assert_eq!(std::fs::read_dir(dir.path().join("backups")).unwrap().count(), 1);
     }
 
     #[test]

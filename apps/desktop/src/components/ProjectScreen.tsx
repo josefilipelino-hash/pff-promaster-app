@@ -130,6 +130,8 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
         st.setImportRunning(false);
         st.setImportProgress(null);
         st.reloadPhotos().catch(() => {});
+        // Contagens da seleção automática ("Analisar N fotografias") com as novas.
+        st.reloadSelection().catch(() => {});
         if (sum.issues.length > 0 || sum.cancelled || sum.error || sum.counts.pending > 0) st.setImportSummary(sum);
         else st.toast("info", t("report.toast", { count: sum.counts.imported }));
       }),

@@ -11,13 +11,23 @@ use tauri::Manager;
 
 pub use commands::{app_info_impl, AppInfo};
 
+/// Dias de registos guardados em `logs/` (sem fotografias nem dados pessoais).
+const LOG_DAYS: usize = 14;
+
 fn init_logging(app: &tauri::App) {
     use tracing_subscriber::{fmt, prelude::*, EnvFilter};
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
     let file_layer = app.path().app_log_dir().ok().and_then(|dir| {
         std::fs::create_dir_all(&dir).ok()?;
-        let (writer, guard) =
-            tracing_appender::non_blocking(tracing_appender::rolling::daily(dir, "momento.log"));
+        // Um ficheiro por dia, só os últimos 14 (Fase 16: antes acumulavam para sempre).
+        let appender = tracing_appender::rolling::RollingFileAppender::builder()
+            .rotation(tracing_appender::rolling::Rotation::DAILY)
+            .filename_prefix("momento")
+            .filename_suffix("log")
+            .max_log_files(LOG_DAYS)
+            .build(&dir)
+            .ok()?;
+        let (writer, guard) = tracing_appender::non_blocking(appender);
         state::LOG_GUARD.set(guard).ok();
         Some(fmt::layer().with_ansi(false).with_writer(writer))
     });

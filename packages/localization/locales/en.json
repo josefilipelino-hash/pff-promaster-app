@@ -87,7 +87,7 @@
   },
   "import": {
     "files": "Import files…",
-    "filesHint": "Import one or more files (Mod+Shift+I)",
+    "filesHint": "Import one or more files",
     "folder": "Import folder…",
     "folderHint": "Import one or more folders, including subfolders",
     "title": "Import photos",
@@ -1171,7 +1171,7 @@
   "export": {
     "title": "Export",
     "button": "Export…",
-    "buttonHint": "Export the selection or the visible photos (Mod + Shift + E)",
+    "buttonHint": "Export the selection or the visible photos",
     "photos": "Photos",
     "scopeSelected_one": "Selection ({{count}})",
     "scopeSelected_other": "Selection ({{count}})",
@@ -1692,7 +1692,8 @@
       "auto": "automatic",
       "manual": "manual",
       "antes-do-restauro": "before a restore",
-      "danificado": "damaged (kept)"
+      "danificado": "damaged (kept)",
+      "update": "before update (schema {{version}})"
     },
     "catalogHint": "Export saves a verified copy of the catalogue elsewhere (e.g. another disk). Import replaces this project's catalogue with an exported one — the current one is kept first.",
     "exportCatalog": "Export catalogue…",

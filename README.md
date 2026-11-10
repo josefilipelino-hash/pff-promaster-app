@@ -4,14 +4,15 @@ Aplicação desktop local para gestão, seleção, edição, exportação e entr
 de casamentos e outros eventos. Pensada para trabalhos de 3 000 a 15 000 fotografias, com
 automatização em cada passo e o controlo final sempre do fotógrafo.
 
-> **Estado atual: Fase 15 concluída (v0.15.0) — estabilização para trabalho real.** Fluxo
+> **Estado atual: v1.0.0-personal — primeira versão instalável (uso pessoal).** Fluxo
 > completo de um casamento: cartão → importação com cópia verificada e disco de segurança →
 > RAW → miniaturas → análise e seleção assistida → momentos e pessoas → edição (global,
 > local, retrato, automática, presets) → exportação em vários formatos → galeria do cliente →
 > álbum para o laboratório. Testado de ponta a ponta, com 15 000 fotografias e em condições
-> adversas (disco cheio, só de leitura, permissões, falhas forçadas). Ainda **não**
-> verificado em macOS/Windows reais. Ver [`PROJECT_STATUS.md`](PROJECT_STATUS.md) e
-> [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md).
+> adversas (disco cheio, só de leitura, permissões, falhas forçadas). Instalação no Mac:
+> [`INSTALLATION.md`](INSTALLATION.md) · notas: [`RELEASE_NOTES.md`](RELEASE_NOTES.md).
+> Ainda **não** verificado em macOS/Windows reais (o `.dmg` gera-se no Mac com
+> `scripts/build-release.sh`).
 
 ![Grelha](docs/screenshots/fase1-grelha.png)
 
@@ -53,7 +54,9 @@ Requisitos e instruções completas: [`INSTALLATION.md`](INSTALLATION.md) e
 | Documento | Conteúdo |
 |---|---|
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Arquitetura, decisões e incompatibilidades |
-| [ROADMAP.md](ROADMAP.md) | Fases 0–16 e critérios |
+| [ROADMAP.md](ROADMAP.md) | Fases 0–17 e critérios |
+| [RELEASE_NOTES.md](RELEASE_NOTES.md) | Notas da versão 1.0.0-personal |
+| [docs/SIGNING.md](docs/SIGNING.md) | Assinatura e notarização (macOS) |
 | [PROJECT_STATUS.md](PROJECT_STATUS.md) | O que funciona realmente hoje |
 | [INSTALLATION.md](INSTALLATION.md) | Instalação e execução |
 | [DEVELOPMENT.md](DEVELOPMENT.md) | Convenções de desenvolvimento |

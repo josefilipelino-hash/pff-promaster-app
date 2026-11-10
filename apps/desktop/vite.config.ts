@@ -14,7 +14,9 @@ export default defineConfig({
   envPrefix: ["VITE_", "TAURI_ENV_"],
   build: {
     target: "safari15",
-    sourcemap: true,
+    // Produção sem source maps (2,3 MB a menos dentro da aplicação); para diagnóstico:
+    // MOMENTO_SOURCEMAP=1 pnpm build.
+    sourcemap: (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.MOMENTO_SOURCEMAP === "1",
   },
   test: {
     environment: "jsdom",

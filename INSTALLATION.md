@@ -1,8 +1,9 @@
 # Instalação
 
 Plataformas-alvo: **macOS 12+** (Apple Silicon e Intel) e **Windows 10/11 (64 bits)**.
-Ainda não existe um instalador assinado: executa-se a partir do código-fonte ou a partir
-dos instaladores gerados pelo CI (ver no fim).
+Versão atual: **1.0.0-personal** — aplicação instalável para uso pessoal, compilada
+localmente com `scripts/build-release.sh` (sem assinatura Apple; ver
+"Versão 1.0.0-personal no Mac").
 
 ## macOS — preparação (uma vez)
 
@@ -68,39 +69,104 @@ o compilador C++ vem com as Xcode Command Line Tools no macOS e com as Build Too
 Windows). Abre a janela
 “Momento Studio” no ecrã inicial.
 
-## Criar a aplicação instalável
+## Versão 1.0.0-personal no Mac (uso pessoal)
+
+### Requisitos
+
+| | |
+|---|---|
+| Sistema | macOS 12 Monterey ou mais recente; Apple Silicon (recomendado) ou Intel |
+| Memória | 8 GB mínimo; 16 GB recomendado para casamentos de 5 000+ fotografias com análise |
+| Disco | ~200 MB para a aplicação; projetos num disco **local** (interno ou externo USB/Thunderbolt) — nunca numa partilha de rede |
+| Para compilar | Xcode Command Line Tools, Rust (instalado pelo `rustup`, versão fixada no repositório), Node.js 22, pnpm 10, Python 3, ~15 GB livres durante a compilação |
+
+### 1. Compilar (uma vez por versão)
+
+Com a preparação do macOS acima feita e os modelos de IA em `models/` (ver
+`models/README.md`):
 
 ```bash
-pnpm build
+./scripts/build-release.sh
 ```
 
-Resultado em `target/release/bundle/`:
-- macOS: `macos/Momento Studio.app` e `dmg/Momento Studio_0.1.0_aarch64.dmg`
-- Windows: `nsis/Momento Studio_0.1.0_x64-setup.exe`
+O script verifica as ferramentas, instala as dependências exatamente como nos locks,
+confirma os 9 modelos de IA pelo SHA-256 e gera:
 
-Binário universal para macOS (Apple Silicon + Intel):
+- `target/release/bundle/macos/Momento Studio.app`
+- `target/release/bundle/dmg/Momento Studio_1.0.0_aarch64.dmg` (ou `_x64` num Mac Intel)
+- `target/release/bundle/BUILD_INFO.txt` (commit, ferramentas) e `SHA256SUMS.txt`
 
-```bash
-rustup target add aarch64-apple-darwin x86_64-apple-darwin
-```
+Para um único `.dmg` que funcione em Apple Silicon e Intel: `./scripts/build-release.sh --universal`
+(resultado em `target/universal-apple-darwin/release/bundle/`).
 
-```bash
-pnpm --filter @momento/desktop tauri build --target universal-apple-darwin
-```
+### 2. Instalar
 
-### Aplicação não assinada
+1. Abrir o `.dmg` e arrastar **Momento Studio** para **Aplicações**.
+2. **Primeira abertura** (aplicação não assinada): clique direito na aplicação → **Abrir** →
+   **Abrir**. Em macOS 15+, se não aparecer a opção: **Definições do Sistema → Privacidade e
+   segurança → Abrir mesmo assim**. Só é preciso uma vez.
+   Alternativa no Terminal: `xattr -dr com.apple.quarantine "/Applications/Momento Studio.app"`
+   (só necessário se o `.dmg` tiver sido descarregado da internet).
 
-- **macOS**: na primeira abertura, clique direito → **Abrir** → **Abrir**. Em macOS 15+, se
-  não aparecer a opção: **Definições do Sistema → Privacidade e segurança → Abrir mesmo
-  assim**.
-- **Windows**: o SmartScreen pode mostrar “O Windows protegeu o computador” → **Mais
-  informações** → **Executar mesmo assim**.
+### 3. Permissões de acesso
+
+A aplicação não usa sandbox: lê e escreve onde o utilizador escolher. O macOS pede
+autorização uma vez, com uma explicação, quando se acede pela primeira vez a:
+
+| Local | Pedido do macOS |
+|---|---|
+| Cartões de memória e discos externos | "Aceder a ficheiros num volume amovível" |
+| Secretária, Documentos, Transferências | "Aceder a ficheiros na pasta …" |
+| Pastas de rede | "Aceder a ficheiros num volume de rede" |
+| `~/Imagens` (Pictures) e outras pastas escolhidas no diálogo | Sem pedido (não são pastas protegidas) |
+
+Se uma autorização for recusada por engano: **Definições do Sistema → Privacidade e
+segurança → Ficheiros e pastas → Momento Studio**. A aplicação não acede à fototeca do
+Fotos.
+
+### 4. Atualizar para uma versão nova
+
+1. Fechar a aplicação (os projetos ficam gravados — não há "Guardar").
+2. Instalar a versão nova por cima (arrastar para Aplicações → **Substituir**).
+3. Abrir os projetos normalmente. Se a versão nova mudar o formato do catálogo, **antes** de
+   o alterar é guardada uma cópia completa em
+   `<projeto>.momento/backups/catalog-antes-da-atualizacao-v<N>-<data>.db` (visível em
+   **Segurança e cópias → Versões**). Sem conseguir fazer essa cópia, o catálogo não é
+   alterado.
+4. Voltar a uma versão anterior: reinstalar a versão antiga e, em **Segurança e cópias →
+   Versões**, restaurar a cópia "antes da atualização". Uma versão antiga recusa abrir um
+   catálogo de uma versão mais recente (nunca o estraga).
+
+As preferências e a lista de projetos recentes (`~/Library/Application Support/
+pt.momentostudio.desktop/`) passam de versão para versão; o identificador
+`pt.momentostudio.desktop` não muda.
+
+### 5. Backup
+
+| O quê | Como |
+|---|---|
+| **Originais** | Na importação: **Copiar também para um disco de segurança** + **Verificar cada cópia**. Nunca formatar o cartão antes de a importação acabar sem erros |
+| **Catálogo** (classificações, edições, momentos, álbuns) | Automático: versões a cada 15/30/60/240 min (60 por omissão), ao abrir e ao fechar, em `<projeto>.momento/backups/`. Manual: **Segurança e cópias → Criar versão** ou **Exportar catálogo** (ficheiro único para outro disco) |
+| **Projeto completo** | Copiar a pasta `<AAAA-MM-DD_Cliente>.momento` (com a aplicação fechada) para outro disco; a pasta `cache/` pode ser omitida (é regenerada) |
+| Time Machine | Complemento útil (não testado pela aplicação): uma cópia feita com o projeto aberto pode apanhar o catálogo a meio de uma escrita — as versões em `backups/` são sempre consistentes e são as que se restauram |
+
+### 6. Desinstalar
+
+Arrastar **Momento Studio** de Aplicações para o Lixo. Os projetos e originais **não** são
+tocados. Para apagar também as preferências e os registos:
+`~/Library/Application Support/pt.momentostudio.desktop/` e
+`~/Library/Logs/pt.momentostudio.desktop/`.
+
+### Assinatura e notarização
+
+Não são necessárias para uso pessoal. Passos para quando houver conta Apple Developer:
+[`docs/SIGNING.md`](docs/SIGNING.md).
 
 ### Instaladores gerados pelo CI
 
-Quando o repositório estiver no GitHub, cada envio para `main` gera (após os testes) os
-artefactos `momento-studio-macOS` (`.dmg` universal) e `momento-studio-Windows` (`.exe`
-NSIS), descarregáveis na página da execução em **Actions**.
+Com o repositório no GitHub, cada tag `v*` (ex.: `v1.0.0-personal`) gera os artefactos
+`momento-studio-macOS` (`.dmg` universal, `BUILD_INFO.txt`, `SHA256SUMS.txt`) e
+`momento-studio-Windows` em **Actions**.
 
 ## Linux (desenvolvimento e CI)
 
@@ -115,7 +181,7 @@ sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libayata
 | Projeto (catálogo, cache, cópias de segurança) | `<pasta de trabalho>/<AAAA-MM-DD_Cliente>.momento/` — **disco local**, interno ou externo, nunca numa partilha de rede |
 | Originais | Onde já estavam (modo “manter”) ou na pasta dos originais do projeto (modo “copiar”) |
 | Lista de projetos recentes | macOS: `~/Library/Application Support/pt.momentostudio.desktop/library.db` · Windows: `%APPDATA%\pt.momentostudio.desktop\library.db` |
-| Registos (logs) | macOS: `~/Library/Logs/pt.momentostudio.desktop/` · Windows: `%LOCALAPPDATA%\pt.momentostudio.desktop\logs\` |
+| Registos (logs, 14 dias) e relatórios de falhas | macOS: `~/Library/Logs/pt.momentostudio.desktop/` · Windows: `%LOCALAPPDATA%\pt.momentostudio.desktop\logs\` |
 
 Apagar a pasta `cache/` de um projeto é seguro: as miniaturas são regeneradas.
 
