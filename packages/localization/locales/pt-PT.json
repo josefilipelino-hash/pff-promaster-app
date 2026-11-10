@@ -67,8 +67,9 @@
     "people": "Pessoas",
     "phase": "Fase {{phase}}",
     "availableIn": "Disponível na Fase {{phase}} do desenvolvimento",
-    "galleries": "Galerias",
-    "albums": "Álbuns"
+    "albums": "Álbuns",
+    "delivery": "Entrega",
+    "gallery": "Galeria…"
   },
   "collection": {
     "all": "Todas",
@@ -1366,6 +1367,138 @@
     "unavailable": {
       "hevc": "Indisponível: codificar HEIF/HEIC exige um codificador HEVC (x265, licença GPL e patentes). Não está incluído; use AVIF (o mesmo contentor HEIF com AV1).",
       "dng": "Indisponível nesta versão: um DNG útil exige os dados do sensor por revelar e as matrizes de cor da câmara; ainda não está implementado."
+    }
+  },
+  "gallery": {
+    "title": "Galeria do cliente",
+    "loading": "A carregar…",
+    "hiddenToast_one": "{{count}} fotografia oculta na galeria",
+    "hiddenToast_other": "{{count}} fotografias ocultas na galeria",
+    "shownToast_one": "{{count}} fotografia volta a aparecer",
+    "shownToast_other": "{{count}} fotografias voltam a aparecer",
+    "destination": "Pasta de publicação",
+    "logoFilter": "Imagens",
+    "started_one": "A gerar a galeria ({{count}} fotografia)…",
+    "started_other": "A gerar a galeria ({{count}} fotografias)…",
+    "summary": "{{photos}} fotografias · {{chapters}} capítulos · ≈ {{size}}",
+    "replaceAsk": "Já existe uma galeria nesta pasta. Substituir?",
+    "replace": "Substituir",
+    "generate_one": "Gerar galeria ({{count}})",
+    "generate_other": "Gerar galeria ({{count}})",
+    "tab": {
+      "content": "Conteúdo",
+      "look": "Aparência",
+      "features": "Funcionalidades",
+      "publish": "Publicar"
+    },
+    "couple": "Noivos (título)",
+    "date": "Data",
+    "location": "Local",
+    "intro": "Texto introdutório",
+    "introHint": "Uma mensagem para os noivos. Linhas em branco separam parágrafos.",
+    "selection": "Fotografias",
+    "selectionOption": {
+      "picks": "Favoritas (ou todas as não rejeitadas)",
+      "notRejected": "Todas exceto rejeitadas",
+      "stars": "Com estrelas",
+      "all": "Todas"
+    },
+    "minStars": "Mínimo de estrelas",
+    "chapters": "Capítulos",
+    "chaptersOption": {
+      "grouped": "Por momentos do casamento",
+      "detailed": "Um por momento",
+      "none": "Sem capítulos"
+    },
+    "chapterList": "Capítulos da galeria",
+    "single": "Todas as fotografias",
+    "hiddenCount_one": "{{count}} fotografia oculta",
+    "hiddenCount_other": "{{count}} fotografias ocultas",
+    "hideSelection": "Ocultar seleção ({{count}})",
+    "showSelection": "Mostrar seleção ({{count}})",
+    "showAll": "Mostrar todas",
+    "theme": "Tema",
+    "themeName": {
+      "light": "Light",
+      "dark": "Dark",
+      "minimal": "Minimal",
+      "editorial": "Editorial"
+    },
+    "themeHint": {
+      "light": "Claro e quente, títulos serif",
+      "dark": "Fundo escuro, para fotografias contrastadas",
+      "minimal": "Branco, sans-serif, discreto",
+      "editorial": "Revista: imagem ao lado, itálicos grandes"
+    },
+    "hero": "Imagem hero (topo)",
+    "cover": "Capa (pré-visualização ao partilhar)",
+    "useFocus": "Usar a fotografia em foco",
+    "remove": "Retirar",
+    "logo": "Logótipo",
+    "noLogo": "Sem logótipo",
+    "layout": "Disposição inicial",
+    "layoutMasonry": "Mosaico",
+    "layoutGrid": "Grelha",
+    "language": "Idioma da galeria",
+    "heroHint": "Escolha uma fotografia na grelha (fica em foco) e use \"Usar a fotografia em foco\". Sem hero, o topo mostra só os nomes.",
+    "favorites": "Favoritas (o cliente marca com o coração e envia-lhe a lista)",
+    "downloads": "Downloads",
+    "downloadsOption": {
+      "none": "Sem downloads",
+      "individual": "Fotografia a fotografia",
+      "all": "Individuais e ZIP completo"
+    },
+    "downloadSize": "Tamanho dos downloads",
+    "sizeHigh": "Resolução total",
+    "sizeWeb": "Ecrã (2048 px)",
+    "chapterZips": "Também um ZIP por capítulo",
+    "slideshow": "Apresentação: segundos por fotografia",
+    "protection": "Acesso",
+    "protectionMode": "Proteção",
+    "protectionOption": {
+      "none": "Aberta (quem tiver o endereço)",
+      "pin": "PIN",
+      "password": "Palavra-passe"
+    },
+    "pin": "PIN (4–8 dígitos)",
+    "password": "Palavra-passe (mín. 6)",
+    "protectionHint": {
+      "pin": "A lista das fotografias fica cifrada (AES-GCM) e os ficheiros têm nomes aleatórios. Um PIN curto é uma barreira ligeira: para mais segurança use palavra-passe. Quem tiver o endereço direto de uma imagem consegue abri-la.",
+      "password": "A lista das fotografias fica cifrada (AES-GCM, chave derivada da palavra-passe) e os ficheiros têm nomes aleatórios impossíveis de adivinhar. Quem tiver o endereço direto de uma imagem consegue abri-la."
+    },
+    "watermark": "Marca de água nas imagens da galeria",
+    "contact": "Fotógrafo",
+    "photographer": "Nome (rodapé e copyright)",
+    "email": "Email para receber as favoritas",
+    "folder": "Pasta da galeria",
+    "existsNote": "já existe — será substituída depois de confirmar",
+    "publishInfo": "A galeria é uma pasta estática: abre diretamente no computador e pode ser publicada como está em qualquer alojamento (Cloudflare Pages, Netlify, um servidor próprio…). Desative a listagem de pastas no servidor.",
+    "providers": "Publicação direta",
+    "provider": {
+      "s3": "Amazon S3",
+      "r2": "Cloudflare R2",
+      "b2": "Backblaze B2",
+      "sftp": "SFTP"
+    },
+    "providerLater": "Fase futura",
+    "providersInfo": "A arquitetura está preparada (plano de envio incremental, credenciais só no porta-chaves do sistema), mas nesta fase nenhum serviço é contactado.",
+    "clientFavorites": "Favoritas do cliente",
+    "clientFavoritesInfo": "Cole a lista que o cliente lhe enviou da galeria: as fotografias ficam com a etiqueta roxa.",
+    "importFavorites": "Marcar favoritas",
+    "importResult_one": "{{count}} fotografia marcada",
+    "importResult_other": "{{count}} fotografias marcadas",
+    "importUnmatched": "não encontradas: {{names}}",
+    "open": "Abrir galeria",
+    "assembling": "A montar a galeria…",
+    "problem": {
+      "couple": "Indique os nomes dos noivos",
+      "pin": "O PIN tem de ter 4 a 8 dígitos",
+      "password": "A palavra-passe tem de ter pelo menos 6 carateres",
+      "destination": "Escolha a pasta de publicação",
+      "empty": "Nenhuma fotografia para a galeria",
+      "blocked": "A pasta de destino já existe e não é uma galeria do Momento",
+      "logo": "O logótipo não foi encontrado",
+      "exists": "Já existe uma galeria nesta pasta"
     }
   }
 }

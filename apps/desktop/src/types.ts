@@ -791,4 +791,59 @@ export interface ExportProgress {
   errors: { file: string; message: string }[];
   notes: ExportNote[];
   folders: string[];
+  /** Galeria: index.html gerado. */
+  index: string | null;
+}
+
+// ---------------------------------------------------------------- galeria (Fase 10)
+
+export type GalleryTheme = "light" | "dark" | "minimal" | "editorial";
+export const GALLERY_THEMES: GalleryTheme[] = ["light", "dark", "minimal", "editorial"];
+
+export interface GallerySettings {
+  couple: string;
+  date: string;
+  location: string;
+  intro: string;
+  cover: number | null;
+  hero: number | null;
+  logoPath: string;
+  theme: GalleryTheme;
+  layout: "masonry" | "grid";
+  language: "pt" | "en";
+  selection: "picks" | "notRejected" | "stars" | "all";
+  minStars: number;
+  chapters: "grouped" | "detailed" | "none";
+  hidden: number[];
+  favorites: boolean;
+  downloads: "none" | "individual" | "all";
+  downloadSize: "web" | "high";
+  chapterZips: boolean;
+  protection: "none" | "pin" | "password";
+  secret: string;
+  photographer: string;
+  contactEmail: string;
+  slideshowSeconds: number;
+}
+
+export interface GalleryConfig {
+  settings: GallerySettings;
+  watermark: ExportRecipe["watermark"];
+  destination: string;
+}
+
+export interface GalleryPreview {
+  photos: number;
+  hidden: number;
+  chapters: { title: string; count: number }[];
+  folder: string;
+  exists: boolean;
+  blocked: boolean;
+  problems: string[];
+  estimateBytes: number;
+}
+
+export interface FavoritesImport {
+  matched: number;
+  unmatched: string[];
 }

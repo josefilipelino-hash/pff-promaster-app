@@ -63,6 +63,11 @@ ainda **não** implementada (adiada para a Fase 2; as licenças diretas foram ve
 | ab_glyph | 0.2 | Apache-2.0 | texto da marca de água |
 | **Fonte Inter** (`packages/export-engine/assets/fonts`) | 4.0 | **OFL-1.1** (licença ao lado da fonte) | marca de água de texto |
 
+| aes-gcm / pbkdf2 / sha2 (RustCrypto) | 0.10.3 / 0.12.2 / 0.10.9 | Apache-2.0 OR MIT | PIN/palavra-passe das galerias (Fase 10) |
+| base64 / getrandom | 0.22 / 0.3 | MIT OR Apache-2.0 | galerias |
+| zip | 2.6.1 | MIT | ZIP de download das galerias |
+| **Fontes Instrument Serif e Instrument Sans** (`packages/gallery/assets/fonts`, subconjuntos woff2) | 2022 | **OFL-1.1** (licenças ao lado) | tipografia das galerias |
+
 **LibRaw sob CDDL-1.0:** o copyleft da CDDL aplica-se apenas aos ficheiros da própria
 LibRaw (que não modificamos e cujo código-fonte está disponível no submódulo). Permite a
 ligação estática ao resto da aplicação. Os ficheiros `LICENSE.CDDL` e `COPYRIGHT` da LibRaw

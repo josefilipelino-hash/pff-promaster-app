@@ -35,6 +35,9 @@ pub struct ExportRequest {
     pub name: String,
     /// Nomes (traduzidos) dos momentos, para o campo {momento}.
     pub moment_names: HashMap<i64, String>,
+    /// Geração de uma galeria (definida pela sessão, nunca pela interface).
+    #[serde(skip)]
+    pub gallery: Option<Box<crate::gallery::GalleryJob>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -112,6 +115,8 @@ pub struct ExportProgress {
     pub notes: Vec<Note>,
     /// Pastas criadas/usadas (para "Mostrar na pasta").
     pub folders: Vec<String>,
+    /// Galeria: `index.html` gerado.
+    pub index: Option<String>,
 }
 
 struct Job {
@@ -265,6 +270,7 @@ impl ProjectSession {
                 errors: Vec::new(),
                 notes: Vec::new(),
                 folders: Vec::new(),
+                index: None,
             }),
             req,
             paused: AtomicBool::new(false),
@@ -441,6 +447,8 @@ impl ProjectSession {
         let dest = PathBuf::from(&req.destination);
         let mut reserved = HashSet::new();
         let mut folders: HashSet<String> = HashSet::new();
+        // Ficheiros escritos: (chave, receita, caminho, largura, altura).
+        let mut outputs: Vec<(i64, usize, PathBuf, u32, u32)> = Vec::new();
         for (pi, &key) in req.keys.iter().enumerate() {
             if job.cancelled.load(Ordering::SeqCst) {
                 break;
@@ -534,6 +542,11 @@ impl ProjectSession {
                     moment: meta.moment.clone(),
                     width: ow,
                     height: oh,
+                    token: req
+                        .gallery
+                        .as_ref()
+                        .and_then(|g| g.tokens.get(&key).cloned())
+                        .unwrap_or_default(),
                 };
                 let dir = dest.join(naming::subfolder(&r.naming, &vars));
                 let name = naming::file_name(&r.naming, &vars, prep.extension());
@@ -569,10 +582,11 @@ impl ProjectSession {
                         return Err(CoreError::Other("cancelada".into()));
                     }
                     momento_image_processing::write_atomic(&path, &out.bytes)?;
-                    Ok(out.bytes.len() as u64)
+                    Ok((out.bytes.len() as u64, out.width, out.height))
                 });
                 match result {
-                    Ok(n) => {
+                    Ok((n, ow, oh)) => {
+                        outputs.push((key, ri, path.clone(), ow, oh));
                         ratio[ri].0 += n;
                         ratio[ri].1 += est[ri][pi];
                         folders.insert(dir.to_string_lossy().into_owned());
@@ -621,6 +635,21 @@ impl ProjectSession {
             });
             self.emit_export(job);
         }
+        // Galeria: montar o site com os ficheiros escritos.
+        let mut failed = false;
+        if let Some(g) = req.gallery.as_ref().filter(|_| !job.cancelled.load(Ordering::SeqCst)) {
+            update(&mut |p| p.current = Some("galeria".into()));
+            self.emit_export(job);
+            match self.finish_gallery(g, &outputs) {
+                Ok(index) => update(&mut |p| p.index = Some(index.clone())),
+                Err(e) => {
+                    failed = true;
+                    update(&mut |p| {
+                        p.errors.push(ExportError { file: String::new(), message: e.to_string() })
+                    });
+                }
+            }
+        }
         update(&mut |p| {
             p.current = None;
             p.eta_seconds = Some(0.0);
@@ -631,6 +660,8 @@ impl ProjectSession {
             };
             p.state = if job.cancelled.load(Ordering::SeqCst) {
                 JobState::Cancelled
+            } else if failed {
+                JobState::Failed
             } else {
                 JobState::Done
             };

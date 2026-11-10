@@ -17,6 +17,7 @@ tauri-build.workspace = true
 
 [dependencies]
 momento-export-engine.workspace = true
+momento-gallery.workspace = true
 momento-color-management.workspace = true
 tauri.workspace = true
 tauri-plugin-dialog.workspace = true

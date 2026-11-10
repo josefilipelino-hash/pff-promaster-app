@@ -67,8 +67,9 @@
     "people": "People",
     "phase": "Phase {{phase}}",
     "availableIn": "Available in development Phase {{phase}}",
-    "galleries": "Galleries",
-    "albums": "Albums"
+    "albums": "Albums",
+    "delivery": "Delivery",
+    "gallery": "Gallery…"
   },
   "collection": {
     "all": "All",
@@ -1366,6 +1367,138 @@
     "unavailable": {
       "hevc": "Unavailable: encoding HEIF/HEIC requires an HEVC encoder (x265, GPL licence and patents). Not included; use AVIF (the same HEIF container with AV1).",
       "dng": "Unavailable in this version: a useful DNG needs the undeveloped sensor data and the camera colour matrices; not implemented yet."
+    }
+  },
+  "gallery": {
+    "title": "Client gallery",
+    "loading": "Loading…",
+    "hiddenToast_one": "{{count}} photo hidden from the gallery",
+    "hiddenToast_other": "{{count}} photos hidden from the gallery",
+    "shownToast_one": "{{count}} photo shown again",
+    "shownToast_other": "{{count}} photos shown again",
+    "destination": "Publishing folder",
+    "logoFilter": "Images",
+    "started_one": "Generating the gallery ({{count}} photo)…",
+    "started_other": "Generating the gallery ({{count}} photos)…",
+    "summary": "{{photos}} photos · {{chapters}} chapters · ≈ {{size}}",
+    "replaceAsk": "A gallery already exists in this folder. Replace it?",
+    "replace": "Replace",
+    "generate_one": "Generate gallery ({{count}})",
+    "generate_other": "Generate gallery ({{count}})",
+    "tab": {
+      "content": "Content",
+      "look": "Appearance",
+      "features": "Features",
+      "publish": "Publish"
+    },
+    "couple": "Couple (title)",
+    "date": "Date",
+    "location": "Venue",
+    "intro": "Introduction",
+    "introHint": "A message for the couple. Blank lines separate paragraphs.",
+    "selection": "Photos",
+    "selectionOption": {
+      "picks": "Picks (or all not rejected)",
+      "notRejected": "All except rejected",
+      "stars": "With stars",
+      "all": "All"
+    },
+    "minStars": "Minimum stars",
+    "chapters": "Chapters",
+    "chaptersOption": {
+      "grouped": "By wedding moments",
+      "detailed": "One per moment",
+      "none": "No chapters"
+    },
+    "chapterList": "Gallery chapters",
+    "single": "All photos",
+    "hiddenCount_one": "{{count}} hidden photo",
+    "hiddenCount_other": "{{count}} hidden photos",
+    "hideSelection": "Hide selection ({{count}})",
+    "showSelection": "Show selection ({{count}})",
+    "showAll": "Show all",
+    "theme": "Theme",
+    "themeName": {
+      "light": "Light",
+      "dark": "Dark",
+      "minimal": "Minimal",
+      "editorial": "Editorial"
+    },
+    "themeHint": {
+      "light": "Warm and bright, serif titles",
+      "dark": "Dark background, for contrasty photos",
+      "minimal": "White, sans-serif, understated",
+      "editorial": "Magazine: side image, large italics"
+    },
+    "hero": "Hero image (top)",
+    "cover": "Cover (share preview)",
+    "useFocus": "Use the focused photo",
+    "remove": "Remove",
+    "logo": "Logo",
+    "noLogo": "No logo",
+    "layout": "Initial layout",
+    "layoutMasonry": "Masonry",
+    "layoutGrid": "Grid",
+    "language": "Gallery language",
+    "heroHint": "Pick a photo in the grid (it gets focus) and use \"Use the focused photo\". Without a hero, the top shows only the names.",
+    "favorites": "Favourites (the client hearts photos and sends you the list)",
+    "downloads": "Downloads",
+    "downloadsOption": {
+      "none": "No downloads",
+      "individual": "Photo by photo",
+      "all": "Individual and full ZIP"
+    },
+    "downloadSize": "Download size",
+    "sizeHigh": "Full resolution",
+    "sizeWeb": "Screen (2048 px)",
+    "chapterZips": "Also one ZIP per chapter",
+    "slideshow": "Slideshow: seconds per photo",
+    "protection": "Access",
+    "protectionMode": "Protection",
+    "protectionOption": {
+      "none": "Open (anyone with the address)",
+      "pin": "PIN",
+      "password": "Password"
+    },
+    "pin": "PIN (4–8 digits)",
+    "password": "Password (min. 6)",
+    "protectionHint": {
+      "pin": "The photo list is encrypted (AES-GCM) and files have random names. A short PIN is a light barrier: use a password for more security. Anyone with the direct address of an image can open it.",
+      "password": "The photo list is encrypted (AES-GCM, key derived from the password) and files have unguessable random names. Anyone with the direct address of an image can open it."
+    },
+    "watermark": "Watermark on gallery images",
+    "contact": "Photographer",
+    "photographer": "Name (footer and copyright)",
+    "email": "Email to receive favourites",
+    "folder": "Gallery folder",
+    "existsNote": "already exists — will be replaced after you confirm",
+    "publishInfo": "The gallery is a static folder: it opens directly on the computer and can be published as is on any host (Cloudflare Pages, Netlify, your own server…). Disable directory listing on the server.",
+    "providers": "Direct publishing",
+    "provider": {
+      "s3": "Amazon S3",
+      "r2": "Cloudflare R2",
+      "b2": "Backblaze B2",
+      "sftp": "SFTP"
+    },
+    "providerLater": "Future phase",
+    "providersInfo": "The architecture is ready (incremental upload plan, credentials only in the system keychain), but no service is contacted in this phase.",
+    "clientFavorites": "Client favourites",
+    "clientFavoritesInfo": "Paste the list the client sent you from the gallery: those photos get the purple label.",
+    "importFavorites": "Mark favourites",
+    "importResult_one": "{{count}} photo marked",
+    "importResult_other": "{{count}} photos marked",
+    "importUnmatched": "not found: {{names}}",
+    "open": "Open gallery",
+    "assembling": "Assembling the gallery…",
+    "problem": {
+      "couple": "Enter the couple's names",
+      "pin": "The PIN must have 4 to 8 digits",
+      "password": "The password must have at least 6 characters",
+      "destination": "Choose the publishing folder",
+      "empty": "No photos for the gallery",
+      "blocked": "The destination folder exists and is not a Momento gallery",
+      "logo": "Logo not found",
+      "exists": "A gallery already exists in this folder"
     }
   }
 }

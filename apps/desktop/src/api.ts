@@ -1,6 +1,9 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  FavoritesImport,
+  GalleryConfig,
+  GalleryPreview,
   ExportCaps,
   ExportEstimate,
   ExportPlan,
@@ -165,6 +168,14 @@ export const api = {
   cancelExport: (id: number) => invoke<boolean>("cancel_export", { id }),
   clearFinishedExports: () => invoke<void>("clear_finished_exports"),
   revealFolder: (path: string) => invoke<void>("reveal_folder", { path }),
+  // Galeria.
+  galleryConfig: () => invoke<GalleryConfig>("gallery_config"),
+  saveGalleryConfig: (config: GalleryConfig) => invoke<void>("save_gallery_config", { config }),
+  galleryPreview: (config: GalleryConfig, momentNames: Record<number, string>) => invoke<GalleryPreview>("gallery_preview", { config, momentNames }),
+  startGallery: (config: GalleryConfig, momentNames: Record<number, string>, replace: boolean) => invoke<number>("start_gallery", { config, momentNames, replace }),
+  setGalleryHidden: (keys: number[], hidden: boolean) => invoke<GalleryConfig>("set_gallery_hidden", { keys, hidden }),
+  importClientFavorites: (text: string) => invoke<FavoritesImport>("import_client_favorites", { text }),
+  openGallery: (path: string) => invoke<void>("open_gallery", { path }),
 };
 
 export const events = {

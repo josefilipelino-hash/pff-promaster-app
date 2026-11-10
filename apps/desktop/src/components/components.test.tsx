@@ -43,6 +43,12 @@ const EXPORT_BASE = {
   naming: { template: "{nome}", prefix: "", suffix: "", seqStart: 1, seqDigits: 4, subfolder: "Galeria", conflict: "rename" },
 };
 const EXPORT_JPEG = EXPORT_BASE;
+const GALLERY_SETTINGS = {
+  couple: "Ana & Pedro", date: "2026-06-15", location: "Sintra", intro: "", cover: null, hero: null, logoPath: "",
+  theme: "light", layout: "masonry", language: "pt", selection: "picks", minStars: 3, chapters: "grouped", hidden: [] as number[],
+  favorites: true, downloads: "all", downloadSize: "high", chapterZips: false, protection: "none", secret: "",
+  photographer: "", contactEmail: "", slideshowSeconds: 4,
+};
 const EXPORT_TIFF = { ...EXPORT_BASE, id: "builtin:arquivo-tiff", name: "Arquivo TIFF", format: "tiff", depth: "16", compression: "zip", color: "adobeRgb", size: { ...EXPORT_BASE.size, mode: "original" }, naming: { ...EXPORT_BASE.naming, subfolder: "Arquivo" } };
 
 const apiMock = {
@@ -124,6 +130,13 @@ const apiMock = {
   cancelExport: vi.fn(async () => true),
   clearFinishedExports: vi.fn(async () => {}),
   revealFolder: vi.fn(async () => {}),
+  galleryConfig: vi.fn(async () => ({ settings: { ...GALLERY_SETTINGS }, watermark: { ...EXPORT_BASE.watermark }, destination: "/tmp/pub" })),
+  saveGalleryConfig: vi.fn(async () => {}),
+  galleryPreview: vi.fn(async () => ({ photos: 4, hidden: 0, chapters: [{ title: "Preparação", count: 2 }, { title: "Cerimónia", count: 2 }], folder: "/tmp/pub/ana-e-pedro-galeria", exists: true, blocked: false, problems: [] as string[], estimateBytes: 50e6 })),
+  startGallery: vi.fn(async () => 9),
+  setGalleryHidden: vi.fn(async (keys: number[], hidden: boolean) => ({ settings: { ...GALLERY_SETTINGS, hidden: hidden ? keys : [] } })),
+  importClientFavorites: vi.fn(async () => ({ matched: 2, unmatched: ["x"] })),
+  openGallery: vi.fn(async () => {}),
   autoEditPhoto: vi.fn(),
   startAutoEdit: vi.fn(async (keys: number[]) => keys.length),
   autoEditStatus: vi.fn(),
@@ -316,7 +329,7 @@ describe("ecrã de projeto", () => {
 
   it("secções futuras estão desativadas e identificadas", async () => {
     await openProject(5);
-        for (const name of [/Galerias/, /Álbuns/]) {
+        for (const name of [/Álbuns/]) {
       const b = screen.getByRole("button", { name }) as HTMLButtonElement;
       expect(b.disabled).toBe(true);
     }
@@ -1237,6 +1250,69 @@ describe("exportação (Fase 9)", () => {
     expect(fitToFormat({ ...r, color: "adobeRgb", depth: "16" }, avif, ["srgb", "displayP3", "adobeRgb", "proPhoto", "rec709", "rec2020", "icc"])).toMatchObject({ format: "avif", color: "srgb", depth: "8" });
     expect(formatDuration(3725)).toBe("1 h 02 min");
     expect(formatDuration(65)).toBe("1 min 05 s");
+  });
+});
+
+describe("galeria (Fase 10)", () => {
+  it("diálogo: conteúdo, ocultar, tema, PIN, fornecedores futuros e gerar com confirmação", async () => {
+    apiMock.listPhotos.mockResolvedValue(rows(4));
+    act(() => useStore.getState().setProject(project));
+    render(<App />);
+    await screen.findByText("Casamento Ana & Pedro");
+    await act(async () => {});
+    act(() => useStore.getState().setSelection({ ids: new Set([2, 3]), focus: 2, anchor: 2 }));
+    fireEvent.click(screen.getByRole("button", { name: "Galeria…" }));
+    const dlg = await screen.findByRole("dialog", { name: "Galeria do cliente" });
+    await act(async () => {});
+    expect((within(dlg).getByRole("textbox", { name: "Noivos (título)" }) as HTMLInputElement).value).toBe("Ana & Pedro");
+    await waitFor(() => expect(within(dlg).getByRole("list", { name: "Capítulos da galeria" }).textContent).toContain("Cerimónia"));
+    fireEvent.click(within(dlg).getByRole("button", { name: "Ocultar seleção (2)" }));
+    await act(async () => {});
+    expect(apiMock.setGalleryHidden).toHaveBeenCalledWith([2, 3], true);
+    expect(within(dlg).getByText("2 fotografias ocultas")).toBeTruthy();
+    // Aparência: tema editorial e hero da fotografia em foco.
+    fireEvent.click(within(dlg).getByRole("tab", { name: "Aparência" }));
+    fireEvent.click(within(dlg).getByRole("radio", { name: /Editorial/ }));
+    fireEvent.click(within(dlg).getAllByRole("button", { name: "Usar a fotografia em foco" })[0]!);
+    // Funcionalidades: PIN só com dígitos.
+    fireEvent.click(within(dlg).getByRole("tab", { name: "Funcionalidades" }));
+    fireEvent.change(within(dlg).getByRole("combobox", { name: "Proteção" }), { target: { value: "pin" } });
+    fireEvent.change(within(dlg).getByRole("textbox", { name: "PIN (4–8 dígitos)" }), { target: { value: "24a68" } });
+    expect((within(dlg).getByRole("textbox", { name: "PIN (4–8 dígitos)" }) as HTMLInputElement).value).toBe("2468");
+    expect(within(dlg).getByText(/barreira ligeira/)).toBeTruthy();
+    // Publicar: fornecedores apresentados como fase futura (sem botões).
+    fireEvent.click(within(dlg).getByRole("tab", { name: "Publicar" }));
+    expect(within(dlg).getByText("Cloudflare R2")).toBeTruthy();
+    expect(within(dlg).queryByRole("button", { name: /R2|S3|SFTP|B2/ })).toBeNull();
+    fireEvent.change(within(dlg).getByRole("textbox", { name: "Favoritas do cliente" }), { target: { value: "IMG_0001\nx" } });
+    fireEvent.click(within(dlg).getByRole("button", { name: "Marcar favoritas" }));
+    await act(async () => {});
+    expect(within(dlg).getByText(/2 fotografias marcadas/)).toBeTruthy();
+    // Gerar: a pasta já tem uma galeria → confirmar substituição.
+    await waitFor(() => expect(within(dlg).getByRole("button", { name: "Gerar galeria (4)" })).toBeTruthy());
+    fireEvent.click(within(dlg).getByRole("button", { name: "Gerar galeria (4)" }));
+    expect(within(dlg).getByText(/Substituir\?/)).toBeTruthy();
+    fireEvent.click(within(dlg).getByRole("button", { name: "Substituir" }));
+    await act(async () => {});
+    const call = apiMock.startGallery.mock.calls.at(-1) as unknown as [{ settings: typeof GALLERY_SETTINGS }, unknown, boolean];
+    expect(call[2]).toBe(true);
+    expect(call[0].settings).toMatchObject({ theme: "editorial", hero: 2, protection: "pin", secret: "2468" });
+  });
+
+  it("fila: galeria concluída oferece abri-la", async () => {
+    apiMock.listPhotos.mockResolvedValue(rows(2));
+    act(() => useStore.getState().setProject(project));
+    render(<App />);
+    await screen.findByText("Casamento Ana & Pedro");
+    act(() =>
+      useStore.getState().upsertExportJob({
+        id: 9, name: "Galeria", destination: "/tmp/pub/g", state: "done", pausedReason: null, photosTotal: 2, photosDone: 2, filesTotal: 6, filesDone: 6,
+        filesFailed: 0, filesSkipped: 0, bytesWritten: 1e6, bytesEstimated: 1e6, freeBytes: 1e9, elapsedSeconds: 3, etaSeconds: 0, current: null,
+        errors: [], notes: [], folders: [], index: "/tmp/pub/g/index.html",
+      } as never),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Abrir galeria" }));
+    expect(apiMock.openGallery).toHaveBeenCalledWith("/tmp/pub/g/index.html");
   });
 });
 

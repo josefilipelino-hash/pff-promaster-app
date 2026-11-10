@@ -10,6 +10,8 @@ authors.workspace = true
 
 [dependencies]
 momento-export-engine.workspace = true
+momento-gallery.workspace = true
+momento-color-management.workspace = true
 fs4.workspace = true
 momento-core-types.workspace = true
 momento-database.workspace = true
@@ -34,3 +36,4 @@ momento-test-fixtures.workspace = true
 tempfile.workspace = true
 kamadak-exif.workspace = true
 walkdir.workspace = true
+zip.workspace = true

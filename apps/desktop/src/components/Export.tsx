@@ -710,7 +710,7 @@ function JobRow({ j, expanded, onToggle, fail }: { j: ExportProgress; expanded: 
         {isActive(j) && j.etaSeconds != null && j.photosDone > 0 && ` · ${t("export.eta", { time: formatDuration(j.etaSeconds) })}`}
       </p>
       {j.pausedReason === "noSpace" && <p className="small warn">{t("export.pausedNoSpace")}</p>}
-      {isActive(j) && j.current && <p className="small muted ellipsis">{j.current}</p>}
+      {isActive(j) && j.current && <p className="small muted ellipsis">{j.current === "galeria" ? t("gallery.assembling") : j.current}</p>}
       {j.errors.length > 0 && (
         <button type="button" className="btn ghost small warn" aria-expanded={expanded} onClick={onToggle}>
           {t("export.errors", { count: j.errors.length })}
@@ -742,6 +742,11 @@ function JobRow({ j, expanded, onToggle, fail }: { j: ExportProgress; expanded: 
               {t("export.cancel")}
             </button>
           </>
+        )}
+        {j.state === "done" && j.index && (
+          <button type="button" className="btn small primary" onClick={() => api.openGallery(j.index!).catch(fail)}>
+            {t("gallery.open")}
+          </button>
         )}
         {j.state === "done" && (
           <button type="button" className="btn small" onClick={() => api.revealFolder(j.destination).catch(fail)}>

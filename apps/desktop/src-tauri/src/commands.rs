@@ -831,3 +831,85 @@ pub async fn reveal_folder(path: String) -> CmdResult<()> {
         .map(|_| ())
         .map_err(|e| err(momento_core_types::CoreError::Io(e)))
 }
+
+// ---------------------------------------------------------------- galeria (Fase 10)
+
+use momento_project_management::gallery::{FavoritesImport, GalleryConfig, GalleryPreview};
+
+#[tauri::command]
+pub async fn gallery_config(state: State<'_, AppState>) -> CmdResult<GalleryConfig> {
+    state.session().and_then(|s| s.gallery_config()).map_err(err)
+}
+
+#[tauri::command]
+pub async fn save_gallery_config(
+    state: State<'_, AppState>,
+    config: GalleryConfig,
+) -> CmdResult<()> {
+    state.session().and_then(|s| s.save_gallery_config(&config)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn gallery_preview(
+    state: State<'_, AppState>,
+    config: GalleryConfig,
+    moment_names: std::collections::HashMap<i64, String>,
+) -> CmdResult<GalleryPreview> {
+    let s = state.session().map_err(err)?;
+    tauri::async_runtime::spawn_blocking(move || s.gallery_preview(&config, &moment_names))
+        .await
+        .map_err(|e| err(momento_core_types::CoreError::Other(e.to_string())))?
+        .map_err(err)
+}
+
+#[tauri::command]
+pub async fn start_gallery(
+    state: State<'_, AppState>,
+    config: GalleryConfig,
+    moment_names: std::collections::HashMap<i64, String>,
+    replace: bool,
+) -> CmdResult<u64> {
+    state.session().and_then(|s| s.start_gallery(config, moment_names, replace)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn set_gallery_hidden(
+    state: State<'_, AppState>,
+    keys: Vec<i64>,
+    hidden: bool,
+) -> CmdResult<GalleryConfig> {
+    state.session().and_then(|s| s.set_gallery_hidden(&keys, hidden)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn import_client_favorites(
+    state: State<'_, AppState>,
+    text: String,
+) -> CmdResult<FavoritesImport> {
+    state.session().and_then(|s| s.import_client_favorites(&text)).map_err(err)
+}
+
+/// Abre a galeria gerada no navegador predefinido (só `index.html` de uma pasta de galeria
+/// criada pelo Momento).
+#[tauri::command]
+pub async fn open_gallery(path: String) -> CmdResult<()> {
+    let p = std::path::PathBuf::from(&path);
+    let ok = p.file_name().is_some_and(|n| n == "index.html")
+        && p.parent().is_some_and(|d| d.join(momento_gallery::site::MARKER).is_file());
+    if !ok {
+        return Err(err(momento_core_types::CoreError::Other(
+            "não é uma galeria do Momento".into(),
+        )));
+    }
+    #[cfg(target_os = "macos")]
+    let mut cmd = std::process::Command::new("open");
+    #[cfg(target_os = "windows")]
+    let mut cmd = {
+        let mut c = std::process::Command::new("cmd");
+        c.args(["/C", "start", ""]);
+        c
+    };
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    let mut cmd = std::process::Command::new("xdg-open");
+    cmd.arg(&p).spawn().map(|_| ()).map_err(|e| err(momento_core_types::CoreError::Io(e)))
+}

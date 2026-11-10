@@ -104,10 +104,14 @@ multi-exportação; fila com progresso, tamanho, espaço e tempo restante.
 **Por fazer:** HEIF/HEIC (ImageIO no macOS, por testar num Mac), DNG de arquivo, JPEG XL
 com perdas, soft proofing, GPU.
 
-## Fase 10 — Galerias
+## Fase 10 — Galerias ✅ *(concluída 2026-11-10, ver PROJECT_STATUS.md)*
 
-Galeria estática com temas, slideshow, downloads, favoritas, palavra-passe (cifra), e
-publicação opcional (S3/R2/B2/SFTP).
+Galeria HTML estática por projeto (nomes, data, local, capa, hero, logótipo, texto),
+capítulos automáticos pelos momentos, temas Light/Dark/Minimal/Editorial, mosaico, grelha,
+visualizador, apresentação e ecrã inteiro em telemóvel, tablet e desktop; favoritas,
+downloads (individual e ZIP), marca de água, PIN/palavra-passe, ocultar fotografias.
+**Por fazer:** publicação direta (S3, R2, B2, SFTP — arquitetura pronta), expiração da
+galeria, estatísticas de visitas (exigem servidor).
 
 ## Fase 11 — Álbuns
 

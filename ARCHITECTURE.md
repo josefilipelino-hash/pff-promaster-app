@@ -603,23 +603,30 @@ Ver `EXPORT_FORMATS.md`.
 
 ---
 
-## 15. Galerias **[definido]**
+## 15. Galerias **[implementado na Fase 10 — D-064 a D-070]**
 
-- Gerador de **site estático** em Rust com `minijinja` (Apache-2.0): HTML/CSS/JS próprio,
-  sem frameworks, sem CDN, funciona offline e em qualquer alojamento.
-- Conteúdo: capa, destaque, texto, secções por momento, grelha responsiva, slideshow,
-  downloads (individual e ZIP pré-gerado), marca de água, temas claro/escuro, cores,
-  logótipo.
-- **Palavra-passe:** cifra real das imagens e índice com AES-GCM; chave derivada da
-  palavra-passe com PBKDF2 (WebCrypto no navegador do cliente). Protege enquanto a
-  palavra-passe não for divulgada. Documentado honestamente: a proteção é do conteúdo, não
-  do acesso aos ficheiros cifrados.
-- **Limitações honestas do estático:** a expiração é apenas indicativa sem servidor; as
-  favoritas do cliente ficam no `localStorage` dele e são devolvidas ao fotógrafo como
-  código/ficheiro de lista que a aplicação importa.
-- **Publicação (Fase 7):** S3 / R2 / B2 / S3 compatível (API S3), SFTP. Credenciais no
-  porta-chaves do sistema (Keychain/Credential Manager via crate `keyring`), nunca no
-  catálogo nem no código.
+- Crate `momento-gallery`: site **estático** com HTML/CSS/JS próprios (sem frameworks, sem
+  CDN, sem pedidos externos), fontes OFL incluídas (Instrument Serif/Sans, woff2). Funciona
+  aberto diretamente do disco (`file://`) e em qualquer alojamento estático.
+- Imagens geradas pela **fila de exportação** a partir dos originais (miniatura 900 px,
+  ecrã 2048 px, download em resolução total), com nomes aleatórios de 128 bits; o site é
+  montado no fim do trabalho (`finish_gallery`).
+- Conteúdo: nomes, data, local, texto, hero, capa (pré-visualização ao partilhar),
+  logótipo, capítulos automáticos a partir dos momentos (Preparação, Cerimónia, Sessão,
+  Família e amigos, Cocktail, Receção, Festa, personalizados), temas Light, Dark, Minimal e
+  Editorial; mosaico, grelha, visualizador, apresentação, ecrã inteiro; telemóvel, tablet
+  e desktop.
+- Favoritas no `localStorage` do cliente → lista copiada/enviada por email → importada na
+  aplicação (etiqueta roxa). Downloads individuais e ZIP pré-gerados (completo e por
+  capítulo); ZIP das favoritas feito no navegador (só por HTTP).
+- **PIN/palavra-passe:** o índice (textos, lista e endereços das imagens) é cifrado com
+  AES-256-GCM, chave PBKDF2-SHA256 (250 000 iterações), decifrado pela WebCrypto. As
+  imagens **não** são cifradas (D-066): ficam protegidas por nomes impossíveis de adivinhar.
+- Pastas de galeria marcadas (`.momento-gallery`): só essas podem ser substituídas, e
+  apenas depois de confirmação.
+- **Publicação:** arquitetura em `momento_gallery::publish` — plano de envio (SHA-256, MIME,
+  Cache-Control), comparação incremental, configurações de S3/R2/B2/SFTP sem segredos
+  (`credential_ref` para o porta-chaves). Nenhum fornecedor implementado nesta fase.
 
 ---
 
@@ -770,3 +777,10 @@ ficheiros a partir do frontend (caminhos sempre resolvidos e verificados no núc
 | D-061 | 2026-11-09 | **Metadados escritos por nós** (EXIF TIFF e XMP a partir do catálogo), nunca copiados do original: modos tudo / copyright / nada e "remover GPS" (por omissão) | Copiar o bloco EXIF do original | Garante que o GPS removido não fica escondido noutro bloco; lido por leitores independentes nos testes |
 | D-062 | 2026-11-09 | **JPEG XL só sem perdas** (zune-jpegxl, Rust) com o cabeçalho de cor reescrito por nós (primárias/branco/curva enumerados ou personalizados); AVIF com rav1e diretamente para sinalizar P3/Rec. 2020 por CICP | libjxl/libavif (C++/C, cmake no Windows e macOS) | Sem dependências C++ pesadas; ficheiros validados com libjxl, libavif e jxl-oxide; JPEG XL com perdas fica por fazer |
 | D-063 | 2026-11-09 | HEIF/HEIC e DNG **indisponíveis** e assinalados na interface com a razão | x265 (GPL); DNG "linear" a partir da imagem revelada | HEVC: licença e patentes; ImageIO no macOS fica para quando houver testes num Mac. DNG útil exige os dados do sensor e matrizes da câmara |
+| D-064 | 2026-11-10 | Galeria **estática** com HTML/CSS/JS escritos à mão e incluídos no binário (`include_str!`), dados num `<script>` (`data/gallery.js`) em vez de `fetch` | Framework JS; JSON por `fetch`; `minijinja` | Abre do disco (os navegadores bloqueiam `fetch` em `file://`), sem dependências, ≈ 48 KB de código |
+| D-065 | 2026-11-10 | Imagens da galeria geradas pela **fila de exportação** (mesmo motor, a partir dos originais, marca de água e copyright incluídos), três tamanhos com nomes aleatórios; site montado no fim do trabalho | Gerar a partir das previews | Qualidade igual à exportação; progresso, pausa e cancelamento já existentes |
+| D-066 | 2026-11-10 | PIN/palavra-passe cifram o **índice**, não as imagens; imagens com nomes aleatórios de 128 bits; `noindex`; ZIP numa pasta aleatória | Cifrar cada imagem (planeado na Fase 0) | Imagens cifradas exigem `fetch` (não funciona aberto do disco) e duplicariam o custo de CPU no telemóvel do cliente. Limitação explicada na interface: quem tiver o endereço direto de uma imagem consegue abri-la |
+| D-067 | 2026-11-10 | Capítulos por **agrupamento** dos 25 momentos finos em 7 capítulos de casamento (+ personalizados); fotografias sem momento vão para o capítulo da classificada mais próxima no tempo (≤ 45 min), senão "Mais momentos" | Um capítulo por momento (disponível como opção) | Galerias de clientes com secções reconhecíveis e sem capítulos de 2 fotografias |
+| D-068 | 2026-11-10 | Mosaico calculado em JS a partir das proporções do índice (coluna mais curta), sem deslocar a página ao carregar; grelha em CSS | `columns` CSS | Ordem de leitura por linhas e zero saltos de layout |
+| D-069 | 2026-11-10 | Favoritas só no navegador do cliente; o regresso é uma **lista de nomes** (copiar/email) importada na aplicação | Servidor para guardar favoritas | Sem servidor nem serviços externos nesta fase |
+| D-070 | 2026-11-10 | Publicação direta adiada: só a arquitetura (plano de envio, incremental, configuração sem segredos) | Integrar já S3/R2/B2/SFTP | Pedido do utilizador: não integrar serviços cloud sem necessidade nesta fase |

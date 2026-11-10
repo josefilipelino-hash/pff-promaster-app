@@ -19,6 +19,8 @@ pub struct Vars {
     pub moment: String,
     pub width: u32,
     pub height: u32,
+    /// Identificador aleatório (galerias): campo {token}.
+    pub token: String,
 }
 
 /// Carateres proibidos em Windows/macOS e nomes reservados do Windows.
@@ -57,6 +59,7 @@ fn expand(t: &str, n: &Naming, v: &Vars) -> String {
         .replace("{momento}", &v.moment)
         .replace("{largura}", &v.width.to_string())
         .replace("{altura}", &v.height.to_string())
+        .replace("{token}", &v.token)
 }
 
 /// Nome do ficheiro (com extensão).

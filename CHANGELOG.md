@@ -5,6 +5,23 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [0.10.0] — 2026-11-10 — Fase 10: galerias
+
+### Adicionado
+- **Galeria do cliente** por projeto: pasta HTML estática pronta a publicar (abre também
+  diretamente do disco), sem serviços externos.
+- Nomes dos noivos, data, local, texto introdutório, imagem hero, capa (pré-visualização
+  ao partilhar) e logótipo; idioma português ou inglês.
+- Capítulos automáticos pelos momentos: Preparação, Cerimónia, Sessão, Família e amigos,
+  Cocktail, Receção, Festa (e momentos personalizados).
+- Temas **Light, Dark, Minimal e Editorial**; mosaico e grelha; visualizador com setas,
+  gestos, teclado e ecrã inteiro; apresentação automática; telemóvel, tablet e desktop.
+- Favoritas (coração; lista copiada ou enviada por email; importação na aplicação com
+  etiqueta roxa), downloads individuais e ZIP (completo e por capítulo), marca de água,
+  **PIN/palavra-passe** (índice cifrado com AES-GCM) e ocultar fotografias.
+- Imagens geradas pela fila de exportação a partir dos originais.
+- Arquitetura de publicação (S3, R2, B2, SFTP) sem integração nesta fase.
+
 ## [0.9.0] — 2026-11-09 — Fase 9: exportação
 
 ### Adicionado

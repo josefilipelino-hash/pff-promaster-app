@@ -18,6 +18,7 @@ pub mod consistency;
 pub mod edit;
 pub mod export;
 pub mod export_store;
+pub mod gallery;
 pub mod local_edit;
 pub mod organize;
 pub mod paths;

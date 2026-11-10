@@ -1,6 +1,6 @@
 [package]
 name = "momento-gallery"
-description = "Gerador de galerias web estáticas."
+description = "Galerias web estáticas para clientes (HTML, CSS e JS próprios, sem serviços externos)."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,3 +9,17 @@ publish.workspace = true
 authors.workspace = true
 
 [dependencies]
+momento-core-types.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+aes-gcm.workspace = true
+pbkdf2.workspace = true
+sha2.workspace = true
+base64.workspace = true
+getrandom.workspace = true
+zip.workspace = true
+image.workspace = true
+walkdir.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

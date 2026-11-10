@@ -23,7 +23,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.9.0"
+version = "0.10.0"
 edition = "2021"
 rust-version = "1.85"
 license = "UNLICENSED"
@@ -58,6 +58,12 @@ openjp2 = "0.6.1"
 fs4 = "1.1.0"
 ab_glyph = "0.2"
 zune-core = "0.5.3"
+aes-gcm = "0.10.3"
+pbkdf2 = { version = "0.12.2", features = ["hmac"] }
+sha2 = "0.10.9"
+base64 = "0.22"
+getrandom = "0.3"
+zip = { version = "2.4", default-features = false }
 walkdir = "2.5"
 rayon = "1.12"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
@@ -82,6 +88,7 @@ momento-face-analysis = { path = "packages/face-analysis" }
 momento-ai-analysis = { path = "packages/ai-analysis" }
 momento-color-management = { path = "packages/color-management" }
 momento-export-engine = { path = "packages/export-engine" }
+momento-gallery = { path = "packages/gallery" }
 
 [profile.dev.package."*"]
 # Dependências optimizadas mesmo em debug: descodificação de imagem em debug puro é demasiado lenta.

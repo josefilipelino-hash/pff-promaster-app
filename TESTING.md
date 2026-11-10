@@ -69,6 +69,18 @@ plataforma, ecrã inicial, validação do formulário, grelha virtualizada com 3
 secções futuras desativadas, classificação por teclado e em seleção múltipla, filtro
 Favoritas + visualizador, reversão quando o núcleo recusa, paridade de traduções.
 
+## Fase 10 — galerias
+
+| Teste | O que verifica |
+|---|---|
+| `gallery::chapters` | 25 momentos → capítulos de casamento por ordem (Preparação, Cerimónia, Sessão, Cocktail, Festa, personalizado, "Mais momentos"); fotografia sem momento vai para o capítulo mais próximo no tempo; inglês; um por momento; sem capítulos |
+| `gallery::crypto` | cifra/decifra AES-GCM + PBKDF2; código errado recusado; sal novo a cada geração |
+| `gallery::tests` (3) | site completo com JPEG reais: ficheiros, fontes e licenças, título **escapado** (sem injeção), dados sem `</script>`, nomes de download únicos, ZIP completo (pastas por capítulo, alta resolução) + ZIP por capítulo; **protegida**: nada visível sem o código (nomes, local, endereços, capítulos, og:image), `noindex`, logótipo com nome aleatório; downloads desligados/ecrã |
+| `gallery::publish` | plano de envio (sem ficheiros ocultos, MIME, cache, SHA-256), envio incremental (só o que mudou, apaga o que saiu), validação de S3/R2/B2/SFTP sem segredos, nenhum serviço contactado |
+| `gallery_flow` | caminho real: definições iniciais do projeto, oculta e rejeitada fora, capítulos pelos momentos, geração a partir dos originais (não amplia; download em resolução total), ZIP, copyright sem GPS; voltar a gerar pede confirmação; PIN; **pasta que não é do Momento nunca é tocada**; favoritas do cliente → etiqueta roxa; originais intactos |
+| `scripts/test-gallery.cjs` (Chromium/Playwright) | por `file://` e HTTP: fotografias e capítulos; mosaico sem sobreposições (4 colunas no desktop, 3 no tablet, 2 no telemóvel, sem deslocamento horizontal); grelha quadrada e persistente; favoritas (contagem, persistência, filtro, lista, email, ZIP no navegador só por HTTP); visualizador (setas, Esc, endereço direto); apresentação avança e pausa; downloads individuais e ZIP existem; PIN errado/certo e lembrado no separador; sem erros de JavaScript — galerias de demonstração e a gerada pela aplicação real |
+| Interface (+2) | diálogo (nomes, capítulos, ocultar seleção, tema, hero da fotografia em foco, PIN só com dígitos, fornecedores como fase futura sem botões, favoritas do cliente, confirmação para substituir); fila com "Abrir galeria" |
+
 ## Fase 9 — exportação
 
 | Teste | O que verifica |

@@ -103,6 +103,7 @@ interface State {
   presetDialog: boolean;
   // Exportação (Fase 9)
   exportDialog: boolean;
+  galleryDialog: boolean;
   /** Trabalhos da fila de exportação (atualizados pelos eventos). */
   exportJobs: ExportProgress[];
 }
@@ -142,6 +143,7 @@ interface Actions {
   reloadPresets(): Promise<void>;
   setPresetDialog(o: boolean): void;
   setExportDialog(o: boolean): void;
+  setGalleryDialog(o: boolean): void;
   /** Atualiza (ou junta) um trabalho da fila de exportação. */
   upsertExportJob(p: ExportProgress): void;
   setExportJobs(j: ExportProgress[]): void;
@@ -227,6 +229,7 @@ export const useStore = create<State & Actions>((set, get) => ({
   presets: [],
   presetDialog: false,
   exportDialog: false,
+  galleryDialog: false,
   exportJobs: [],
 
 
@@ -264,6 +267,7 @@ export const useStore = create<State & Actions>((set, get) => ({
         autoProgress: null,
         autoDialog: false,
         exportDialog: false,
+        galleryDialog: false,
         exportJobs: [],
       });
       return;
@@ -484,6 +488,10 @@ export const useStore = create<State & Actions>((set, get) => ({
 
   setExportDialog(o) {
     set({ exportDialog: o });
+  },
+
+  setGalleryDialog(o) {
+    set({ galleryDialog: o });
   },
 
   upsertExportJob(p) {

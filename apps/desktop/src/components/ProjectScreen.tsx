@@ -11,6 +11,7 @@ import { errorText, useStore } from "../store";
 import type { Color, GroupRow, ImportMode, Label } from "../types";
 import { AutoEditDialog, AutoEditQueue } from "./AutoEdit";
 import { ExportDialog, ExportQueue } from "./Export";
+import { GalleryDialog } from "./Gallery";
 import { ConsistencyView } from "./ConsistencyView";
 import { ApplyPresetDialog } from "./Presets";
 import { ClockDialog } from "./ClockDialog";
@@ -441,7 +442,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const st = useStore.getState();
-            if (isTyping(e.target) || st.pendingImport || st.importSummary || st.helpOpen || st.clockOpen || st.autoDialog || st.presetDialog || st.exportDialog) return;
+            if (isTyping(e.target) || st.pendingImport || st.importSummary || st.helpOpen || st.clockOpen || st.autoDialog || st.presetDialog || st.exportDialog || st.galleryDialog) return;
       const a = keyToAction(e, mac);
       if (!a) return;
       e.preventDefault();
@@ -478,6 +479,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
             s.setView("grid");
           }}
           onDropMoment={(ids, m) => void assignMoment(ids, m)}
+          onGallery={() => s.setGalleryDialog(true)}
           activePersons={s.filter.persons ?? []}
           onPersons={(ids) => {
             s.setFilter({ persons: ids });
@@ -600,6 +602,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
       {s.presetDialog && <ApplyPresetDialog onClose={() => s.setPresetDialog(false)} />}
       <AutoEditQueue />
       {s.exportDialog && <ExportDialog selected={order.filter((k) => s.selection.ids.has(k))} visible={order} onClose={() => s.setExportDialog(false)} />}
+      {s.galleryDialog && <GalleryDialog selected={order.filter((k) => s.selection.ids.has(k))} focus={s.selection.focus} onClose={() => s.setGalleryDialog(false)} />}
       <ExportQueue />
       {s.dragIds && <div className="drag-badge">{t("moments.dropHint", { count: s.dragIds.length })}</div>}
     </div>

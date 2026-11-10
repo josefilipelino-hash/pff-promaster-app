@@ -62,6 +62,14 @@ abaixo são requisitos de arquitetura, não opções.
    "Arquivo TIFF" (cópia pessoal). Os dados faciais, pessoas, momentos e classificações
    da IA **nunca** são escritos nos ficheiros (só a classificação por estrelas, no modo
    "tudo"). A exportação é local: grava apenas na pasta escolhida, sem ligações de rede.
+6b. **Galerias (Fase 10):** a galeria é uma pasta local; a aplicação não a envia para lado
+   nenhum. A galeria não faz pedidos externos (sem fontes, estatísticas ou bibliotecas de
+   terceiros) e só contém as fotografias escolhidas (as ocultas e as rejeitadas nunca são
+   escritas). Metadados: só copyright/autor, **sem GPS**. Com PIN/palavra-passe, os nomes,
+   textos e endereços das imagens ficam cifrados (AES-GCM) e a página pede aos motores de
+   pesquisa para não indexar; as imagens têm nomes aleatórios mas **não** estão cifradas —
+   quem tiver o endereço direto de uma imagem consegue abri-la. As favoritas do cliente
+   ficam só no navegador dele até as enviar. O PIN fica no catálogo local do projeto.
 7. **Credenciais** de publicação ficam no porta-chaves do sistema (Keychain no macOS),
    nunca no catálogo, em ficheiros de texto ou no código.
 8. **Repositório:** fotografias, modelos e credenciais nunca são versionados (garantido

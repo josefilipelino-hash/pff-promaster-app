@@ -9,7 +9,7 @@ import { SelectionPanel } from "./SelectionPanel";
 const COLLECTIONS: Collection[] = ["all", "picks", "rejects", "unrated"];
 
 /** Secções futuras: visíveis mas desativadas e identificadas com a fase em que chegam. */
-const UPCOMING: [string, number][] = [["galleries", 10], ["albums", 11]];
+const UPCOMING: [string, number][] = [["albums", 11]];
 
 export function Sidebar({
   active,
@@ -25,6 +25,7 @@ export function Sidebar({
   onDropMoment,
   activePersons,
   onPersons,
+  onGallery,
 }: {
   active: Collection;
   counts: Record<Collection, number>;
@@ -39,6 +40,8 @@ export function Sidebar({
   onDropMoment: (ids: number[], moment: number | null) => void;
   activePersons: number[];
   onPersons: (ids: number[]) => void;
+  /** Abrir a galeria do cliente. */
+  onGallery?: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -57,6 +60,18 @@ export function Sidebar({
             <MomentsPanel active={activeMoment} onSelect={onMoment} onDrop={onDropMoment} />
       <PeoplePanel active={activePersons} onPersons={onPersons} view={view} onView={onView} />
       <SelectionPanel labelCounts={labelCounts} activeLabel={activeLabel} onLabel={onLabel} view={view} onView={onView} />
+      {onGallery && (
+        <>
+          <h3 className="sidebar-title">{t("sidebar.delivery")}</h3>
+          <ul>
+            <li>
+              <button type="button" className="side-item" onClick={onGallery}>
+                <span>{t("sidebar.gallery")}</span>
+              </button>
+            </li>
+          </ul>
+        </>
+      )}
       <h3 className="sidebar-title">{t("sidebar.upcoming")}</h3>
       <ul>
         {UPCOMING.map(([k, phase]) => (

@@ -33,6 +33,30 @@ impl Catalog {
     }
 }
 
+impl Catalog {
+    /// Valor guardado em `catalog_info` (ex.: definições da galeria).
+    pub fn load_value(&self, key: &str) -> CoreResult<Option<String>> {
+        self.connection()
+            .query_row("SELECT value FROM catalog_info WHERE key = ?1", [key], |r| r.get(0))
+            .optional()
+            .map_err(db_err)
+    }
+
+    pub fn save_value(&self, key: &str, value: &str) -> CoreResult<()> {
+        if value.len() > 4 * 1024 * 1024 {
+            return Err(momento_core_types::CoreError::Other("valor demasiado grande".into()));
+        }
+        self.connection()
+            .execute(
+                "INSERT INTO catalog_info(key, value) VALUES(?1, ?2)
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                [key, value],
+            )
+            .map_err(db_err)?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::Catalog;
