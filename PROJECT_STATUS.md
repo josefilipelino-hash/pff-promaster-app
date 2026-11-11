@@ -1,7 +1,7 @@
 # Estado do projeto
 
 **Última atualização:** 2026-11-10 · **Etapa atual:** Auditoria final da versão 1.0 pessoal · **Estado:** ✅ concluída
-**Produto:** PFF ProMaster · **Versão:** 1.0.0-personal · **Branch:** `main` · **Plataformas-alvo:** macOS (Apple Silicon e Intel) e Windows 10/11 — **nenhuma das duas testada ainda em hardware real** (ver `KNOWN_LIMITATIONS.md`)
+**Produto:** PFF ProMaster · **Versão:** 1.0.0-personal · **Branch:** `main` · **Plataformas-alvo:** macOS (Apple Silicon e Intel) e Windows 10/11 — instaladores gerados pela CI do GitHub; todos os testes automáticos passam em macOS 15, Windows e Linux; **nunca abertos por uma pessoa num Mac/PC** (ver `KNOWN_LIMITATIONS.md`)
 
 ---
 
@@ -82,6 +82,16 @@ pnpm -r test
 | `pnpm -r test` (Vitest) | ✅ 97 (desktop) + 6 (localização) |
 | `tsc --noEmit`, `cargo fmt --check`, `cargo clippy -D warnings` | ✅ limpos |
 | Pacote de produção (Linux) reconstruído com o nome e ícone novos, instalado e executado | ✅ lançamento, registo anonimizado, abrir projeto real, Limpar cache, Eliminar projeto (Lixo) — `FINAL_AUDIT.md` §5b |
+
+### CI no GitHub (repositório `josefilipelino-hash/pff-promaster`)
+
+| Sistema | Testes | Instalador |
+|---|---|---|
+| macOS 15 (Apple Silicon) | ✅ todos | ✅ `PFF ProMaster_1.0.0_universal.dmg` (Apple Silicon + Intel), modelos de IA convertidos na CI (ver `KNOWN_LIMITATIONS.md`) |
+| Windows (Server 2022) | ✅ 288 passaram, 0 falharam | ✅ `PFF ProMaster_1.0.0_x64-setup.exe` |
+| Linux (Ubuntu 24.04) | ✅ todos | (pacotes gerados localmente) |
+
+Corrigido graças à CI: pilha das threads do rayon (macOS), cópia do catálogo no Windows ("Access is denied"), testes só-Unix e caminhos com `/` nos testes.
 
 ## Riscos
 
