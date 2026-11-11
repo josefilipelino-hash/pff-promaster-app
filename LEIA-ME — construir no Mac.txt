@@ -1,0 +1,22 @@
+PFF ProMaster 1.1 — construir a aplicação no seu Mac
+=====================================================
+
+Porquê: só um Mac pode gerar aplicações para Mac (regra da Apple) e a compilação
+automática no GitHub está parada. Este pacote gera o instalador (.dmg) no seu Mac.
+
+1. Descomprima este zip (por exemplo na pasta Transferências).
+2. Abra a pasta "scripts" e faça CLIQUE DIREITO em
+   "Construir PFF ProMaster (Mac).command" → Abrir → Abrir.
+   (Se o macOS recusar: Definições do Sistema → Privacidade e segurança →
+   "Abrir mesmo assim". Alternativa: abra o Terminal, escreva "bash " e arraste o
+   ficheiro para dentro da janela; depois Enter.)
+3. Se pedir para instalar as "ferramentas de linha de comandos" da Apple, aceite
+   e, quando terminar, volte a abrir o ficheiro do passo 2.
+4. Espere 10 a 25 minutos. No fim, o ficheiro "PFF ProMaster_1.1.0_….dmg" aparece na
+   Secretária.
+5. Abra o .dmg, arraste o PFF ProMaster para Aplicações. Na primeira abertura:
+   Definições do Sistema → Privacidade e segurança → "Abrir mesmo assim".
+
+O que é instalado (só se faltar): ferramentas da Apple, Rust (rustup.rs) e Node.js 22
+numa pasta própria (~/.pff-promaster-ferramentas). Nada é enviado para fora.
+Os modelos de IA incluídos são os validados (os mesmos dos testes).
