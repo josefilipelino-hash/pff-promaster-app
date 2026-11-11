@@ -1,0 +1,8 @@
+{
+  "bundle": {
+    "resources": {
+      "../../../models/": "models/",
+      "../../../target/x86_64-pc-windows-gnu/release/WebView2Loader.dll": "WebView2Loader.dll"
+    }
+  }
+}
