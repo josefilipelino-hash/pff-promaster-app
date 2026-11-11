@@ -1,6 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  LightroomReport,
   AvailabilitySummary,
   BackupInfo,
   CatalogValidation,
@@ -127,6 +128,9 @@ export const api = {
   reclusterPeople: () => invoke<number>("recluster_people"),
   clearPeople: () => invoke<void>("clear_people"),
   logUiError: (kind: string, message: string, stack: string | null) => invoke<void>("log_ui_error", { kind, message, stack }),
+  exportLightroomRatings: (options: { keepUserStars: boolean; applyInApp: boolean }) =>
+    invoke<LightroomReport>("export_lightroom_ratings", { options }),
+  asShotKelvin: (key: number) => invoke<number | null>("as_shot_kelvin", { key }),
   clearCache: () => invoke<{ files: number; bytes: number }>("clear_cache"),
   deleteProject: (path: string) => invoke<void>("delete_project", { path }),
   listMoments: () => invoke<MomentRow[]>("list_moments"),

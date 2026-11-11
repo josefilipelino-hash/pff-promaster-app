@@ -86,6 +86,47 @@ pub struct RawInfo {
     pub sensor_supported: bool,
     /// Maior preview embutida utilizável: (índice, formato LibRaw, largura, altura).
     pub preview: Option<(i32, i32, u32, u32)>,
+    /// Cor (sRGB linear, normalizada) da luz do disparo segundo o balanço de brancos da
+    /// câmara — o que a câmara considerou "branco". Serve para a temperatura em Kelvin.
+    pub as_shot_white: Option<[f32; 3]>,
+}
+
+/// Branco do disparo em sRGB linear: `rgb_cam · (pre_mul / cam_mul)`, normalizado.
+fn as_shot_white(r: &sys::mlr_info) -> Option<[f32; 3]> {
+    let colors = r.colors.clamp(0, 4) as usize;
+    if colors < 3 {
+        return None;
+    }
+    let mut w = [0f32; 4];
+    for c in 0..colors {
+        let cm = if r.cam_mul[c] > 0.0 {
+            r.cam_mul[c]
+        } else if c == 3 {
+            r.cam_mul[1]
+        } else {
+            0.0
+        };
+        let pm = if r.pre_mul[c] > 0.0 {
+            r.pre_mul[c]
+        } else if c == 3 {
+            r.pre_mul[1]
+        } else {
+            0.0
+        };
+        if cm <= 0.0 || pm <= 0.0 {
+            return None;
+        }
+        w[c] = pm / cm;
+    }
+    let mut s = [0f32; 3];
+    for (i, si) in s.iter_mut().enumerate() {
+        *si = (0..colors).map(|c| r.rgb_cam[i][c] * w[c]).sum();
+    }
+    let m = s.iter().copied().fold(0f32, f32::max);
+    if !(m > 0.0) || s.iter().any(|v| !v.is_finite() || *v <= 0.0) {
+        return None;
+    }
+    Some(s.map(|v| v / m))
 }
 
 /// Imagem linear de 16 bits (Rec. 2020) para a edição.
@@ -223,6 +264,7 @@ impl<'a> RawFile<'a> {
             decoder: cstr(&r.decoder_name),
             sensor_supported: r.decoder_supported != 0,
             preview,
+            as_shot_white: as_shot_white(&r),
         };
         Ok(RawFile { handle, info, _data: data })
     }

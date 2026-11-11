@@ -76,6 +76,12 @@ static void fill_info(LibRaw *r, mlr_info *info) {
   info->dng_version = d.idata.dng_version;
   info->is_foveon = (int)d.idata.is_foveon;
   info->filters_nonzero = d.idata.filters != 0;
+  for (int c = 0; c < 4; c++) {
+    info->cam_mul[c] = d.color.cam_mul[c];
+    info->pre_mul[c] = d.color.pre_mul[c];
+  }
+  for (int i = 0; i < 3; i++)
+    for (int c = 0; c < 4; c++) info->rgb_cam[i][c] = d.color.rgb_cam[i][c];
   info->decoder_supported = 1;
   libraw_decoder_info_t di;
   memset(&di, 0, sizeof di);

@@ -14,6 +14,8 @@ export function Slider({
   digits = 0,
   onChange,
   gradient,
+  format,
+  parse,
 }: {
   label: string;
   value: number;
@@ -24,9 +26,12 @@ export function Slider({
   digits?: number;
   onChange: (v: number, done: boolean) => void;
   gradient?: string;
+  /** Mostrar o valor noutra unidade (ex.: Kelvin) e ler o que se escreve nessa unidade. */
+  format?: (v: number) => string;
+  parse?: (text: string) => number | null;
 }) {
   const { t } = useTranslation();
-  const shown = digits > 0 ? value.toFixed(digits) : String(Math.round(value));
+  const shown = format ? format(value) : digits > 0 ? value.toFixed(digits) : String(Math.round(value));
   const done = (e: { currentTarget: HTMLInputElement }) => onChange(Number(e.currentTarget.value), true);
   return (
     <div className={`dev-slider${value !== def ? " changed" : ""}`}>
@@ -58,8 +63,8 @@ export function Slider({
         onFocus={(e) => e.target.select()}
         onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
         onBlur={(e) => {
-          const v = Number(e.target.value.replace(",", "."));
-          if (e.target.value !== shown && Number.isFinite(v)) onChange(Math.min(max, Math.max(min, v)), true);
+          const v = parse ? parse(e.target.value) : Number(e.target.value.replace(",", "."));
+          if (e.target.value !== shown && v !== null && Number.isFinite(v)) onChange(Math.min(max, Math.max(min, v)), true);
         }}
       />
     </div>

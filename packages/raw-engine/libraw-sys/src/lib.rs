@@ -58,6 +58,9 @@ pub struct mlr_info {
     pub thumb_height: c_int,
     pub thumb_length: c_uint,
     pub thumb_flip: c_int,
+    pub cam_mul: [f32; 4],
+    pub pre_mul: [f32; 4],
+    pub rgb_cam: [[f32; 4]; 3],
 }
 
 #[repr(C)]

@@ -48,14 +48,17 @@ pub fn load_source(
             let long = info.width.max(info.height);
             let half = max_edge.is_some_and(|m| long / 2 >= m.min(long));
             let bm = raw.develop_linear(half)?;
-            Ok(Source::from_linear16(
+            let mut s = Source::from_linear16(
                 bm.width,
                 bm.height,
                 &bm.rgb,
                 src.orientation,
                 info.width,
                 info.height,
-            ))
+            );
+            // Temperatura do balanço da câmara: a temperatura passa a ser em Kelvin.
+            s.as_shot_k = info.as_shot_white.and_then(develop::color::kelvin_of_white);
+            Ok(s)
         }) {
             Ok(s) => return Ok(s),
             Err(e) => {
@@ -185,12 +188,14 @@ pub fn ai_denoised(
                 })
             })
             .collect();
-    Ok(Some(Source::from_plane(
+    let mut out = Source::from_plane(
         Plane { w: p.w, h: p.h, px },
         src.full_width,
         src.full_height,
         src.baseline_ev,
-    )))
+    );
+    out.as_shot_k = src.as_shot_k;
+    Ok(Some(out))
 }
 
 /// Chave de uma fonte com AI Denoise: asset, resolução total?, intensidade.

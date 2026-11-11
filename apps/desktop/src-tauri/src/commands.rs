@@ -293,6 +293,21 @@ pub fn log_ui_error(kind: String, message: String, stack: Option<String>) {
     );
 }
 
+/// Classificações da seleção assistida para o Lightroom (`.xmp` ao lado dos RAW).
+#[tauri::command]
+pub async fn export_lightroom_ratings(
+    state: State<'_, AppState>,
+    options: momento_project_management::lightroom::LightroomOptions,
+) -> CmdResult<momento_project_management::lightroom::LightroomReport> {
+    state.session().and_then(|s| s.export_lightroom_ratings(&options)).map_err(err)
+}
+
+/// Temperatura (K) do balanço da câmara de um RAW, para mostrar a temperatura em Kelvin.
+#[tauri::command]
+pub async fn as_shot_kelvin(state: State<'_, AppState>, key: i64) -> CmdResult<Option<f32>> {
+    state.session().and_then(|s| s.as_shot_kelvin(key)).map_err(err)
+}
+
 /// Privacidade/espaço: apaga a cache regenerável do projeto aberto.
 #[tauri::command]
 pub async fn clear_cache(

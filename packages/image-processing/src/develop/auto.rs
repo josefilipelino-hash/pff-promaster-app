@@ -9,7 +9,7 @@
 //! As correções são **parciais** de propósito (ex.: só ~70 % da distância à exposição
 //! "média"), para não achatar o ambiente de uma festa à noite ou de um pôr do sol.
 
-use super::color::{luma, mul3, neutralize, oetf, wb_matrix};
+use super::color::{luma, mul3, neutralize_at, oetf, wb_matrix_at};
 use super::filters::gaussian;
 use super::geometry::GeoMap;
 use super::settings::*;
@@ -887,7 +887,7 @@ pub fn auto_edit(
     let (mut temp, mut tint) = (0.0, 0.0);
     if on(o.white_balance) {
         if let Some(ill) = estimate_illuminant(small) {
-            let (t, n) = neutralize(ill);
+            let (t, n) = neutralize_at(ill, src.wb_reference_k());
             // A matiz (verde/magenta) raramente é a causa: corrige-se menos.
             let n = n * 0.6;
             let conf = if t.abs() > 60.0 || n.abs() > 40.0 { 0.5 } else { 1.0 };
@@ -898,7 +898,7 @@ pub fn auto_edit(
         }
         s.wb = WhiteBalance { temperature: round1(temp), tint: round1(tint) };
     }
-    let wbm = wb_matrix(s.wb.temperature, s.wb.tint);
+    let wbm = wb_matrix_at(s.wb.temperature, s.wb.tint, src.wb_reference_k());
 
     // Exposição: chave da cena (parcial, mantém o ambiente) e rostos.
     let lum_lin: Vec<f32> = px.iter().map(|q| luma(mul3(&wbm, *q))).collect();

@@ -290,3 +290,34 @@ fn embedded_icc_profile_is_honoured() {
     }
     assert!(tagged[1] - tagged[0] > plain[1] - plain[0] + 5.0, "o verde Adobe RGB é mais saturado");
 }
+
+/// Temperatura do balanço da câmara (Kelvin) dos RAW reais: plausível (luz de dia/flash/
+/// tungsténio) e a mesma no render — com `MOMENTO_SAMPLES_DIR`.
+#[test]
+fn as_shot_kelvin_of_real_raws() {
+    let Some(dir) = std::env::var("MOMENTO_SAMPLES_DIR").ok().map(PathBuf::from) else {
+        eprintln!("SALTADO: MOMENTO_SAMPLES_DIR não definido");
+        return;
+    };
+    let mut seen = 0;
+    for p in std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.path()) {
+        let ext = p.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+        if !["nef", "cr2", "cr3", "arw", "raf", "orf", "rw2", "pef", "srw", "dng"]
+            .contains(&ext.as_str())
+        {
+            continue;
+        }
+        let data = std::fs::read(&p).unwrap();
+        let Ok(raw) = momento_raw_engine::RawFile::open(&data) else { continue };
+        let k = raw
+            .info()
+            .as_shot_white
+            .and_then(momento_image_processing::develop::color::kelvin_of_white);
+        eprintln!("{:<40} {:?}", p.file_name().unwrap().to_string_lossy(), k.map(|k| k.round()));
+        if let Some(k) = k {
+            assert!((1800.0..=15000.0).contains(&k), "{p:?}: {k} K");
+            seen += 1;
+        }
+    }
+    assert!(seen >= 5, "poucos RAW com temperatura: {seen}");
+}

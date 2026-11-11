@@ -170,11 +170,59 @@ pub const WB_REFERENCE_K: f32 = 5500.0;
 /// Matriz de balanço de brancos (em Rec. 2020 linear) para temperatura/matiz relativos.
 /// Temperatura +100 → mais quente (como se a luz fosse ~2× mais fria e se compensasse).
 pub fn wb_matrix(temperature: f32, tint: f32) -> [[f32; 3]; 3] {
+    wb_matrix_at(temperature, tint, WB_REFERENCE_K)
+}
+
+/// Temperatura (K) da luz que o balanço da câmara tornou branca: procura no locus do corpo
+/// negro (o mesmo usado em [`wb_matrix_at`]) a temperatura cuja cor em sRGB linear tem a
+/// mesma direção que `white` (de `RawInfo::as_shot_white`).
+pub fn kelvin_of_white(white: [f32; 3]) -> Option<f32> {
+    let n = |v: [f32; 3]| {
+        let s = v[0] + v[1] + v[2];
+        [v[0] / s, v[1] / s, v[2] / s]
+    };
+    if white.iter().any(|v| !v.is_finite() || *v <= 0.0) {
+        return None;
+    }
+    let w = n(white);
+    let err = |k: f32| {
+        let b = n(white_srgb(k));
+        // Só a direção vermelho↔azul (a temperatura); o verde é a matiz.
+        let r = (w[0] / w[2]).ln() - (b[0] / b[2]).ln();
+        r * r
+    };
+    // Em mired (1e6/K), passo fino e depois refinamento.
+    let mut best = (WB_REFERENCE_K, f32::MAX);
+    let mut m = 1e6 / 25000.0;
+    while m <= 1e6 / 1700.0 {
+        let k = 1e6 / m;
+        let e = err(k);
+        if e < best.1 {
+            best = (k, e);
+        }
+        m += 2.0;
+    }
+    let mb = 1e6 / best.0;
+    for i in -40..=40 {
+        let k = 1e6 / (mb + i as f32 * 0.05);
+        let e = err(k);
+        if e < best.1 {
+            best = (k, e);
+        }
+    }
+    Some(best.0)
+}
+
+/// Como [`wb_matrix`], com a temperatura de referência (o "neutro" atual da imagem): em RAW,
+/// a temperatura do disparo, para que `temperatura` corresponda a Kelvin reais:
+/// `K = k_ref · 2^(temperatura/100)`.
+pub fn wb_matrix_at(temperature: f32, tint: f32, k_ref: f32) -> [[f32; 3]; 3] {
     if temperature == 0.0 && tint == 0.0 {
         return [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
     }
-    let k_scene = WB_REFERENCE_K * 2f32.powf(temperature / 100.0);
-    let a = white_srgb(WB_REFERENCE_K);
+    let k_ref = if k_ref.is_finite() { k_ref.clamp(1700.0, 25000.0) } else { WB_REFERENCE_K };
+    let k_scene = k_ref * 2f32.powf(temperature / 100.0);
+    let a = white_srgb(k_ref);
     let b = white_srgb(k_scene);
     let mut m = [a[0] / b[0], a[1] / b[1], a[2] / b[2]];
     m[1] *= 2f32.powf(-tint / 100.0 * 0.4);
@@ -189,14 +237,19 @@ pub fn wb_matrix(temperature: f32, tint: f32) -> [[f32; 3]; 3] {
 /// (temperatura, matiz) que fazem `sample` (linear Rec. 2020) ficar com a mesma cor que
 /// `target` (normalizado). Com `target` neutro é o mesmo que [`neutralize`].
 pub fn match_white(sample: [f32; 3], target: [f32; 3]) -> (f32, f32) {
+    match_white_at(sample, target, WB_REFERENCE_K)
+}
+
+/// [`match_white`] com a temperatura de referência da imagem (ver [`wb_matrix_at`]).
+pub fn match_white_at(sample: [f32; 3], target: [f32; 3], k_ref: f32) -> (f32, f32) {
     let ts = mul3(&REC2020_TO_SRGB, target);
     let tm = (ts[0] + ts[1] + ts[2]) / 3.0;
     if tm <= 0.0 {
-        return neutralize(sample);
+        return neutralize_at(sample, k_ref);
     }
     let tn = ts.map(|v| v / tm);
     let err = |t: f32, n: f32| {
-        let v = mul3(&wb_matrix(t, n), sample);
+        let v = mul3(&wb_matrix_at(t, n, k_ref), sample);
         let s = mul3(&REC2020_TO_SRGB, v);
         let m = (s[0] + s[1] + s[2]) / 3.0;
         if m <= 0.0 {
@@ -230,8 +283,13 @@ pub fn match_white(sample: [f32; 3], target: [f32; 3]) -> (f32, f32) {
 }
 
 pub fn neutralize(sample: [f32; 3]) -> (f32, f32) {
+    neutralize_at(sample, WB_REFERENCE_K)
+}
+
+/// [`neutralize`] com a temperatura de referência da imagem (ver [`wb_matrix_at`]).
+pub fn neutralize_at(sample: [f32; 3], k_ref: f32) -> (f32, f32) {
     let err = |t: f32, n: f32| {
-        let v = mul3(&wb_matrix(t, n), sample);
+        let v = mul3(&wb_matrix_at(t, n, k_ref), sample);
         let s = mul3(&REC2020_TO_SRGB, v);
         let m = (s[0] + s[1] + s[2]) / 3.0;
         if m <= 0.0 {
@@ -267,6 +325,31 @@ pub fn neutralize(sample: [f32; 3]) -> (f32, f32) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Temperatura em Kelvin: o branco de cada temperatura volta a dar essa temperatura, e com
+    /// a referência certa `K = k_ref · 2^(t/100)` é mesmo a luz que fica neutra.
+    #[test]
+    fn kelvin_round_trip_and_reference() {
+        for k in [2700.0f32, 3200.0, 4300.0, 5500.0, 6500.0, 9000.0] {
+            let got = kelvin_of_white(white_srgb(k)).unwrap();
+            assert!((got - k).abs() / k < 0.01, "{k} → {got}");
+        }
+        assert!(kelvin_of_white([0.0, 1.0, 1.0]).is_none());
+        // Fonte balanceada para 3200 K: escolher 4000 K torna neutra uma luz de 4000 K.
+        let k_ref = 3200.0;
+        let t = 100.0 * (4000.0f32 / k_ref).log2();
+        let m = wb_matrix_at(t, 0.0, k_ref);
+        // Luz de 4000 K vista por uma câmara balanceada a 3200 K: branco(4000)/branco(3200).
+        let (a, b) = (white_srgb(4000.0), white_srgb(k_ref));
+        let seen = mul3(&SRGB_TO_REC2020, [a[0] / b[0], a[1] / b[1], a[2] / b[2]]);
+        let out = mul3(&REC2020_TO_SRGB, mul3(&m, seen));
+        let mean = (out[0] + out[1] + out[2]) / 3.0;
+        for c in out {
+            assert!((c / mean - 1.0).abs() < 0.01, "{out:?}");
+        }
+        // Sem referência (JPEG): igual ao comportamento anterior.
+        assert_eq!(wb_matrix(30.0, 5.0), wb_matrix_at(30.0, 5.0, WB_REFERENCE_K));
+    }
 
     #[test]
     fn matrices_are_inverse_and_keep_white() {

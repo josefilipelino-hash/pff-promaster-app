@@ -102,9 +102,17 @@ Para um único `.dmg` que funcione em Apple Silicon e Intel: `./scripts/build-re
 ### 2. Instalar
 
 1. Abrir o `.dmg` e arrastar **PFF ProMaster** para **Aplicações**.
-2. **Primeira abertura** (aplicação não assinada): clique direito na aplicação → **Abrir** →
-   **Abrir**. Em macOS 15+, se não aparecer a opção: **Definições do Sistema → Privacidade e
-   segurança → Abrir mesmo assim**. Só é preciso uma vez.
+2. **Primeira abertura** (assinatura local *ad-hoc*, sem certificado Apple): abrir a aplicação;
+   o macOS recusa da primeira vez. Ir a **Definições do Sistema → Privacidade e segurança**,
+   descer até "PFF ProMaster foi bloqueado" e carregar em **Abrir mesmo assim**. Só é preciso
+   uma vez. (Em macOS 15 e posteriores o clique direito → Abrir deixou de funcionar.)
+3. Se aparecer **"está danificado e não pode ser aberto"** (marca de quarentena de um
+   ficheiro descarregado), no Terminal:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/PFF ProMaster.app"
+```
+
    Alternativa no Terminal: `xattr -dr com.apple.quarantine "/Applications/PFF ProMaster.app"`
    (só necessário se o `.dmg` tiver sido descarregado da internet).
 

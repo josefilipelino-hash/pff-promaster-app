@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api, events, isMac } from "../../api";
 import { Icon } from "../Icon";
@@ -180,6 +180,14 @@ function CopyDialog({
   );
 }
 
+/** Blocos sincronizáveis que mudaram (os próprios de cada fotografia nunca vão). */
+const SYNC_EXCLUDED = new Set(["geometry", "retouch", "masks", "portrait"]);
+export function changedSyncBlocks(a: DevelopSettings, b: DevelopSettings): string[] {
+  const ra = a as unknown as Record<string, unknown>;
+  const rb = b as unknown as Record<string, unknown>;
+  return SETTINGS_BLOCKS.filter((k) => !SYNC_EXCLUDED.has(k) && JSON.stringify(ra[k]) !== JSON.stringify(rb[k]));
+}
+
 export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoKey: number; order: number[]; onNavigate: (key: number) => void; filmstrip?: React.ReactNode }) {
   const { t } = useTranslation();
   const toast = useStore((s) => s.toast);
@@ -191,6 +199,20 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
   const [view, setView] = useState<EditView | null>(null);
   const [settings, setSettings] = useState<DevelopSettings>(defaultSettings());
   const [frame, setFrame] = useState<Frame | null>(null);
+  // RAW: temperatura do balanço da câmara (K), pedida depois do primeiro render (a fonte já
+  // está em memória) — a temperatura passa a ser mostrada em Kelvin.
+  const [asShot, setAsShot] = useState<{ key: number; k: number | null } | null>(null);
+  const hasFrame = frame !== null;
+  useEffect(() => {
+    if (!hasFrame) return;
+    let live = true;
+    api.asShotKelvin(photoKey)
+      .then((k) => live && setAsShot({ key: photoKey, k }))
+      .catch(() => live && setAsShot({ key: photoKey, k: null }));
+    return () => {
+      live = false;
+    };
+  }, [photoKey, hasFrame]);
   const [before, setBefore] = useState(false);
   const [cropMode, setCropMode] = useState(false);
   const [wbPicking, setWbPicking] = useState(false);
@@ -341,12 +363,48 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded, before, cropMode, box.w, box.h, photoKey]);
 
+  // Sincronização automática (como o "Auto Sync" do Lightroom): com várias fotografias
+  // selecionadas, cada alteração gravada aqui vai também para as outras selecionadas — só os
+  // blocos que mudaram e nunca os próprios de cada fotografia (recorte, máscaras, retoque).
+  const [autoSync, setAutoSyncState] = useState(() => {
+    try {
+      return localStorage.getItem("pff.autoSync") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const setAutoSync = (on: boolean) => {
+    setAutoSyncState(on);
+    try {
+      localStorage.setItem("pff.autoSync", on ? "1" : "0");
+    } catch {
+      /* sem armazenamento: só nesta sessão */
+    }
+  };
+  const syncTargets = useMemo(
+    () => (selection.ids.has(photoKey) ? [...selection.ids].filter((k) => k !== photoKey) : []),
+    [selection, photoKey],
+  );
+  const syncRef = useRef({ on: autoSync, targets: syncTargets, skipOnce: false });
+  syncRef.current.on = autoSync;
+  syncRef.current.targets = syncTargets;
+
   const commit = useCallback(
     async (label: string, s: DevelopSettings) => {
       // Só para a fotografia mostrada e com os SEUS ajustes carregados.
       if (photoKey !== photoKeyRef.current || viewKeyRef.current !== photoKey) return;
       if (sameSettings(s, committed.current)) return;
+      const before = committed.current;
       committed.current = s;
+      const sync = syncRef.current;
+      const skip = sync.skipOnce;
+      sync.skipOnce = false;
+      if (sync.on && !skip && sync.targets.length > 0) {
+        const blocks = changedSyncBlocks(before, s);
+        if (blocks.length > 0) {
+          api.pasteSettings(sync.targets, s, blocks).then(() => void reloadPhotos()).catch(fail);
+        }
+      }
       // Gravações em série: duas seguidas (ex.: nova máscara + pincel) nunca chegam ao
       // catálogo pela ordem inversa (Fase 15).
       const prev = commitChain.current;
@@ -430,6 +488,15 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
       const s = await api.presetPreviewSettings(settings, p.id, presetAmount);
       hoverSeq.current++;
       setPreview(null);
+      // Várias selecionadas: o preset é aplicado a cada uma (relativo ao que cada uma tem),
+      // não copiado desta.
+      const others = syncRef.current.targets;
+      if (others.length > 0) {
+        syncRef.current.skipOnce = true;
+        const n = await api.applyPreset(others, p.id, presetAmount);
+        void reloadPhotos();
+        toast("info", t("presets.applied", { name: p.name, count: n + 1 }));
+      }
       set(`preset:${p.name}`, (cur) => void Object.assign(cur, s), true);
     } catch (e) {
       fail(e);
@@ -947,6 +1014,17 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
             <Icon name="sync" />
             <span className="act-label">{t("develop.sync")}</span>
           </button>
+          <button
+            type="button"
+            className={`btn small act auto-sync${autoSync && syncTargets.length > 0 ? " on" : ""}`}
+            aria-pressed={autoSync}
+            disabled={syncTargets.length === 0}
+            onClick={() => setAutoSync(!autoSync)}
+            title={syncTargets.length === 0 ? t("develop.autoSyncNeedSelection") : t("develop.autoSyncHint", { count: syncTargets.length })}
+          >
+            <Icon name="sync" />
+            <span className="act-label">{autoSync && syncTargets.length > 0 ? t("develop.autoSyncOn", { count: syncTargets.length + 1 }) : t("develop.autoSync")}</span>
+          </button>
           <button type="button" className="btn small act" aria-label={t("develop.makeVirtualCopy")} onClick={() => void virtualCopy()} title={`${mod}+'`}>
             <Icon name="duplicate" />
             <span className="act-label">{t("develop.makeVirtualCopy")}</span>
@@ -1070,6 +1148,7 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
       </section>
       <DevelopPanel
         settings={settings}
+        asShotKelvin={asShot && asShot.key === photoKey ? asShot.k : null}
         set={set}
         histogram={frame?.histogram ?? null}
         wbPicking={wbPicking}

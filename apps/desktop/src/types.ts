@@ -1031,3 +1031,15 @@ export interface CatalogValidation {
   integrity: string[];
   foreignKeys: number;
 }
+
+/** Resultado de "Classificações para o Lightroom" (`.xmp` ao lado dos RAW). */
+export interface LightroomReport {
+  created: number;
+  updated: number;
+  /** Escritas por estrelas: [2★, 3★, 5★, outras]. */
+  byStars: [number, number, number, number];
+  notRaw: string[];
+  unavailable: string[];
+  failed: [string, string][];
+  starsInApp: number;
+}

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { api } from "../api";
 import { errorText, useStore, type View } from "../store";
+import { LightroomDialog } from "./LightroomDialog";
 import { LABELS, SELECTION_MODES, type Label, type SelectionMode } from "../types";
 
 /** “Seleção automática” na barra lateral: análise, modo, objetivo e contagens por etiqueta. */
@@ -26,6 +27,7 @@ export function SelectionPanel({
   const reloadSelection = useStore((s) => s.reloadSelection);
   const [target, setTarget] = useState("");
   const [confirmReanalyze, setConfirmReanalyze] = useState(false);
+  const [lightroom, setLightroom] = useState(false);
   const fail = (e: unknown) => toast("error", errorText(e, t));
 
   useEffect(() => {
@@ -149,9 +151,15 @@ export function SelectionPanel({
                 {t("selection.reanalyze")}
               </button>
             ))}
+          {!running && (
+            <button type="button" className="btn small lr-button" onClick={() => setLightroom(true)} title={t("lightroom.hint")}>
+              {t("lightroom.open")}
+            </button>
+          )}
           <p className="small muted privacy-note">{t("selection.local")}</p>
         </>
       )}
+      {lightroom && <LightroomDialog onClose={() => setLightroom(false)} />}
     </section>
   );
 }

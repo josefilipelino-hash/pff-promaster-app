@@ -131,6 +131,8 @@ const apiMock = {
   pasteSettings: vi.fn(async (keys: number[]) => keys.length),
   pickWhiteBalance: vi.fn(async () => [23.4, -7.6] as [number, number]),
   autoStraighten: vi.fn(async () => 2.34),
+  asShotKelvin: vi.fn(async () => null as number | null),
+  exportLightroomRatings: vi.fn(async () => ({ created: 2, updated: 0, byStars: [0, 1, 1, 0], notRaw: ["IMG_9.jpg"], unavailable: [], failed: [], starsInApp: 2 })),
   aiDenoiseAvailable: vi.fn(async () => true),
   exportCapabilities: vi.fn(async () => EXPORT_CAPS),
   exportRecipes: vi.fn(async () => [EXPORT_JPEG, EXPORT_TIFF]),
@@ -1665,7 +1667,7 @@ describe("UX profissional (Fase 14)", () => {
     expect(within(more).getByRole("menuitemcheckbox", { name: /Escuro/ }).getAttribute("aria-checked")).toBe("true");
     fireEvent.click(within(more).getByRole("menuitemcheckbox", { name: /Claro/ }));
     expect(document.documentElement.dataset.theme).toBe("light");
-    expect(document.documentElement.style.getPropertyValue("--bg")).toBe("#f3f3f3");
+    expect(document.documentElement.style.getPropertyValue("--bg")).toBe("#f5f4f2");
     fireEvent.click(screen.getByRole("button", { name: "Mais" }));
     fireEvent.click(within(screen.getByRole("menu", { name: "Mais" })).getByRole("menuitemcheckbox", { name: /Escuro/ }));
     expect(document.documentElement.dataset.theme).toBe("dark");
@@ -1951,5 +1953,44 @@ describe("auditoria final: erros da interface", () => {
     spy.mockRestore();
     expect(screen.getByRole("alert").textContent).toContain("falhou de propósito");
     expect(screen.getByRole("button", { name: "Recarregar a interface" })).toBeTruthy();
+  });
+});
+
+describe("pedidos do utilizador: Kelvin, sincronização, Lightroom", () => {
+  it("temperatura em Kelvin: conversões nos dois sentidos e limites", async () => {
+    const k = await import("../logic/kelvin");
+    expect(k.formatKelvin(0, 5150)).toBe("5150");
+    expect(k.formatKelvin(100, 3000)).toBe("6000");
+    expect(Math.round(k.parseKelvin("6 000 K", 3000)!)).toBe(100);
+    expect(k.parseKelvin("abc", 5000)).toBeNull();
+    // Fora de 2000–50000 K: limitado.
+    expect(k.kelvinFromRelative(k.parseKelvin("100", 5000)!, 5000)).toBeCloseTo(2000, 0);
+    const [lo, hi] = k.relativeRange(5000);
+    expect(k.kelvinFromRelative(lo, 5000)).toBeCloseTo(2000, 0);
+    expect(k.kelvinFromRelative(hi, 5000)).toBeCloseTo(50000, 0);
+  });
+
+  it("sincronização automática só leva os blocos que mudaram e nunca recorte/máscaras/retoque", async () => {
+    const { changedSyncBlocks } = await import("./develop/DevelopView");
+    const { defaultSettings } = await import("../logic/develop");
+    const a = defaultSettings();
+    const b = defaultSettings();
+    b.light.exposure = 0.5;
+    b.wb.temperature = 12;
+    b.geometry.straighten = 3;
+    expect(changedSyncBlocks(a, b).sort()).toEqual(["light", "wb"]);
+    expect(changedSyncBlocks(a, defaultSettings())).toEqual([]);
+  });
+
+  it("Lightroom: correspondência, confirmação e relatório", async () => {
+    const { LightroomDialog } = await import("./LightroomDialog");
+    const onClose = vi.fn();
+    render(<LightroomDialog onClose={onClose} />);
+    const dlg = screen.getByRole("dialog", { name: "Classificações para o Lightroom" });
+    expect(dlg.textContent).toContain("★★★★★");
+    expect(dlg.textContent).toContain("Os RAW nunca são alterados");
+    fireEvent.click(within(dlg).getByRole("button", { name: "Escrever classificações" }));
+    await waitFor(() => expect(screen.getByRole("status").textContent).toContain("2 ficheiros .xmp escritos"));
+    expect(screen.getByRole("status").textContent).toContain("1 fotografia não é RAW");
   });
 });

@@ -618,8 +618,17 @@ impl ProjectSession {
     ) -> CoreResult<Option<(f32, f32)>> {
         let (_, asset) = self.catalog().resolve_key(key)?;
         let src = self.edits.source(&*self.open_catalog()?, &self.registry, asset)?;
+        let k_ref = src.wb_reference_k();
         Ok(momento_image_processing::develop::sample_for_white_balance(&src, settings, u, v)
-            .map(momento_image_processing::develop::color::neutralize))
+            .map(|s| momento_image_processing::develop::color::neutralize_at(s, k_ref)))
+    }
+
+    /// Temperatura (K) do balanço da câmara de um RAW (`None` noutros formatos): a fonte de
+    /// edição fica em cache, por isso é imediato depois do primeiro render.
+    pub fn as_shot_kelvin(&self, key: i64) -> CoreResult<Option<f32>> {
+        let (_, asset) = self.catalog().resolve_key(key)?;
+        let src = self.edits.source(&*self.open_catalog()?, &self.registry, asset)?;
+        Ok(src.as_shot_k)
     }
 
     pub fn auto_straighten(&self, key: i64, settings: &DevelopSettings) -> CoreResult<Option<f32>> {

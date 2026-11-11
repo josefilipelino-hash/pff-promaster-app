@@ -5,6 +5,32 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [1.1.0-personal] — 2026-11-11 — pedidos do utilizador
+
+### Adicionado
+- **Classificações para o Lightroom** (Seleção automática → "Classificações para o
+  Lightroom…"): Melhor 5★, Alternativa 3★, Rever 2★ em ficheiros `.xmp` ao lado de cada RAW,
+  que o Lightroom lê ao importar (ou em Metadados → Ler metadados dos ficheiros). Os RAW nunca
+  são alterados; um `.xmp` existente só tem a classificação mudada (cópia
+  `.xmp.pff-original`). Opções: manter as estrelas já dadas; aplicar também no PFF ProMaster.
+  Um catálogo `.lrcat` não é gerado (formato privado, sem documentação — ver
+  `KNOWN_LIMITATIONS.md`).
+- **Temperatura em Kelvin para RAW**: calculada a partir do balanço da câmara (LibRaw) e usada
+  como referência do balanço de brancos; controlo de 2000 a 50 000 K (escala logarítmica,
+  arredondado a 50 K, aceita "5600" ou "5600 K"). JPEG e outros mantêm a escala relativa.
+- **Editar várias fotografias ao mesmo tempo**: "Sincronizar auto" no editor (cada alteração
+  vai também para as outras selecionadas — sem recorte, máscaras nem retoque); presets no
+  editor aplicados a todas as selecionadas; seleção múltipla na tira do editor
+  (Cmd/Ctrl+clique, Shift+clique).
+- **Novo visual**: destaque coral → sol, cantos mais suaves, barra do fluxo do trabalho
+  (Importar → Selecionar → Editar → Entregar) com o progresso real de cada passo.
+
+### Corrigido
+- macOS recente recusava abrir a aplicação (sem qualquer assinatura): passa a ter assinatura
+  local *ad-hoc*; instruções para a primeira abertura em `INSTALLATION.md`.
+- Windows: cópia do catálogo antes de migrar/restaurar ("Access is denied").
+- Pilhas de 16 MB nas threads de processamento (esgotavam sob carga, visto em macOS).
+
 ## [1.0.0-personal] — 2026-11-10 — Fase 16 + auditoria final
 
 Sem funcionalidades novas além das prometidas na documentação que não existiam. Ver

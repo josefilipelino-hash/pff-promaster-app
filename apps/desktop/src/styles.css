@@ -732,6 +732,7 @@ progress { accent-color: var(--accent); height: 4px; border-radius: var(--r-full
 .strip-cell { position: relative; width: 68px; height: 68px; padding: 0; border: 2px solid transparent; border-radius: var(--r-md); background: var(--surface-2); cursor: pointer; overflow: hidden; display: grid; place-items: center; }
 .strip-cell:hover { border-color: var(--border-strong); }
 .strip-cell.current { border-color: var(--accent); }
+.strip-cell.selected:not(.current) { border-color: color-mix(in srgb, var(--accent) 55%, transparent); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent); }
 .strip-cell img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
 .strip-cell.rejected img { opacity: 0.35; }
 .strip-pending { width: 14px; height: 14px; border-radius: var(--r-full); border: 2px solid var(--border-strong); }
@@ -767,3 +768,52 @@ progress { accent-color: var(--accent); height: 4px; border-radius: var(--r-full
 /* Falha num componente (auditoria final): mensagem em vez de janela em branco. */
 .app-error { max-width: 560px; margin: 15vh auto; padding: 0 16px; color: var(--text); }
 .app-error pre { white-space: pre-wrap; word-break: break-word; }
+
+/* Classificações para o Lightroom */
+.lightroom-dialog { display: flex; flex-direction: column; gap: 10px; }
+.lr-map { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-variant-numeric: tabular-nums; }
+.lr-map li { display: flex; align-items: center; gap: 8px; color: var(--pick); letter-spacing: 0.08em; }
+.lr-button { width: 100%; margin-top: 6px; }
+.act.auto-sync.on { background: var(--accent); border-color: var(--accent); color: var(--accent-fg, #111); }
+
+/* ===================================================================================== */
+/* Visual 1.1 (pedido do utilizador): moderno, alegre e prático. Fundos neutros (as cores  */
+/* das fotografias não são influenciadas); a energia está no destaque coral → sol.        */
+/* ===================================================================================== */
+.btn { transition: background var(--dur), border-color var(--dur), transform var(--dur), box-shadow var(--dur); }
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn.primary { background: var(--accent-grad); border-color: transparent; color: var(--on-accent); box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 30%, transparent); }
+.btn.primary:hover:not(:disabled) { background: var(--accent-grad); filter: brightness(1.06); box-shadow: 0 4px 16px color-mix(in srgb, var(--accent) 40%, transparent); }
+.btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.segmented.views .btn.active { background: var(--accent-soft); border-color: transparent; box-shadow: inset 0 -2px 0 var(--accent); }
+.side-item.active { background: var(--accent-soft) !important; color: var(--text); box-shadow: inset 3px 0 0 var(--accent); }
+.modal { border-radius: 18px; }
+.modal-header h2 { font-size: var(--fs-xl); letter-spacing: -0.01em; }
+input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* Fluxo do trabalho: Importar → Selecionar → Editar → Entregar */
+.workflow { display: flex; gap: 6px; padding: 6px 12px; background: var(--surface); border-bottom: 1px solid var(--border); overflow-x: auto; flex-shrink: 0; }
+.wf-step { flex: 1 1 0; min-width: 150px; display: flex; align-items: center; gap: 10px; padding: 6px 12px; border-radius: 12px; background: transparent; border: 1px solid transparent; cursor: pointer; text-align: left; color: var(--text-muted); position: relative; transition: background var(--dur), border-color var(--dur); }
+.wf-step:hover { background: var(--hover); color: var(--text); }
+.wf-step:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.wf-step > svg { margin-left: auto; opacity: 0.6; }
+.wf-num { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: var(--fs-xs); font-weight: 700; background: var(--surface-3); color: var(--text-muted); flex-shrink: 0; }
+.wf-text { display: flex; flex-direction: column; min-width: 0; }
+.wf-name { font-weight: 600; font-size: var(--fs-md); color: inherit; }
+.wf-detail { font-size: var(--fs-xs); color: var(--text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wf-step.done .wf-num { background: color-mix(in srgb, var(--success) 22%, transparent); color: var(--success); }
+.wf-step.next { border-color: color-mix(in srgb, var(--accent) 45%, transparent); color: var(--text); }
+.wf-step.next .wf-num { background: var(--accent-grad); color: var(--on-accent); }
+.wf-step.active { background: var(--accent-soft); color: var(--text); }
+.wf-step.active::after { content: ""; position: absolute; left: 14px; right: 14px; bottom: -7px; height: 3px; border-radius: 3px; background: var(--accent-grad); }
+
+/* Ecrã inicial mais acolhedor */
+.home-header h1 { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; background: var(--accent-grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.recent-card { border-radius: 16px; overflow: hidden; position: relative; transition: border-color var(--dur), transform var(--dur), box-shadow var(--dur); }
+.recent-card::before { content: ""; position: absolute; left: 0; top: 0; right: 0; height: 3px; background: var(--accent-grad); opacity: 0.85; }
+.recent-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); }
+.empty { border-radius: 16px; }
+
+/* Etiquetas da seleção assistida mais vivas */
+:root { --l-best: #3fbf6a; --l-alt: #4aa3ff; --l-review: #ffc857; --l-reject: #ff6b6b; --l-dup: #9a9a9a; }
+.label-chip { border-radius: var(--r-full); padding: 2px 8px; }

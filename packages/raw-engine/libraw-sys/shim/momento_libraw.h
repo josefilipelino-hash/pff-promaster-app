@@ -63,6 +63,12 @@ typedef struct mlr_info {
   int thumb_height;
   unsigned thumb_length;
   int thumb_flip;
+  /* Balanço de brancos (auditoria pós-1.0: temperatura em Kelvin). cam_mul: multiplicadores
+   * da câmara no disparo; pre_mul: multiplicadores de luz do dia; rgb_cam: câmara → sRGB
+   * linear (depois de pre_mul). Zeros se desconhecidos. */
+  float cam_mul[4];
+  float pre_mul[4];
+  float rgb_cam[3][4];
 } mlr_info;
 
 typedef struct mlr_image {

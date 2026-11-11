@@ -15,6 +15,7 @@ import { ExportDialog, ExportQueue } from "./Export";
 import { GalleryDialog } from "./Gallery";
 import { AlbumView } from "./AlbumView";
 import { DeleteDialog, SafetyDialog } from "./SafetyDialogs";
+import { WorkflowBar } from "./WorkflowBar";
 import { ConsistencyView } from "./ConsistencyView";
 import { ApplyPresetDialog } from "./Presets";
 import { ClockDialog } from "./ClockDialog";
@@ -608,13 +609,41 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
             onView={(v) => s.setView(v)}
           />
         )}
+        {!fullscreen && (
+          <WorkflowBar view={s.view} onView={(v) => s.setView(v)} onImport={() => void chooseImport(true)} onExport={() => s.setExportDialog(true)} />
+        )}
         <div className="content">
                     {s.view === "develop" && developKey !== undefined ? (
             <DevelopView
               photoKey={developKey}
               order={order}
               onNavigate={(k) => s.setSelection({ ids: new Set([k]), focus: k, anchor: k })}
-              filmstrip={<Filmstrip photos={visible} current={developKey} onSelect={(k) => s.setSelection({ ids: new Set([k]), focus: k, anchor: k })} onMenu={openPhotoMenu} />}
+              filmstrip={
+                <Filmstrip
+                  photos={visible}
+                  current={developKey}
+                  selected={s.selection.ids}
+                  onSelect={(k, how) => {
+                    const sel = s.selection;
+                    // Cmd/Ctrl e Shift juntam à seleção sem mudar a fotografia mostrada (para
+                    // editar várias ao mesmo tempo com a sincronização automática).
+                    if (how.toggle || how.range) {
+                      const ids = new Set(sel.ids);
+                      if (developKey !== undefined) ids.add(developKey);
+                      if (how.range) {
+                        const a = order.indexOf(sel.anchor ?? developKey ?? k);
+                        const b = order.indexOf(k);
+                        for (const x of order.slice(Math.min(a, b), Math.max(a, b) + 1)) ids.add(x);
+                      } else if (ids.has(k) && k !== developKey) ids.delete(k);
+                      else ids.add(k);
+                      s.setSelection({ ids, focus: developKey ?? k, anchor: how.range ? sel.anchor : k });
+                    } else {
+                      s.setSelection({ ids: new Set([k]), focus: k, anchor: k });
+                    }
+                  }}
+                  onMenu={openPhotoMenu}
+                />
+              }
             />
           ) : s.photos.length === 0 ? (
             <div className="empty-state">

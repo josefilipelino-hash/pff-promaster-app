@@ -15,15 +15,18 @@ export function stripRange(scrollLeft: number, width: number, count: number): [n
   return [first, last];
 }
 
-const Item = memo(function Item({ p, current, token, version, onSelect, onMenu }: { p: PhotoRow; current: boolean; token: number; version: number; onSelect: (id: number) => void; onMenu: (id: number, x: number, y: number) => void }) {
+/** Clique na tira: simples (mostrar esta), Cmd/Ctrl (juntar/tirar da seleção) ou Shift (intervalo). */
+export type StripClick = { toggle: boolean; range: boolean };
+
+const Item = memo(function Item({ p, current, selected, token, version, onSelect, onMenu }: { p: PhotoRow; current: boolean; selected: boolean; token: number; version: number; onSelect: (id: number, how: StripClick) => void; onMenu: (id: number, x: number, y: number) => void }) {
   return (
     <button
       type="button"
-      className={`strip-cell${current ? " current" : ""}${p.flag === -1 ? " rejected" : ""}`}
+      className={`strip-cell${current ? " current" : ""}${selected ? " selected" : ""}${p.flag === -1 ? " rejected" : ""}`}
       aria-label={p.fileName}
       aria-current={current ? "true" : undefined}
       tabIndex={current ? 0 : -1}
-      onClick={() => onSelect(p.id)}
+      onClick={(e) => onSelect(p.id, { toggle: e.metaKey || e.ctrlKey, range: e.shiftKey })}
       onContextMenu={(e) => {
         e.preventDefault();
         onMenu(p.id, e.clientX, e.clientY);
@@ -47,7 +50,7 @@ const Item = memo(function Item({ p, current, token, version, onSelect, onMenu }
  * fotografias não criam 15 000 elementos), a atual centrada sem animação, marcas e
  * classificação visíveis, menu contextual.
  */
-export function Filmstrip({ photos, current, onSelect, onMenu }: { photos: PhotoRow[]; current: number | null; onSelect: (id: number) => void; onMenu: (id: number, x: number, y: number) => void }) {
+export function Filmstrip({ photos, current, selected, onSelect, onMenu }: { photos: PhotoRow[]; current: number | null; selected?: Set<number>; onSelect: (id: number, how: StripClick) => void; onMenu: (id: number, x: number, y: number) => void }) {
   const { t } = useTranslation();
   const token = useStore((s) => s.project?.imageToken ?? 0);
   const versions = useStore((s) => s.thumbVersion);
@@ -78,7 +81,7 @@ export function Filmstrip({ photos, current, onSelect, onMenu }: { photos: Photo
     const p = photos[i]!;
     items.push(
       <div key={p.id} className="strip-slot" role="listitem" style={{ left: i * STRIP_ITEM }}>
-        <Item p={p} current={i === index} token={token} version={versions.get(p.id) ?? 0} onSelect={onSelect} onMenu={onMenu} />
+        <Item p={p} current={i === index} selected={!!selected && selected.size > 1 && selected.has(p.id)} token={token} version={versions.get(p.id) ?? 0} onSelect={onSelect} onMenu={onMenu} />
       </div>,
     );
   }

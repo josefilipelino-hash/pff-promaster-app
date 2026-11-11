@@ -10,7 +10,9 @@
 //! 3. **Filtros espaciais** à resolução do render: textura, redução de ruído, nitidez.
 //! 4. **Saída**: vinheta, grão → sRGB 8 bits (RGBA) + histograma.
 
-use super::color::{eotf, luma, mul3, oetf, wb_matrix, Transfer, REC2020_TO_SRGB, SRGB_TO_REC2020};
+use super::color::{
+    eotf, luma, mul3, oetf, wb_matrix_at, Transfer, REC2020_TO_SRGB, SRGB_TO_REC2020,
+};
 use super::curves::CurveLuts;
 use super::filters::{gaussian, min_filter, sample_plane};
 use super::geometry::{output_size, GeoMap};
@@ -114,7 +116,7 @@ fn chroma_of(hue: f32) -> [f32; 3] {
 impl<'a> Prep<'a> {
     fn new(src: &Source, s: &'a Settings, uncropped: bool) -> Self {
         let gain = 2f32.powf(s.light.exposure.clamp(-5.0, 5.0));
-        let mut wbx = wb_matrix(s.wb.temperature, s.wb.tint);
+        let mut wbx = wb_matrix_at(s.wb.temperature, s.wb.tint, src.wb_reference_k());
         for row in &mut wbx {
             for v in row.iter_mut() {
                 *v *= gain;

@@ -30,6 +30,20 @@ que têm impacto no uso real, por gravidade.
 | Catálogo em disco de rede não suportado (SQLite WAL). | Usar disco local ou externo. |
 | Nomes de ficheiro com mais de 255 bytes falham individualmente. | Erro do sistema mostrado por ficheiro. |
 
+## 2b. Lightroom e temperatura (1.1)
+
+- **Não é gerado um catálogo `.lrcat`**: é uma base de dados privada da Adobe, sem
+  documentação e diferente entre versões; um catálogo gerado poderia não abrir ou ficar
+  danificado. As classificações vão em `.xmp` ao lado dos RAW (o caminho suportado pela Adobe).
+- **DNG, JPEG, TIFF, HEIC, PSD não recebem classificação para o Lightroom**: o Lightroom só a
+  lê de dentro destes ficheiros, que a aplicação nunca altera. Ficam listados no relatório.
+- **A temperatura em Kelvin é uma estimativa própria** a partir dos coeficientes da câmara
+  (LibRaw) e do locus do corpo negro: valores plausíveis em 20 RAW reais de 12 marcas
+  (3100–6500 K), mas pode diferir algumas centenas de K do valor que o Lightroom mostra (usa
+  os perfis de câmara da Adobe). Não foi comparada com o valor gravado pela câmara.
+- A sincronização automática não leva recorte/rotação, máscaras, retoque nem retrato (são
+  próprios de cada fotografia, como no Lightroom).
+
 ## 3. Funcionalidades da especificação não implementadas (principais)
 
 - **Importação:** deteção automática de cartões/DCIM e dispositivos USB (PTP/MTP),

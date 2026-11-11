@@ -4,6 +4,7 @@ import type { DevelopSettings } from "../../types";
 import { CurveEditor } from "./CurveEditor";
 import { Histogram } from "./Histogram";
 import { Slider } from "./Slider";
+import { formatKelvin, parseKelvin, relativeRange } from "../../logic/kelvin";
 
 /** Campo numérico: [bloco, campo, mín, máx, passo, neutro, casas decimais]. */
 type Field = [keyof DevelopSettings, string, number, number, number, number, number?];
@@ -108,8 +109,11 @@ export function DevelopPanel({
   portrait,
   retouch,
   ai,
+  asShotKelvin,
 }: {
   settings: DevelopSettings;
+  /** RAW: temperatura do balanço da câmara (K) — a temperatura é mostrada em Kelvin. */
+  asShotKelvin?: number | null;
   set: SetField;
   histogram: [Uint32Array, Uint32Array, Uint32Array] | null;
   wbPicking: boolean;
@@ -134,14 +138,18 @@ export function DevelopPanel({
   const fieldSlider = ([block, key, min, max, step, def, digits]: Field) => {
     const value = (settings[block] as unknown as Record<string, number>)[key]!;
     const label = `${block}.${key}`;
+    const kelvin = label === "wb.temperature" && asShotKelvin ? asShotKelvin : null;
+    const [lo, hi] = kelvin ? relativeRange(kelvin) : [min, max];
     return (
       <Slider
         key={label}
-        label={t(`develop.field.${label}`)}
+        label={kelvin ? t("develop.field.wb.temperatureKelvin") : t(`develop.field.${label}`)}
         value={value}
-        min={min}
-        max={max}
-        step={step}
+        min={lo}
+        max={hi}
+        format={kelvin ? (v) => formatKelvin(v, kelvin) : undefined}
+        parse={kelvin ? (s) => parseKelvin(s, kelvin) : undefined}
+        step={kelvin ? 0.5 : step}
         def={def}
         digits={digits ?? 0}
         gradient={GRADIENTS[label]}

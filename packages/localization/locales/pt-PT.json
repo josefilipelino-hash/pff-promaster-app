@@ -623,7 +623,8 @@
       "wb": {
         "temperature": "Temperatura",
         "tint": "Matiz",
-        "picker": "Conta-gotas de balanço de brancos"
+        "picker": "Conta-gotas de balanço de brancos",
+        "temperatureKelvin": "Temperatura (K)"
       },
       "color": {
         "vibrance": "Vibração",
@@ -800,7 +801,11 @@
       }
     },
     "lut": "LUT",
-    "bwEnable": "Converter para preto e branco"
+    "bwEnable": "Converter para preto e branco",
+    "autoSync": "Sincronizar auto",
+    "autoSyncOn": "Sincronizar: {{count}} fotos",
+    "autoSyncHint": "Cada alteração feita aqui é aplicada também às outras {{count}} selecionadas (luz, cor, curvas, detalhe, efeitos… — não o recorte, máscaras nem retoque).",
+    "autoSyncNeedSelection": "Selecione várias fotografias na tira (Cmd/Ctrl+clique ou Shift+clique), incluindo esta, para editar todas ao mesmo tempo."
   },
   "auto": {
     "intensity": "Intensidade",
@@ -1785,5 +1790,54 @@
     "title": "Ocorreu um erro na interface",
     "body": "As suas decisões e edições já estavam gravadas no catálogo. O erro ficou no registo da aplicação (sem caminhos nem dados pessoais). Recarregue a interface para continuar.",
     "reload": "Recarregar a interface"
+  },
+  "lightroom": {
+    "open": "Classificações para o Lightroom…",
+    "hint": "Melhor 5★, Alternativa 3★, Rever 2★ — em ficheiros .xmp que o Lightroom lê",
+    "title": "Classificações para o Lightroom",
+    "mapping": "Correspondência",
+    "run": "Escrever classificações",
+    "running": "A escrever…",
+    "how": "Para cada RAW é criado um ficheiro .xmp ao lado (mesmo nome) com as estrelas. O Lightroom lê-os automaticamente ao importar as fotografias; se já estiverem no Lightroom: selecionar → Metadados → Ler metadados dos ficheiros.",
+    "notCatalog": "Um catálogo .lrcat não é gerado: é um formato privado da Adobe, sem documentação, e um catálogo gerado poderia não abrir ou ficar danificado. Os .xmp são o caminho que a Adobe suporta.",
+    "keepUserStars": "Manter as estrelas que eu já dei (prevalecem sobre a sugestão)",
+    "applyInApp": "Aplicar também estas estrelas no PFF ProMaster (só às fotografias ainda sem estrelas)",
+    "safety": "Os RAW nunca são alterados. DNG, JPEG e TIFF não recebem .xmp (o Lightroom só lê a classificação de dentro destes ficheiros, que nunca alteramos). Um .xmp já existente só tem a classificação mudada; é guardada uma cópia (.xmp.pff-original).",
+    "done_one": "{{count}} ficheiro .xmp escrito.",
+    "done_other": "{{count}} ficheiros .xmp escritos.",
+    "updated_one": "{{count}} .xmp já existia: só a classificação foi alterada (cópia guardada).",
+    "updated_other": "{{count}} .xmp já existiam: só a classificação foi alterada (cópias guardadas).",
+    "inApp_one": "Estrelas aplicadas a {{count}} fotografia no PFF ProMaster.",
+    "inApp_other": "Estrelas aplicadas a {{count}} fotografias no PFF ProMaster.",
+    "notRaw_one": "{{count}} fotografia não é RAW (DNG/JPEG/TIFF…): sem .xmp — use as estrelas do PFF ProMaster ou exporte.",
+    "notRaw_other": "{{count}} fotografias não são RAW (DNG/JPEG/TIFF…): sem .xmp — use as estrelas do PFF ProMaster ou exporte.",
+    "unavailable_one": "{{count}} original indisponível (disco desligado?): ligue o disco e repita.",
+    "unavailable_other": "{{count}} originais indisponíveis (disco desligado?): ligue o disco e repita.",
+    "failed_one": "{{count}} .xmp não pôde ser escrito:",
+    "failed_other": "{{count}} .xmp não puderam ser escritos:",
+    "next": "No Lightroom: importe a pasta dos RAW (os .xmp são lidos sozinhos) ou, para fotografias já importadas, Metadados → Ler metadados dos ficheiros."
+  },
+  "workflow": {
+    "label": "Fluxo do trabalho",
+    "step": {
+      "import": "Importar",
+      "select": "Selecionar",
+      "edit": "Editar",
+      "deliver": "Entregar"
+    },
+    "importDetail_one": "{{count}} fotografia",
+    "importDetail_other": "{{count}} fotografias",
+    "selectDetail_one": "{{count}} escolhida · {{analyzed}} analisadas",
+    "selectDetail_other": "{{count}} escolhidas · {{analyzed}} analisadas",
+    "selectStart": "Análise automática",
+    "editDetail_one": "{{count}} editada",
+    "editDetail_other": "{{count}} editadas",
+    "deliverDetail": "Exportar · galeria · álbum",
+    "hint": {
+      "import": "Importar mais fotografias (cartão ou pasta)",
+      "select": "Escolher as melhores: grelha, seleção automática, comparar",
+      "edit": "Revelar: ajustes, presets, sincronização automática",
+      "deliver": "Exportar para o cliente, galeria e álbum"
+    }
   }
 }

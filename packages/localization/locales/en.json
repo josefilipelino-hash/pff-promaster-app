@@ -623,7 +623,8 @@
       "wb": {
         "temperature": "Temperature",
         "tint": "Tint",
-        "picker": "White balance picker"
+        "picker": "White balance picker",
+        "temperatureKelvin": "Temperature (K)"
       },
       "color": {
         "vibrance": "Vibrance",
@@ -800,7 +801,11 @@
       }
     },
     "lut": "LUT",
-    "bwEnable": "Convert to black & white"
+    "bwEnable": "Convert to black & white",
+    "autoSync": "Auto sync",
+    "autoSyncOn": "Syncing: {{count}} photos",
+    "autoSyncHint": "Every change made here is also applied to the other {{count}} selected photos (light, color, curves, detail, effects… — not crop, masks or retouching).",
+    "autoSyncNeedSelection": "Select several photos in the filmstrip (Cmd/Ctrl+click or Shift+click), including this one, to edit them all at once."
   },
   "auto": {
     "intensity": "Intensity",
@@ -1785,5 +1790,54 @@
     "title": "An error occurred in the interface",
     "body": "Your decisions and edits were already saved in the catalog. The error was written to the application log (without paths or personal data). Reload the interface to continue.",
     "reload": "Reload the interface"
+  },
+  "lightroom": {
+    "open": "Ratings for Lightroom…",
+    "hint": "Best 5★, Alternative 3★, Review 2★ — in .xmp files Lightroom reads",
+    "title": "Ratings for Lightroom",
+    "mapping": "Mapping",
+    "run": "Write ratings",
+    "running": "Writing…",
+    "how": "For each RAW a .xmp file with the same name is created next to it with the stars. Lightroom reads them automatically on import; if the photos are already in Lightroom: select → Metadata → Read Metadata from Files.",
+    "notCatalog": "A .lrcat catalog is not generated: it is a private, undocumented Adobe format, and a generated catalog could fail to open or be damaged. .xmp files are the path Adobe supports.",
+    "keepUserStars": "Keep the stars I already gave (they win over the suggestion)",
+    "applyInApp": "Also apply these stars in PFF ProMaster (only to photos without stars)",
+    "safety": "RAW files are never changed. DNG, JPEG and TIFF get no .xmp (Lightroom only reads the rating from inside these files, which we never change). An existing .xmp only has its rating changed; a copy is kept (.xmp.pff-original).",
+    "done_one": "{{count}} .xmp file written.",
+    "done_other": "{{count}} .xmp files written.",
+    "updated_one": "{{count}} .xmp already existed: only the rating changed (copy kept).",
+    "updated_other": "{{count}} .xmp already existed: only the rating changed (copies kept).",
+    "inApp_one": "Stars applied to {{count}} photo in PFF ProMaster.",
+    "inApp_other": "Stars applied to {{count}} photos in PFF ProMaster.",
+    "notRaw_one": "{{count}} photo is not RAW (DNG/JPEG/TIFF…): no .xmp — use PFF ProMaster's stars or export.",
+    "notRaw_other": "{{count}} photos are not RAW (DNG/JPEG/TIFF…): no .xmp — use PFF ProMaster's stars or export.",
+    "unavailable_one": "{{count}} original unavailable (disk disconnected?): connect it and repeat.",
+    "unavailable_other": "{{count}} originals unavailable (disk disconnected?): connect it and repeat.",
+    "failed_one": "{{count}} .xmp could not be written:",
+    "failed_other": "{{count}} .xmp could not be written:",
+    "next": "In Lightroom: import the RAW folder (the .xmp files are read automatically) or, for photos already imported, Metadata → Read Metadata from Files."
+  },
+  "workflow": {
+    "label": "Workflow",
+    "step": {
+      "import": "Import",
+      "select": "Select",
+      "edit": "Edit",
+      "deliver": "Deliver"
+    },
+    "importDetail_one": "{{count}} photo",
+    "importDetail_other": "{{count}} photos",
+    "selectDetail_one": "{{count}} picked · {{analyzed}} analyzed",
+    "selectDetail_other": "{{count}} picked · {{analyzed}} analyzed",
+    "selectStart": "Automatic analysis",
+    "editDetail_one": "{{count}} edited",
+    "editDetail_other": "{{count}} edited",
+    "deliverDetail": "Export · gallery · album",
+    "hint": {
+      "import": "Import more photos (card or folder)",
+      "select": "Pick the best: grid, automatic selection, compare",
+      "edit": "Develop: adjustments, presets, auto sync",
+      "deliver": "Export for the client, gallery and album"
+    }
   }
 }

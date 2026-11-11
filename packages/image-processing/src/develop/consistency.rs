@@ -15,7 +15,7 @@
 //! As medições fazem-se em renders pequenos (lado maior [`MEASURE_EDGE`]).
 
 use super::auto::{estimate_illuminant, FaceBox};
-use super::color::{eotf, luma, match_white, mul3, wb_matrix};
+use super::color::{eotf, luma, match_white_at, mul3, wb_matrix_at};
 use super::render::{render, Quality, RenderOptions};
 use super::settings::Settings;
 use super::source::Source;
@@ -171,7 +171,7 @@ pub fn measure(src: &Source, s: &Settings, faces: &[FaceBox]) -> LookMeasure {
 /// Branco da referência depois do seu balanço (para o reproduzir noutras fotografias).
 fn rendered_white(src: &Source, s: &Settings) -> Option<([f32; 3], [f32; 3])> {
     let ill = estimate_illuminant(src.level_for(640.0))?;
-    let w = mul3(&wb_matrix(s.wb.temperature, s.wb.tint), ill);
+    let w = mul3(&wb_matrix_at(s.wb.temperature, s.wb.tint, src.wb_reference_k()), ill);
     let g = w[1].max(1e-6);
     Some((ill, w.map(|v| v / g)))
 }
@@ -213,7 +213,7 @@ pub fn match_reference(
         if let (Some((_, w_ref)), Some(ill)) =
             (rendered_white(ref_src, ref_settings), estimate_illuminant(src.level_for(640.0)))
         {
-            let (temp, tint) = match_white(ill, w_ref);
+            let (temp, tint) = match_white_at(ill, w_ref, src.wb_reference_k());
             t.wb.temperature = temp.clamp(-100.0, 100.0);
             t.wb.tint = tint.clamp(-100.0, 100.0);
         }

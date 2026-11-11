@@ -162,6 +162,8 @@ pub fn run() {
             commands::recluster_people,
             commands::clear_people,
             commands::clear_cache,
+            commands::as_shot_kelvin,
+            commands::export_lightroom_ratings,
             commands::log_ui_error,
             commands::delete_project,
             commands::list_moments,

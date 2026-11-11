@@ -67,16 +67,24 @@ pub struct Source {
     pub full_height: u32,
     /// Exposição base aplicada (EV), ex.: RAW lineares escurecidos.
     pub baseline_ev: f32,
+    /// Temperatura (K) do balanço da câmara (RAW): referência do balanço de brancos, para a
+    /// temperatura poder ser mostrada e aplicada em Kelvin. `None` = imagem já revelada.
+    pub as_shot_k: Option<f32>,
 }
 
 impl Source {
+    /// Temperatura de referência do balanço de brancos desta fonte.
+    pub fn wb_reference_k(&self) -> f32 {
+        self.as_shot_k.unwrap_or(super::color::WB_REFERENCE_K)
+    }
+
     pub fn from_plane(base: Plane, full_width: u32, full_height: u32, baseline_ev: f32) -> Self {
         let mut levels = vec![base];
         while levels.last().unwrap().w.max(levels.last().unwrap().h) > 320 {
             let next = levels.last().unwrap().half();
             levels.push(next);
         }
-        Source { levels, full_width, full_height, baseline_ev }
+        Source { levels, full_width, full_height, baseline_ev, as_shot_k: None }
     }
 
     /// A partir de uma imagem sRGB 8 bits (JPEG, PNG, previews…), já orientada.
