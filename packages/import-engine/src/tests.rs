@@ -101,7 +101,11 @@ fn imports_folder_recursively_with_duplicates_and_unsupported() {
     assert_eq!(d.camera_model.as_deref(), Some("NIKON Z 6_2"));
     assert_eq!(d.iso, Some(400));
     assert!(d.capture_time.is_some());
-    assert_eq!(d.path, src.join("DCIM/101CANON/extra/IMG_0001.jpg").to_string_lossy());
+    // Comparar caminhos (não texto): no Windows o separador é "\\".
+    assert_eq!(
+        std::path::Path::new(&d.path),
+        src.join("DCIM").join("101CANON").join("extra").join("IMG_0001.jpg")
+    );
 
     // Reimportar a mesma pasta: tudo “já importado”, nada novo.
     let (c2, added2) = run(&e, &[src], &opts(ImportMode::Reference, true, &e));

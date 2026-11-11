@@ -12,5 +12,5 @@ cargo fmt --all --check
 echo "== Rust: clippy =="
 cargo clippy --workspace --all-targets -- -D warnings
 echo "== Rust: testes =="
-cargo test --workspace
+cargo test --workspace --no-fail-fast
 echo "OK: todas as verificações passaram."
