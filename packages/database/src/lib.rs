@@ -93,7 +93,9 @@ fn backup_before_migration(conn: &Connection, path: &Path, version: u32) -> Core
         // Ficheiro único e autónomo (sem -wal/-shm ao lado quando for aberto).
         out.execute_batch("PRAGMA journal_mode = DELETE;").map_err(db_err)?;
     }
-    std::fs::File::open(&tmp)?.sync_all()?;
+    // Com escrita: no Windows, forçar para o disco (FlushFileBuffers) num ficheiro aberto só
+    // para leitura dá "Access is denied" — a migração era recusada.
+    std::fs::OpenOptions::new().write(true).open(&tmp)?.sync_all()?;
     std::fs::rename(&tmp, &dest)?;
     Ok(dest)
 }

@@ -303,7 +303,9 @@ fn is_corruption(e: &CoreError) -> bool {
 /// Copia e sincroniza com o disco (um corte de energia não deixa uma cópia a meio).
 fn copy_synced(from: &Path, to: &Path) -> CoreResult<()> {
     std::fs::copy(from, to)?;
-    std::fs::File::open(to)?.sync_all()?;
+    // Com escrita: no Windows, `sync_all` num ficheiro aberto só para leitura dá "Access is
+    // denied" (restaurar versões e substituir o catálogo falhavam).
+    std::fs::OpenOptions::new().write(true).open(to)?.sync_all()?;
     Ok(())
 }
 
