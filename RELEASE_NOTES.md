@@ -1,4 +1,26 @@
-# PFF ProMaster 1.0.0-personal
+# PFF ProMaster 1.1.0-personal
+
+**Data:** 2026-11-11 · **Tipo:** versão para uso pessoal (assinatura local *ad-hoc*, sem certificado Apple)
+
+## Novo na 1.1
+
+- **Classificações para o Lightroom** — Seleção automática → *Classificações para o
+  Lightroom…*: **Melhor 5★, Alternativa 3★, Rever 2★** em ficheiros `.xmp` ao lado de cada
+  RAW. O Lightroom lê-os ao importar a pasta, ou em *Metadados → Ler metadados dos ficheiros*.
+  Os RAW nunca são alterados. Opcional: aplicar as mesmas estrelas no PFF ProMaster.
+  (Um catálogo `.lrcat` não é gerado — formato privado da Adobe; ver `KNOWN_LIMITATIONS.md`.)
+- **Temperatura em Kelvin nos RAW** (2000–50 000 K, a partir do balanço da câmara).
+- **Editar várias fotografias ao mesmo tempo**: *Sincronizar auto* no editor, presets
+  aplicados a todas as selecionadas, seleção múltipla na tira (Cmd/Ctrl+clique, Shift+clique).
+- **Novo visual** com a barra do fluxo *Importar → Selecionar → Editar → Entregar*.
+- **macOS recente**: a aplicação passa a ter assinatura local; primeira abertura em
+  *Definições do Sistema → Privacidade e segurança → Abrir mesmo assim*.
+- **Windows**: corrigida a cópia do catálogo antes de migrar/restaurar ("Access is denied").
+
+---
+
+# Versão anterior: 1.0.0-personal
+
 
 **Data:** 2026-11-10 · **Tipo:** versão para uso pessoal (não assinada) · **Tag:** `v1.0.0-personal`
 

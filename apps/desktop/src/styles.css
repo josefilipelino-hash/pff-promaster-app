@@ -817,3 +817,7 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px var(--accent-s
 /* Etiquetas da seleção assistida mais vivas */
 :root { --l-best: #3fbf6a; --l-alt: #4aa3ff; --l-review: #ffc857; --l-reject: #ff6b6b; --l-dup: #9a9a9a; }
 .label-chip { border-radius: var(--r-full); padding: 2px 8px; }
+.lr-button { white-space: normal; text-align: center; line-height: 1.25; padding: 6px 10px; }
+.lightroom-dialog label.check { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
+.lightroom-dialog label.check input { margin-top: 2px; accent-color: var(--accent); }
+.lightroom-dialog .notice { border: 1px solid var(--border); background: var(--surface-2); border-radius: var(--r-md); padding: 8px 10px; }
