@@ -3048,6 +3048,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tracing",
+ "tract-onnx",
  "trash",
  "walkdir",
  "zip",

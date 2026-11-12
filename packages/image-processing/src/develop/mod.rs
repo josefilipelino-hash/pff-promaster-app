@@ -19,6 +19,7 @@ pub mod local;
 pub mod lut;
 pub mod noise;
 pub mod portrait;
+pub mod relight;
 pub mod render;
 pub mod settings;
 pub mod sky;

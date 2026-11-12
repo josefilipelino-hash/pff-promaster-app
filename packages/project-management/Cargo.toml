@@ -34,6 +34,7 @@ blake3.workspace = true
 trash.workspace = true
 
 [dev-dependencies]
+tract-onnx.workspace = true
 rusqlite.workspace = true
 momento-test-fixtures.workspace = true
 tempfile.workspace = true
