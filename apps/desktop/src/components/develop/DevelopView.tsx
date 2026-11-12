@@ -4,7 +4,7 @@ import { api, events, isMac } from "../../api";
 import { Icon } from "../Icon";
 import { ASPECTS, cloneSettings, DEFAULT_COPY_BLOCKS, defaultSettings, fitCropToAspect, parseFrame, sameSettings, type Frame } from "../../logic/develop";
 import { errorText, useStore } from "../../store";
-import { SETTINGS_BLOCKS, type AutoOptions, type AutoReport, type DevelopSettings, type EditView } from "../../types";
+import { SETTINGS_BLOCKS, UPRIGHT_MODES, type AutoOptions, type AutoReport, type DevelopSettings, type EditView } from "../../types";
 import { AutoOptionsForm, AutoReportView } from "./AutoPanel";
 import { CreatePresetDialog, ImportReportDialog, importPresets, PresetList, PresetManager } from "../Presets";
 import { MasksPanel, PortraitPanel, RetouchTools, type BrushSettings, type Tool } from "./LocalPanels";
@@ -217,6 +217,7 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
   const [cropMode, setCropMode] = useState(false);
   const [wbPicking, setWbPicking] = useState(false);
   const [dialog, setDialog] = useState<"copy" | "sync" | null>(null);
+  const [uprightBusy, setUprightBusy] = useState(false);
   const [snapName, setSnapName] = useState("");
   const autoOptions = useStore((s) => s.autoOptions);
   const setAutoOptions = useStore((s) => s.setAutoOptions);
@@ -875,25 +876,68 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
         <button type="button" className={`btn small${settings.geometry.flipHorizontal ? " active" : ""}`} onClick={() => set("geometry.flip", (s) => void (s.geometry.flipHorizontal = !s.geometry.flipHorizontal), true)}>
           ⇋ {t("develop.flip")}
         </button>
+      </div>
+      <h4 className="small muted">{t("develop.upright")}</h4>
+      <div className="dev-row" role="group" aria-label={t("develop.upright")} title={t("develop.uprightHint")}>
         <button
           type="button"
-          className="btn small"
-          onClick={async () => {
-            try {
-              const a = await api.autoStraighten(photoKey, settings);
-              if (a === null) return toast("info", t("develop.autoStraightenNone"));
-              set("geometry.autoStraighten", (s) => void (s.geometry.straighten = Math.round(a * 10) / 10), true);
-            } catch (e) {
-              fail(e);
-            }
-          }}
+          className={`btn small${settings.geometry.upright === "" ? " active" : ""}`}
+          onClick={() =>
+            set("geometry.upright", (s) => {
+              s.geometry.upright = "";
+              s.geometry.vertical = 0;
+              s.geometry.horizontal = 0;
+              s.geometry.straighten = 0;
+            }, true)
+          }
         >
-          {t("develop.autoStraighten")}
+          {t("develop.uprightOff")}
         </button>
+        {UPRIGHT_MODES.map((m) => (
+          <button
+            key={m}
+            type="button"
+            className={`btn small${settings.geometry.upright === m ? " active" : ""}`}
+            disabled={uprightBusy}
+            onClick={async () => {
+              setUprightBusy(true);
+              try {
+                const r = await api.upright(photoKey, settings, m);
+                if (r === null) return toast("info", t("develop.uprightNone"));
+                set("geometry.upright", (s) => {
+                  s.geometry.upright = m;
+                  s.geometry.vertical = Math.round(r.vertical * 10) / 10;
+                  s.geometry.horizontal = Math.round(r.horizontal * 10) / 10;
+                  s.geometry.straighten = Math.round(r.straighten * 100) / 100;
+                  s.geometry.focal35 = r.focal35;
+                }, true);
+                toast(
+                  "info",
+                  t("develop.uprightDone", {
+                    mode: t(`develop.uprightMode.${r.mode}`),
+                    lines: r.verticalLines + r.horizontalLines,
+                    before: r.deviationBefore.toFixed(1),
+                    after: r.deviationAfter.toFixed(1),
+                  }),
+                );
+              } catch (e) {
+                fail(e);
+              } finally {
+                setUprightBusy(false);
+              }
+            }}
+          >
+            {t(`develop.uprightMode.${m}`)}
+          </button>
+        ))}
       </div>
       <Slider label={t("develop.field.geometry.straighten")} value={settings.geometry.straighten} min={-45} max={45} step={0.1} digits={1} onChange={(v, done) => set("geometry.straighten", (s) => void (s.geometry.straighten = v), done)} />
       <Slider label={t("develop.field.geometry.vertical")} value={settings.geometry.vertical} min={-100} max={100} onChange={(v, done) => set("geometry.vertical", (s) => void (s.geometry.vertical = v), done)} />
       <Slider label={t("develop.field.geometry.horizontal")} value={settings.geometry.horizontal} min={-100} max={100} onChange={(v, done) => set("geometry.horizontal", (s) => void (s.geometry.horizontal = v), done)} />
+      <Slider label={t("develop.field.geometry.aspectAdjust")} value={settings.geometry.aspectAdjust ?? 0} min={-100} max={100} onChange={(v, done) => set("geometry.aspectAdjust", (s) => void (s.geometry.aspectAdjust = v), done)} />
+      <Slider label={t("develop.field.geometry.scale")} value={settings.geometry.scale ?? 100} min={100} max={200} onChange={(v, done) => set("geometry.scale", (s) => void (s.geometry.scale = v), done)} />
+      <Slider label={t("develop.field.geometry.offsetX")} value={settings.geometry.offsetX ?? 0} min={-100} max={100} onChange={(v, done) => set("geometry.offsetX", (s) => void (s.geometry.offsetX = v), done)} />
+      <Slider label={t("develop.field.geometry.offsetY")} value={settings.geometry.offsetY ?? 0} min={-100} max={100} onChange={(v, done) => set("geometry.offsetY", (s) => void (s.geometry.offsetY = v), done)} />
       <button type="button" className="btn small ghost" onClick={() => set("reset.geometry", (s) => void (s.geometry = defaultSettings().geometry), true)}>
         ↺ {t("develop.resetGeometry")}
       </button>

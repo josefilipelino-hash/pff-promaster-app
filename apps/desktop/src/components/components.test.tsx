@@ -129,6 +129,7 @@ const apiMock = {
   createVirtualCopy: vi.fn(async () => 2 ** 40 + 77),
   deleteVirtualCopy: vi.fn(async () => {}),
   pasteSettings: vi.fn(async (keys: number[]) => keys.length),
+  upright: vi.fn(async () => ({ vertical: 31.23, horizontal: 0, straighten: -1.249, focal35: 24, mode: "vertical", verticalLines: 12, horizontalLines: 0, deviationBefore: 4.2, deviationAfter: 0.2 })),
   pickWhiteBalance: vi.fn(async () => [23.4, -7.6] as [number, number]),
   autoStraighten: vi.fn(async () => 2.34),
   asShotKelvin: vi.fn(async () => null as number | null),
@@ -826,9 +827,20 @@ describe("edição (Fase 5)", () => {
     expect(apiMock.pickWhiteBalance).toHaveBeenCalled();
     expect(apiMock.commitEdit).toHaveBeenCalledWith(2, "wb.picker", expect.objectContaining({ wb: { temperature: 23, tint: -8 } }));
     fireEvent.click(screen.getByRole("button", { name: /Geometria/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Auto" }));
+    // Upright: modo Vertical aplica a correção calculada (perspetiva + endireitar + focal).
+    const upright = screen.getByRole("group", { name: "Upright" });
+    fireEvent.click(within(upright).getByRole("button", { name: "Vertical" }));
     await act(async () => {});
-    expect(apiMock.commitEdit).toHaveBeenCalledWith(2, "geometry.autoStraighten", expect.objectContaining({ geometry: expect.objectContaining({ straighten: 2.3 }) }));
+    expect(apiMock.upright).toHaveBeenCalledWith(2, expect.anything(), "vertical");
+    expect(apiMock.commitEdit).toHaveBeenLastCalledWith(
+      2,
+      "geometry.upright",
+      expect.objectContaining({ geometry: expect.objectContaining({ upright: "vertical", vertical: 31.2, horizontal: 0, straighten: -1.25, focal35: 24 }) }),
+    );
+    // Desligado repõe a perspetiva.
+    fireEvent.click(within(upright).getByRole("button", { name: "Desligado" }));
+    await act(async () => {});
+    expect(apiMock.commitEdit).toHaveBeenLastCalledWith(2, "geometry.upright", expect.objectContaining({ geometry: expect.objectContaining({ upright: "", vertical: 0, straighten: 0 }) }));
   });
 
   it("copiar (sem geometria por omissão), colar, sincronizar com a seleção, cópia virtual, instantâneos", async () => {

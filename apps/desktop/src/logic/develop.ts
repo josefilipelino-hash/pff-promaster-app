@@ -10,7 +10,7 @@ export function defaultSettings(): DevelopSettings {
     curve: { highlights: 0, lights: 0, darks: 0, shadows: 0, splitShadows: 25, splitMidtones: 50, splitHighlights: 75, rgb: [], red: [], green: [], blue: [] },
     detail: { sharpenAmount: 0, sharpenRadius: 1, sharpenDetail: 25, sharpenMasking: 0, noiseLuminance: 0, noiseColor: 0, noiseDetail: 50, aiDenoise: 0 },
     effects: { texture: 0, clarity: 0, dehaze: 0, vignette: 0, vignetteMidpoint: 50, vignetteFeather: 50, vignetteRoundness: 0, grain: 0, grainSize: 25, grainRoughness: 50 },
-    geometry: { crop: { x: 0, y: 0, w: 1, h: 1 }, quarterTurns: 0, flipHorizontal: false, straighten: 0, aspect: "original", vertical: 0, horizontal: 0 },
+    geometry: { crop: { x: 0, y: 0, w: 1, h: 1 }, quarterTurns: 0, flipHorizontal: false, straighten: 0, aspect: "original", vertical: 0, horizontal: 0, aspectAdjust: 0, scale: 100, offsetX: 0, offsetY: 0, focal35: 0, upright: "", guides: [] },
     lens: { distortion: 0, caRed: 0, caBlue: 0, vignetting: 0, vignettingMidpoint: 50 },
     retouch: { redEyes: [], spots: [], patches: [] },
     grading: { shadowsHue: 220, shadowsSat: 0, highlightsHue: 45, highlightsSat: 0, balance: 0 },

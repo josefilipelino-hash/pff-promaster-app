@@ -1,6 +1,7 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type {
+  UprightOutcome,
   LightroomReport,
   AvailabilitySummary,
   BackupInfo,
@@ -161,6 +162,7 @@ export const api = {
   pasteSettings: (keys: number[], settings: DevelopSettings, blocks: string[]) => invoke<number>("paste_settings", { keys, settings, blocks }),
   pickWhiteBalance: (key: number, settings: DevelopSettings, u: number, v: number) => invoke<[number, number] | null>("pick_white_balance", { key, settings, u, v }),
   autoStraighten: (key: number, settings: DevelopSettings) => invoke<number | null>("auto_straighten", { key, settings }),
+  upright: (key: number, settings: DevelopSettings, mode: string) => invoke<UprightOutcome | null>("upright", { key, settings, mode }),
   // Edição automática (cada fotografia é analisada; fila em segundo plano).
   autoEditPhoto: (key: number, options: AutoOptions) => invoke<AutoEditResult>("auto_edit_photo", { key, options }),
   startAutoEdit: (keys: number[], options: AutoOptions) => invoke<number>("start_auto_edit", { keys, options }),

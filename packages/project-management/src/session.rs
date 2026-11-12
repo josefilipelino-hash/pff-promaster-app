@@ -637,6 +637,45 @@ impl ProjectSession {
         Ok(momento_image_processing::develop::auto_straighten(&src, settings))
     }
 
+    /// Upright (perspetiva automática) com a focal do EXIF. `None` = sem linhas fiáveis.
+    pub fn upright(
+        &self,
+        key: i64,
+        settings: &DevelopSettings,
+        mode: &str,
+    ) -> CoreResult<Option<UprightOutcome>> {
+        use momento_image_processing::develop::upright::UprightMode;
+        let mode = UprightMode::parse(mode)
+            .ok_or_else(|| CoreError::Other(format!("modo Upright desconhecido: {mode}")))?;
+        let cat = self.open_catalog()?;
+        let (_, asset) = cat.resolve_key(key)?;
+        let focal35 = cat.photo_details(asset)?.and_then(|d| d.focal_length_35mm).map(|f| f as f32);
+        let src = self.edits.source(&cat, &self.registry, asset)?;
+        let r = momento_image_processing::develop::upright(&src, settings, mode, focal35);
+        if let Some(r) = &r {
+            tracing::info!(
+                key,
+                modo = r.mode.id(),
+                verticais = r.lines.0,
+                horizontais = r.lines.1,
+                desvio_antes = r.rms_before,
+                desvio_depois = r.rms_after,
+                "Upright"
+            );
+        }
+        Ok(r.map(|r| UprightOutcome {
+            vertical: r.vertical,
+            horizontal: r.horizontal,
+            straighten: r.straighten,
+            focal35: focal35.unwrap_or(0.0),
+            mode: r.mode.id().to_string(),
+            vertical_lines: r.lines.0,
+            horizontal_lines: r.lines.1,
+            deviation_before: r.rms_before,
+            deviation_after: r.rms_after,
+        }))
+    }
+
     /// Ficheiro a servir à interface para uma chave (`thumb`/`preview`/`full`): a versão
     /// editada quando há ajustes, senão os ficheiros normais do asset.
     pub fn serve_image(
@@ -1400,4 +1439,21 @@ impl Drop for ProjectSession {
             r.control.suspend();
         }
     }
+}
+
+/// Resultado do Upright para a interface.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UprightOutcome {
+    pub vertical: f32,
+    pub horizontal: f32,
+    pub straighten: f32,
+    /// Focal equivalente a 35 mm usada (0 = desconhecida, assumidos 35 mm).
+    pub focal35: f32,
+    pub mode: String,
+    pub vertical_lines: usize,
+    pub horizontal_lines: usize,
+    /// Desvio angular médio (graus) das linhas antes e depois.
+    pub deviation_before: f32,
+    pub deviation_after: f32,
 }

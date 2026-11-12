@@ -6,7 +6,7 @@
 /// Versão do motor de revelação. Entra na chave das edições em cache: quando o motor muda
 /// (ex.: auditoria final — realces/sombras locais e perfis ICC de entrada), as imagens
 /// guardadas com a versão anterior deixam de ser usadas e são geradas de novo.
-pub const PIPELINE_VERSION: u32 = 6;
+pub const PIPELINE_VERSION: u32 = 7;
 
 pub mod auto;
 pub mod calibrate;
@@ -22,6 +22,7 @@ pub mod render;
 pub mod settings;
 pub mod sky;
 pub mod source;
+pub mod upright;
 
 pub use render::{
     render, render_linear, render_with_overlay, sample_for_white_balance, LinearImage, Quality,
@@ -58,6 +59,47 @@ pub fn auto_straighten(src: &Source, s: &Settings) -> Option<f32> {
     let img = render_rgb(src, &base, 1024, Quality::Fast);
     let tilt = momento_ai_analysis::metrics::technical(&img).tilt_degrees?;
     Some(-tilt)
+}
+
+/// Upright: correção automática da perspetiva pelas linhas da fotografia (ver `upright`).
+/// Analisa a fotografia orientada (rotações de 90°/espelho e correções da objetiva, sem
+/// perspetiva nem endireitar). No modo guiado usa as guias de `s.geometry.guides`.
+pub fn upright(
+    src: &Source,
+    s: &Settings,
+    mode: upright::UprightMode,
+    focal35: Option<f32>,
+) -> Option<upright::UprightResult> {
+    let base = Settings {
+        geometry: Geometry {
+            quarter_turns: s.geometry.quarter_turns,
+            flip_horizontal: s.geometry.flip_horizontal,
+            ..Default::default()
+        },
+        lens: s.lens,
+        ..Default::default()
+    };
+    let img = render_rgb(src, &base, 1280, Quality::Fast);
+    let (w, h) = (img.width() as usize, img.height() as usize);
+    let segments = if mode == upright::UprightMode::Guided {
+        s.geometry
+            .guides
+            .iter()
+            .map(|g| upright::Segment {
+                x1: g[0] * w as f32,
+                y1: g[1] * h as f32,
+                x2: g[2] * w as f32,
+                y2: g[3] * h as f32,
+            })
+            .collect()
+    } else {
+        let gray: Vec<f32> = img
+            .pixels()
+            .map(|p| (0.2126 * p[0] as f32 + 0.7152 * p[1] as f32 + 0.0722 * p[2] as f32) / 255.0)
+            .collect();
+        upright::detect_segments(&gray, w, h)
+    };
+    upright::solve_upright(&segments, w, h, focal35, mode)
 }
 
 #[cfg(test)]

@@ -420,6 +420,13 @@ export interface DevelopSettings {
     aspect: string;
     vertical: number;
     horizontal: number;
+    aspectAdjust: number;
+    scale: number;
+    offsetX: number;
+    offsetY: number;
+    focal35: number;
+    upright: string;
+    guides: [number, number, number, number][];
   };
   lens: { distortion: number; caRed: number; caBlue: number; vignetting: number; vignettingMidpoint: number };
   retouch: {
@@ -1043,3 +1050,18 @@ export interface LightroomReport {
   failed: [string, string][];
   starsInApp: number;
 }
+
+/** Resultado do Upright (perspetiva automática). */
+export interface UprightOutcome {
+  vertical: number;
+  horizontal: number;
+  straighten: number;
+  focal35: number;
+  mode: string;
+  verticalLines: number;
+  horizontalLines: number;
+  deviationBefore: number;
+  deviationAfter: number;
+}
+
+export const UPRIGHT_MODES = ["auto", "level", "vertical", "full"] as const;

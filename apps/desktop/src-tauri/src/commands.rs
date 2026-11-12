@@ -521,6 +521,16 @@ pub async fn auto_straighten(
     state.session().and_then(|s| s.auto_straighten(key, &settings)).map_err(err)
 }
 
+#[tauri::command]
+pub async fn upright(
+    state: State<'_, AppState>,
+    key: i64,
+    settings: DevelopSettings,
+    mode: String,
+) -> CmdResult<Option<momento_project_management::UprightOutcome>> {
+    state.session().and_then(|s| s.upright(key, &settings, &mode)).map_err(err)
+}
+
 // ---------------------------------------------------------------- edição automática (Fase 6)
 
 #[tauri::command]

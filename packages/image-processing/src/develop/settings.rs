@@ -181,9 +181,24 @@ pub struct Geometry {
     pub straighten: f32,
     /// Proporção do recorte: "free", "original", "1:1", "4:5", "3:2", "16:9"… (só interface).
     pub aspect: String,
-    /// Perspetiva, −100…+100.
+    /// Perspetiva, −100…+100 (±40°): rotação vertical (inclinação) e horizontal da câmara
+    /// num modelo projetivo real — as linhas retas continuam retas.
     pub vertical: f32,
     pub horizontal: f32,
+    /// Compensa o alongamento depois da perspetiva (−100…+100: mais larga / mais alta).
+    pub aspect_adjust: f32,
+    /// Escala depois da correção, % (100…200; o enquadramento nunca mostra zonas vazias).
+    pub scale: f32,
+    /// Deslocamento do enquadramento, −100…+100 (fração da área disponível).
+    pub offset_x: f32,
+    pub offset_y: f32,
+    /// Distância focal equivalente a 35 mm usada no modelo projetivo (0 = 35 mm).
+    pub focal35: f32,
+    /// Modo Upright aplicado por último ("", "level", "vertical", "full", "auto", "guided").
+    pub upright: String,
+    /// Guias do Upright guiado: segmentos [x1, y1, x2, y2] na fotografia orientada sem
+    /// perspetiva (0–1, depois das rotações de 90°/espelho).
+    pub guides: Vec<[f32; 4]>,
 }
 
 impl Default for Geometry {
@@ -196,6 +211,13 @@ impl Default for Geometry {
             aspect: "original".into(),
             vertical: 0.0,
             horizontal: 0.0,
+            aspect_adjust: 0.0,
+            scale: 100.0,
+            offset_x: 0.0,
+            offset_y: 0.0,
+            focal35: 0.0,
+            upright: String::new(),
+            guides: Vec::new(),
         }
     }
 }

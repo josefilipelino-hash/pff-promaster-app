@@ -437,3 +437,75 @@ fn unknown_camera_colors_are_calibrated_from_the_embedded_preview() {
     }
     assert!(tested >= 2);
 }
+
+/// Upright em RAW reais (`MOMENTO_SAMPLES_DIR`): nunca piora as linhas, e é consistente — se a
+/// fotografia for rodada X° (e inclinada em perspetiva), o Upright compensa essa diferença.
+#[test]
+fn upright_on_real_raws() {
+    use momento_image_processing::develop::{self, upright, Geometry, Quality, Settings};
+    let Some(dir) = std::env::var("MOMENTO_SAMPLES_DIR").ok().map(PathBuf::from) else {
+        eprintln!("SALTADO: MOMENTO_SAMPLES_DIR não definido");
+        return;
+    };
+    let mut checked = 0;
+    for p in std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.path()) {
+        let ext = p.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
+        if !["nef", "cr2", "cr3", "arw", "raf", "orf", "rw2", "pef", "dng"].contains(&ext.as_str())
+        {
+            continue;
+        }
+        let data = std::fs::read(&p).unwrap();
+        let Ok(mut raw) = momento_raw_engine::RawFile::open(&data) else { continue };
+        let info = raw.info().clone();
+        let Ok(bm) = raw.develop_linear(true) else { continue };
+        let src = develop::Source::from_linear16(
+            bm.width,
+            bm.height,
+            &bm.rgb,
+            info.orientation,
+            info.width,
+            info.height,
+        );
+        let name = p.file_name().unwrap().to_string_lossy().to_string();
+        let auto = develop::upright(&src, &Settings::default(), upright::UprightMode::Auto, None);
+        eprintln!("{name:<40} auto: {auto:?}");
+        if let Some(r) = &auto {
+            assert!(r.rms_after <= r.rms_before + 1e-3, "{name}: piorou {r:?}");
+            assert!(r.vertical.abs() <= 100.0 && r.horizontal.abs() <= 100.0);
+        }
+        // Consistência: rodar a fotografia 3° (render com endireitar) e pedir Nível à imagem
+        // resultante → a diferença para a original tem de ser ~3°.
+        let level = |s: &Settings| {
+            let img = develop::render_rgb(&src, s, 1280, Quality::Fast);
+            let (w, h) = (img.width() as usize, img.height() as usize);
+            let gray: Vec<f32> = img
+                .pixels()
+                .map(|q| {
+                    (0.2126 * q[0] as f32 + 0.7152 * q[1] as f32 + 0.0722 * q[2] as f32) / 255.0
+                })
+                .collect();
+            let segs = upright::detect_segments(&gray, w, h);
+            upright::solve_upright(&segs, w, h, None, upright::UprightMode::Level)
+                .map(|r| (r.straighten, r.lines))
+        };
+        let (Some(a), Some(b)) = (
+            level(&Settings::default()),
+            level(&Settings {
+                geometry: Geometry { straighten: 3.0, ..Default::default() },
+                ..Default::default()
+            }),
+        ) else {
+            eprintln!("{name:<40} sem linhas suficientes para o teste de consistência");
+            continue;
+        };
+        eprintln!("{name:<40} nível {:.2}° ({:?}) → rodada 3°: {:.2}° ({:?})", a.0, a.1, b.0, b.1);
+        // Só conta onde há linhas a sério (fotografias de natureza não têm).
+        if a.1 .0 + a.1 .1 >= 8 && b.1 .0 + b.1 .1 >= 8 {
+            assert!(((a.0 - b.0) - 3.0).abs() < 0.6, "{name}: {a:?} vs {b:?}");
+            checked += 1;
+        }
+    }
+    eprintln!("consistência verificada em {checked} fotografias");
+    // As amostras públicas têm poucas fotografias com arquitetura (2: Olympus E-M10, Nikon D70).
+    assert!(checked >= 2, "poucas fotografias com linhas: {checked}");
+}

@@ -678,7 +678,12 @@
         "rotateLeft": "Rodar à esquerda",
         "rotateRight": "Rodar à direita",
         "flip": "Espelhar",
-        "autoStraighten": "Endireitar automático"
+        "autoStraighten": "Endireitar automático",
+        "aspectAdjust": "Proporção",
+        "scale": "Escala",
+        "offsetX": "Deslocar X",
+        "offsetY": "Deslocar Y",
+        "upright": "Upright"
       },
       "retouch": {
         "redEye": "Olhos vermelhos",
@@ -805,7 +810,20 @@
     "autoSync": "Sincronizar auto",
     "autoSyncOn": "Sincronizar: {{count}} fotos",
     "autoSyncHint": "Cada alteração feita aqui é aplicada também às outras {{count}} selecionadas (luz, cor, curvas, detalhe, efeitos… — não o recorte, máscaras nem retoque).",
-    "autoSyncNeedSelection": "Selecione várias fotografias na tira (Cmd/Ctrl+clique ou Shift+clique), incluindo esta, para editar todas ao mesmo tempo."
+    "autoSyncNeedSelection": "Selecione várias fotografias na tira (Cmd/Ctrl+clique ou Shift+clique), incluindo esta, para editar todas ao mesmo tempo.",
+    "upright": "Upright",
+    "uprightOff": "Desligado",
+    "uprightMode": {
+      "auto": "Auto",
+      "level": "Nível",
+      "vertical": "Vertical",
+      "full": "Completo",
+      "guided": "Guiado"
+    },
+    "uprightHint": "Corrige a perspetiva pelas linhas da fotografia (pontos de fuga), com a distância focal da câmara.",
+    "uprightNone": "Não foram encontradas linhas fiáveis para este modo.",
+    "uprightDone": "{{mode}}: {{lines}} linhas, desvio {{before}}° → {{after}}°.",
+    "perspective": "Perspetiva"
   },
   "auto": {
     "intensity": "Intensidade",

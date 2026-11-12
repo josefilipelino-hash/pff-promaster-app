@@ -192,6 +192,7 @@ pub fn run() {
             commands::paste_settings,
             commands::pick_white_balance,
             commands::auto_straighten,
+            commands::upright,
             commands::auto_edit_photo,
             commands::start_auto_edit,
             commands::auto_edit_status,

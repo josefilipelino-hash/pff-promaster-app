@@ -678,7 +678,12 @@
         "rotateLeft": "Rotate left",
         "rotateRight": "Rotate right",
         "flip": "Flip",
-        "autoStraighten": "Auto straighten"
+        "autoStraighten": "Auto straighten",
+        "aspectAdjust": "Aspect",
+        "scale": "Scale",
+        "offsetX": "Offset X",
+        "offsetY": "Offset Y",
+        "upright": "Upright"
       },
       "retouch": {
         "redEye": "Red eyes",
@@ -805,7 +810,20 @@
     "autoSync": "Auto sync",
     "autoSyncOn": "Syncing: {{count}} photos",
     "autoSyncHint": "Every change made here is also applied to the other {{count}} selected photos (light, color, curves, detail, effects… — not crop, masks or retouching).",
-    "autoSyncNeedSelection": "Select several photos in the filmstrip (Cmd/Ctrl+click or Shift+click), including this one, to edit them all at once."
+    "autoSyncNeedSelection": "Select several photos in the filmstrip (Cmd/Ctrl+click or Shift+click), including this one, to edit them all at once.",
+    "upright": "Upright",
+    "uprightOff": "Off",
+    "uprightMode": {
+      "auto": "Auto",
+      "level": "Level",
+      "vertical": "Vertical",
+      "full": "Full",
+      "guided": "Guided"
+    },
+    "uprightHint": "Corrects perspective from the photo's lines (vanishing points), using the camera focal length.",
+    "uprightNone": "No reliable lines were found for this mode.",
+    "uprightDone": "{{mode}}: {{lines}} lines, deviation {{before}}° → {{after}}°.",
+    "perspective": "Perspective"
   },
   "auto": {
     "intensity": "Intensity",
