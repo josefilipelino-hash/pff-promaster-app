@@ -81,6 +81,14 @@ fn main() {
     let up = |c: usize| upsample(&cm.probs[c], cm.w, cm.h, w, h);
     let person: Vec<f32> = up(0).iter().map(|b| (1.0 - b).clamp(0.0, 1.0)).collect();
     let face_skin = up(3);
+    if let Ok(out) = std::env::var("MASK_OUT") {
+        image::GrayImage::from_fn(w as u32, h as u32, |x, y| {
+            image::Luma([(person[y as usize * w + x as usize] * 255.0) as u8])
+        })
+        .save(out)
+        .unwrap();
+        return;
+    }
     let hair = up(1);
     eprintln!("{} rosto(s)", faces.len());
     let (d, ds) = depth(&a[1], &srgb);
