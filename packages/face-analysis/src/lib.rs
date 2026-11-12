@@ -49,6 +49,9 @@ pub struct FaceResult {
     /// 478 pontos (x, y) em píxeis da imagem analisada.
     #[serde(skip)]
     pub landmarks: Vec<(f32, f32)>,
+    /// Profundidade relativa de cada ponto (píxeis; menor = mais perto da câmara).
+    #[serde(skip)]
+    pub depth: Vec<f32>,
     /// Identidade (SFace, 128-D normalizado), se o modelo existir e o rosto for grande o suficiente.
     #[serde(skip)]
     pub identity: Option<Vec<f32>>,

@@ -136,6 +136,7 @@ impl VisionModels {
                 presence: mesh.presence,
                 blendshapes,
                 landmarks: mesh.points.iter().map(|p| (p.0, p.1)).collect(),
+                depth: mesh.points.iter().map(|p| p.2).collect(),
                 identity: None,
             });
         }

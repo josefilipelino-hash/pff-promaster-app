@@ -421,3 +421,325 @@ fn smooth(e0: f32, e1: f32, x: f32) -> f32 {
     let t = ((x - e0) / (e1 - e0)).clamp(0.0, 1.0);
     t * t * (3.0 - 2.0 * t)
 }
+
+// ---------------------------------------------------------------------------------------
+// Luz de retrato: geometria do rosto (malha 3D de 478 pontos) + segmentação da pessoa.
+// Convenção: x direita, y baixo, z para a câmara (uma superfície de frente tem normal 0,0,1).
+// ---------------------------------------------------------------------------------------
+
+/// Dados do retrato no tamanho de trabalho `w`×`h`.
+pub struct Portrait {
+    /// Por rosto: pontos (x, y em píxeis; z relativo em píxeis, menor = mais perto).
+    pub faces: Vec<Vec<[f32; 3]>>,
+    /// Máscaras 0–1: pessoa inteira, pele do rosto, cabelo.
+    pub person: Vec<f32>,
+    pub face_skin: Vec<f32>,
+    pub hair: Vec<f32>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct PortraitLight {
+    /// Ângulo à volta da pessoa (graus): 0 = do lado da câmara, −90 esquerda, 90 direita,
+    /// ±180 atrás (contraluz). Elevação em graus (0 = à altura do rosto).
+    pub azimuth: f32,
+    pub elevation: f32,
+    /// 0 = fotografia original; 1 = luz nova completa.
+    pub intensity: f32,
+    pub kelvin: f32,
+    /// 0 = luz dura (sombras marcadas) … 1 = muito suave.
+    pub softness: f32,
+    /// Escurecer o fundo (0–1).
+    pub background: f32,
+}
+
+/// Normais da superfície com o rosto substituído pela geometria da malha facial, e a
+/// profundidade do rosto (para as sombras do nariz/órbitas). Devolve (normais, z do rosto).
+pub fn portrait_normals(s: &Surface, p: &Portrait, softness: f32) -> (Vec<[f32; 3]>, Vec<f32>) {
+    let (w, h) = (s.w, s.h);
+    let mut normal = s.normal.clone();
+    let mut face_z = vec![f32::NAN; w * h];
+    for pts in &p.faces {
+        if pts.len() < 50 {
+            continue;
+        }
+        // Normal de cada ponto: plano z = a·x + b·y + c pelos 12 vizinhos mais próximos.
+        let k = 12.min(pts.len() - 1);
+        let normals: Vec<[f32; 3]> = pts
+            .iter()
+            .map(|q| {
+                let mut nb: Vec<(f32, &[f32; 3])> = pts
+                    .iter()
+                    .map(|r| ((r[0] - q[0]).powi(2) + (r[1] - q[1]).powi(2), r))
+                    .collect();
+                nb.select_nth_unstable_by(k, |a, b| a.0.total_cmp(&b.0));
+                let nb = &nb[..=k];
+                let (mut sxx, mut sxy, mut syy, mut sxz, mut syz) = (0f32, 0f32, 0f32, 0f32, 0f32);
+                for (_, r) in nb {
+                    let (dx, dy, dz) = (r[0] - q[0], r[1] - q[1], r[2] - q[2]);
+                    sxx += dx * dx;
+                    sxy += dx * dy;
+                    syy += dy * dy;
+                    sxz += dx * dz;
+                    syz += dy * dz;
+                }
+                let det = sxx * syy - sxy * sxy;
+                let (a, b) = if det.abs() > 1e-6 {
+                    ((sxz * syy - syz * sxy) / det, (syz * sxx - sxz * sxy) / det)
+                } else {
+                    (0.0, 0.0)
+                };
+                let n = [a, b, 1.0];
+                let l = (n[0] * n[0] + n[1] * n[1] + 1.0).sqrt();
+                [n[0] / l, n[1] / l, n[2] / l]
+            })
+            .collect();
+        // Rasterização: média ponderada (inverso da distância) dos 6 pontos mais próximos,
+        // dentro da caixa do rosto, misturada com as normais da profundidade pela máscara.
+        let (mut x0, mut y0, mut x1, mut y1) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
+        for q in pts {
+            x0 = x0.min(q[0]);
+            y0 = y0.min(q[1]);
+            x1 = x1.max(q[0]);
+            y1 = y1.max(q[1]);
+        }
+        let pad = (x1 - x0) * 0.08;
+        let (bx0, by0) = (((x0 - pad).max(0.0)) as usize, ((y0 - pad).max(0.0)) as usize);
+        let (bx1, by1) = (((x1 + pad) as usize).min(w - 1), ((y1 + pad) as usize).min(h - 1));
+        let face_size = (x1 - x0).max(1.0);
+        for y in by0..=by1 {
+            for x in bx0..=bx1 {
+                let i = y * w + x;
+                let (fx, fy) = (x as f32 + 0.5, y as f32 + 0.5);
+                let mut best = [(f32::MAX, 0usize); 6];
+                for (j, q) in pts.iter().enumerate() {
+                    let d = (q[0] - fx).powi(2) + (q[1] - fy).powi(2);
+                    if d < best[5].0 {
+                        best[5] = (d, j);
+                        best.sort_by(|a, b| a.0.total_cmp(&b.0));
+                    }
+                }
+                let (mut n, mut z, mut ws) = ([0f32; 3], 0f32, 0f32);
+                for (d, j) in best {
+                    let wt = 1.0 / (d + 1.0);
+                    for c in 0..3 {
+                        n[c] += normals[j][c] * wt;
+                    }
+                    z += pts[j][2] * wt;
+                    ws += wt;
+                }
+                let l = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt().max(1e-6);
+                let n = n.map(|c| c / l);
+                face_z[i] = z / ws / face_size;
+                // Rosto: perto dos pontos da malha (o contorno do rosto tem pontos), ou pele do
+                // rosto pela segmentação.
+                let near = 1.0 - smooth(0.02, 0.06, best[0].0.sqrt() / face_size);
+                let m = near.max(smooth(0.1, 0.4, p.face_skin[i])) * (0.3 + 0.7 * p.person[i]);
+                if m < 0.02 {
+                    continue;
+                }
+                let o = normal[i];
+                let mixed = [
+                    o[0] * (1.0 - m) + n[0] * m,
+                    o[1] * (1.0 - m) + n[1] * m,
+                    o[2] * (1.0 - m) + n[2] * m,
+                ];
+                let l = (mixed[0] * mixed[0] + mixed[1] * mixed[1] + mixed[2] * mixed[2])
+                    .sqrt()
+                    .max(1e-6);
+                normal[i] = mixed.map(|c| c / l);
+            }
+        }
+    }
+    // Suavidade: normais mais suaves = transições mais suaves (luz difusa).
+    let r = ((h as f32 / 400.0) * (1.0 + 4.0 * softness)).round().max(1.0) as usize;
+    let comps: Vec<Vec<f32>> = (0..3).map(|c| normal.iter().map(|n| n[c]).collect()).collect();
+    let sm: Vec<Vec<f32>> = comps.iter().map(|c| box_blur(c, w, h, r)).collect();
+    let normal = (0..w * h)
+        .map(|i| {
+            let n = [sm[0][i], sm[1][i], sm[2][i]];
+            let l = (n[0] * n[0] + n[1] * n[1] + n[2] * n[2]).sqrt().max(1e-6);
+            n.map(|c| c / l)
+        })
+        .collect();
+    (normal, face_z)
+}
+
+/// Sombras do próprio rosto (nariz, órbitas) para uma luz: marcha na profundidade do rosto.
+fn face_shadow(face_z: &[f32], w: usize, h: usize, l: [f32; 3], face_px: f32) -> Vec<f32> {
+    let lxy = (l[0] * l[0] + l[1] * l[1]).sqrt();
+    let mut out = vec![1f32; w * h];
+    if lxy < 1e-3 {
+        return out;
+    }
+    let (sx, sy) = (l[0] / lxy, l[1] / lxy);
+    // Subida do raio (para a câmara) por píxel, em unidades de tamanho do rosto.
+    let rise = l[2] / lxy / face_px;
+    let steps = (face_px * 0.25) as usize;
+    for y in 0..h {
+        for x in 0..w {
+            let i = y * w + x;
+            let z0 = face_z[i];
+            if z0.is_nan() {
+                continue;
+            }
+            let mut occ = 0f32;
+            for k in 1..steps.max(2) {
+                let (fx, fy) = (x as f32 + sx * k as f32, y as f32 + sy * k as f32);
+                if fx < 0.0 || fy < 0.0 || fx >= w as f32 || fy >= h as f32 {
+                    break;
+                }
+                let zf = face_z[fy as usize * w + fx as usize];
+                if zf.is_nan() {
+                    break;
+                }
+                // O raio parte de z0 e aproxima-se da câmara (z menor); bloqueado se o rosto
+                // estiver mais perto da câmara do que o raio.
+                let ray = z0 - rise * k as f32;
+                occ = occ.max(smooth(0.004, 0.02, ray - zf));
+            }
+            out[i] = 1.0 - 0.9 * occ;
+        }
+    }
+    let r = (face_px / 60.0).max(1.0) as usize;
+    box_blur(&box_blur(&out, w, h, r), w, h, r)
+}
+
+/// Luz de retrato: luz principal (direção, cor, dureza) sobre a geometria do rosto e da pessoa,
+/// pele com transição suave e quente, brilho especular suave no rosto, sombras do rosto,
+/// contorno quando a luz vem de trás, fundo opcionalmente escurecido. A exposição média da
+/// pessoa é mantida (só muda a direção e a qualidade da luz).
+pub fn portrait_light(img: &Plane, s: &Surface, p: &Portrait, l: &PortraitLight) -> Light {
+    let (w, h) = (s.w, s.h);
+    let (normals, face_z) = portrait_normals(s, p, l.softness);
+    let (az, el) = (l.azimuth.to_radians(), l.elevation.clamp(-30.0, 80.0).to_radians());
+    let ld = [az.sin() * el.cos(), -el.sin(), az.cos() * el.cos()];
+    let color = kelvin_rgb(l.kelvin);
+    let face_px = p
+        .faces
+        .iter()
+        .map(|f| f.iter().fold((f32::MAX, f32::MIN), |a, q| (a.0.min(q[0]), a.1.max(q[0]))))
+        .map(|(a, b)| b - a)
+        .fold(0f32, f32::max)
+        .max(20.0);
+    let shadow =
+        if p.faces.is_empty() { vec![1.0; w * h] } else { face_shadow(&face_z, w, h, ld, face_px) };
+    let wrap = 0.15 + 0.5 * l.softness;
+    let ambient = 0.16 + 0.32 * l.softness;
+    let half = {
+        let v = [ld[0], ld[1], ld[2] + 1.0];
+        let n = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt().max(1e-6);
+        v.map(|c| c / n)
+    };
+    let shininess = 18.0 + 40.0 * (1.0 - l.softness);
+    // Sombreamento novo por píxel.
+    let mut shade = vec![0f32; w * h];
+    let mut spec = vec![0f32; w * h];
+    for i in 0..w * h {
+        let n = normals[i];
+        let ndl = n[0] * ld[0] + n[1] * ld[1] + n[2] * ld[2];
+        let key = ((ndl + wrap) / (1.0 + wrap)).max(0.0) * shadow[i];
+        shade[i] = ambient + (1.0 - ambient) * key;
+        let ndh = (n[0] * half[0] + n[1] * half[1] + n[2] * half[2]).max(0.0);
+        spec[i] = ndh.powf(shininess) * shadow[i] * p.face_skin[i] * (1.0 - p.hair[i]);
+    }
+    // Exposição: média do novo sombreamento na pessoa = 1.
+    let (sum, wsum) =
+        (0..w * h).fold((0f32, 0f32), |a, i| (a.0 + shade[i] * p.person[i], a.1 + p.person[i]));
+    let mean_shade = if wsum > 1.0 { sum / wsum } else { 1.0 };
+    let face_lum = {
+        let (s1, s2) = (0..w * h).fold((0f32, 0f32), |a, i| {
+            let q = img.px[i];
+            (
+                a.0 + (0.2627 * q[0] + 0.678 * q[1] + 0.0593 * q[2]) * p.face_skin[i],
+                a.1 + p.face_skin[i],
+            )
+        });
+        if s2 > 1.0 {
+            s1 / s2
+        } else {
+            mean_lum(img)
+        }
+    };
+    let behind = smooth(100.0, 150.0, l.azimuth.abs());
+    // Luz por trás: a pessoa fica mais escura (só a luz ambiente) e ganha o contorno.
+    let exposure = 1.0 - 0.45 * behind;
+    // Contorno da silhueta (cabelo, ombros) do lado da luz: a máscara da pessoa é ajustada às
+    // arestas da fotografia (filtro guiado) e o contorno é uma banda fina só por dentro.
+    let edge_band = if behind > 0.0 {
+        let lum: Vec<f32> = img
+            .px
+            .iter()
+            .map(|q| (0.2627 * q[0] + 0.678 * q[1] + 0.0593 * q[2]).max(0.0).powf(1.0 / 2.2))
+            .collect();
+        let matte = guided_filter(&p.person, &lum, w, h, (h / 120).max(2), 1e-3);
+        let matte = guided_filter(&matte, &lum, w, h, (h / 300).max(1), 1e-4);
+        // Distância à borda por dentro: diferença entre a máscara e a sua erosão suave.
+        let r = (h / 450).max(1);
+        let inner = box_blur(&matte, w, h, r);
+        let mut e = vec![0f32; w * h];
+        for y in 1..h - 1 {
+            for x in 1..w - 1 {
+                let i = y * w + x;
+                let gx = inner[i + 1] - inner[i - 1];
+                let gy = inner[i + w] - inner[i - w];
+                let g = (gx * gx + gy * gy).sqrt();
+                // Lado da luz: o gradiente aponta para dentro da pessoa, oposto à luz.
+                let toward = (-(gx * ld[0] + gy * ld[1]) / g.max(1e-6)).max(0.0) * 1.0;
+                let band = (matte[i] - inner[i]).max(0.0) * 4.0
+                    + (g * r as f32 * 0.6).min(1.0) * matte[i] * matte[i];
+                e[i] = band.min(1.0) * toward * matte[i];
+            }
+        }
+        e
+    } else {
+        vec![0.0; w * h]
+    };
+    let (mut gain, mut add) = (Vec::with_capacity(w * h), Vec::with_capacity(w * h));
+    for i in 0..w * h {
+        let pm = p.person[i];
+        let r = shade[i] / mean_shade * exposure;
+        // A cor da luz só onde ela chega (a parte ambiente fica neutra).
+        let keyf = ((shade[i] - ambient) / (1.0 - ambient)).clamp(0.0, 1.0);
+        // Pele: na transição luz/sombra a luz atravessa a pele e fica mais quente.
+        let skin = (p.face_skin[i] + 0.0).min(1.0);
+        let term = smooth(0.15, 0.45, shade[i]) * (1.0 - smooth(0.45, 0.8, shade[i]));
+        let sss = [1.0 + 0.10 * term * skin, 1.0 - 0.02 * term * skin, 1.0 - 0.06 * term * skin];
+        let lit: [f32; 3] =
+            std::array::from_fn(|c| r * (1.0 + (color[c] - 1.0) * 0.9 * keyf) * sss[c]);
+        let bg = 1.0 - l.background * (1.0 - pm);
+        let g: [f32; 3] = std::array::from_fn(|c| {
+            let person = 1.0 + (lit[c] - 1.0) * l.intensity;
+            (pm * person + (1.0 - pm)) * bg
+        });
+        // Contorno: a luz atravessa o cabelo e as arestas e multiplica a cor própria
+        // (fios escuros ganham brilho quente, não uma tinta uniforme por cima).
+        let edge = behind * edge_band[i];
+        let g: [f32; 3] =
+            std::array::from_fn(|c| g[c] * (1.0 + 2.5 * l.intensity * edge * color[c]));
+        gain.push(g);
+        let a = l.intensity * (0.35 * spec[i] * (1.0 - behind) + 0.35 * edge) * face_lum;
+        add.push(color.map(|c| c * a));
+    }
+    Light { gain, add }
+}
+
+/// Filtro guiado (He, Sun & Tang, 2010): ajusta uma máscara grosseira às arestas da imagem
+/// (`guide`, luminância 0–1). `r` = raio, `eps` = regularização (menor = segue mais a imagem).
+pub fn guided_filter(
+    mask: &[f32],
+    guide: &[f32],
+    w: usize,
+    h: usize,
+    r: usize,
+    eps: f32,
+) -> Vec<f32> {
+    let mean = |v: &[f32]| box_blur(v, w, h, r);
+    let ip: Vec<f32> = guide.iter().zip(mask).map(|(i, p)| i * p).collect();
+    let ii: Vec<f32> = guide.iter().map(|i| i * i).collect();
+    let (mi, mp, mip, mii) = (mean(guide), mean(mask), mean(&ip), mean(&ii));
+    let a: Vec<f32> =
+        (0..w * h).map(|k| (mip[k] - mi[k] * mp[k]) / (mii[k] - mi[k] * mi[k] + eps)).collect();
+    let b: Vec<f32> = (0..w * h).map(|k| mp[k] - a[k] * mi[k]).collect();
+    let (ma, mb) = (mean(&a), mean(&b));
+    (0..w * h).map(|k| (ma[k] * guide[k] + mb[k]).clamp(0.0, 1.0)).collect()
+}
