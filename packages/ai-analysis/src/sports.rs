@@ -105,7 +105,8 @@ pub fn detect(times: &[i64], hints: &MatchHints) -> Option<MatchTimes> {
     for a in 0..n {
         // Com hora de início: a 1.ª parte começa perto dela (até 10 min de atraso; 2 min antes).
         if let Some(k) = hints.kickoff_ms {
-            if b[a].0 < k - 2 * 60_000 && (a + 1 >= n || b[a + 1].0 < k - 2 * 60_000) && b[a].1 < k {
+            if b[a].0 < k - 2 * 60_000 && (a + 1 >= n || b[a + 1].0 < k - 2 * 60_000) && b[a].1 < k
+            {
                 continue;
             }
             if b[a].0 > k + 10 * 60_000 {
@@ -135,13 +136,20 @@ pub fn detect(times: &[i64], hints: &MatchHints) -> Option<MatchTimes> {
                         .chain(b[s2..=e2].windows(2))
                         .map(|w| (w[1].0 - w[0].1) as f64)
                         .fold(0.0, f64::max);
-                    let mut score = 1.5 * inside as f64 / total - 2.0 * balance + (gap / (15.0 * min)).min(1.0);
+                    // Pausas de ≥ 4 min dentro de uma parte são raras (o jogo não para): cada
+                    // uma penaliza — evita juntar o aquecimento ou os festejos às partes.
+                    let inner_pauses = (e1 - a) + (e2 - s2);
+                    let mut score = inside as f64 / total - 2.0 * balance
+                        + (gap / (15.0 * min)).min(1.0)
+                        - 0.4 * inner_pauses as f64;
                     if inner_gap > gap {
                         score -= 1.0;
                     }
                     if let Some(h) = half_target {
                         // Cada parte: duração regulamentar + até 10 min de descontos.
-                        let err = |d: f64| ((d - h).max(0.0) - 10.0 * min).max(0.0) + (h - 5.0 * min - d).max(0.0);
+                        let err = |d: f64| {
+                            ((d - h).max(0.0) - 10.0 * min).max(0.0) + (h - 5.0 * min - d).max(0.0)
+                        };
                         score -= (err(d1) + err(d2)) / (10.0 * min);
                     }
                     if let Some(k) = hints.kickoff_ms {
@@ -155,10 +163,18 @@ pub fn detect(times: &[i64], hints: &MatchHints) -> Option<MatchTimes> {
         }
     }
     let (_, mut m) = best?;
-    if let Some(k) = hints.kickoff_ms {
-        // O pontapé de saída é a fronteira certa (as fotografias podem começar um pouco depois).
-        if (m.first.0 - k).abs() <= 10 * 60_000 {
-            m.first.0 = m.first.0.min(k);
+    match hints.kickoff_ms {
+        // O pontapé de saída é a fronteira certa: o que vem antes é aquecimento/entrada.
+        Some(k) if (m.first.0 - k).abs() <= 10 * 60_000 => m.first.0 = k,
+        _ => {
+            // Sem hora de início: a entrada das equipas cola-se à 1.ª parte (pausa curta);
+            // a última pausa de ≥ 1 min nos primeiros 6 min do bloco marca o pontapé de saída.
+            let start = m.first.0;
+            let head: Vec<i64> =
+                t.iter().copied().filter(|&x| x >= start && x <= start + 6 * 60_000).collect();
+            if let Some(w) = head.windows(2).filter(|w| w[1] - w[0] >= 60_000).last() {
+                m.first.0 = w[1];
+            }
         }
     }
     Some(m)
@@ -210,8 +226,14 @@ mod tests {
                 let m = detect(&t, &MatchHints::default()).expect("jogo");
                 // A primeira/última fotografia de cada parte pode estar até 2,5 min dentro.
                 let near = |a: i64, b: i64| (a - b).abs() <= 150_000;
-                assert!(near(m.first.0, truth.first.0) && near(m.first.1, truth.first.1), "{half} min, {seed}: 1.ª {m:?} vs {truth:?}");
-                assert!(near(m.second.0, truth.second.0) && near(m.second.1, truth.second.1), "{half} min, {seed}: 2.ª {m:?} vs {truth:?}");
+                assert!(
+                    near(m.first.0, truth.first.0) && near(m.first.1, truth.first.1),
+                    "{half} min, {seed}: 1.ª {m:?} vs {truth:?}"
+                );
+                assert!(
+                    near(m.second.0, truth.second.0) && near(m.second.1, truth.second.1),
+                    "{half} min, {seed}: 2.ª {m:?} vs {truth:?}"
+                );
                 // Classificação: aquecimento antes, festejos depois.
                 assert_eq!(m.phase_of(truth.first.0 - 20 * MIN), MatchPhase::PreGame);
                 assert_eq!(m.phase_of(truth.second.1 + 7 * MIN), MatchPhase::PostGame);
@@ -235,5 +257,16 @@ mod tests {
         assert!(detect(&[0, 1000, 2000], &MatchHints::default()).is_none());
         let one_block: Vec<i64> = (0..400).map(|i| i * 20_000).collect();
         assert!(detect(&one_block, &MatchHints::default()).is_none());
+    }
+
+    #[test]
+    fn a_long_stoppage_inside_a_half_is_not_the_interval() {
+        let (t, truth) = game(25 * MIN, 45 * MIN, 15 * MIN, 10 * MIN, 5);
+        // Lesão: 6 min sem fotografias a meio da 2.ª parte.
+        let mid = (truth.second.0 + truth.second.1) / 2;
+        let t: Vec<i64> = t.into_iter().filter(|&x| x < mid || x > mid + 6 * MIN).collect();
+        let m = detect(&t, &MatchHints::default()).unwrap();
+        assert!((m.second.1 - truth.second.1).abs() <= 150_000, "{m:?} vs {truth:?}");
+        assert_eq!(m.phase_of(mid + 7 * MIN), MatchPhase::SecondHalf);
     }
 }
