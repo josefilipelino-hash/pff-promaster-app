@@ -134,20 +134,24 @@ impl ImageCodec for RawCodec {
         };
 
         // 1) Preview embutida: suficiente para miniaturas e previews quando é grande o bastante.
-        let want_preview = min_short_edge.is_some() || !info.sensor_supported;
+        // Câmara sem perfil de cor nesta LibRaw (ex.: Canon EOS C50): a revelação do sensor
+        // sai com cores erradas (sem matriz, sem balanço, sem nível de preto) — usa-se sempre a
+        // preview da câmara, mesmo que pequena.
+        let preview_only = !info.sensor_supported || !info.color_matrix_known;
+        let want_preview = min_short_edge.is_some() || preview_only;
         if want_preview {
             if let Some((_, _, pw, ph)) = info.preview {
                 let big_enough = match min_short_edge {
                     Some(min) => preview_acceptable(pw, ph, min) || (pw == 0 && ph == 0),
                     None => true,
                 };
-                if big_enough || !info.sensor_supported {
+                if big_enough || preview_only {
                     match raw.embedded_preview() {
                         Ok(Some(p)) => {
                             let (img, icc) = self.decode_preview(p, min_short_edge)?;
                             let img = normalize_preview_rotation(img, sw, sh, info.orientation);
                             let (iw, ih) = img.dimensions();
-                            if !info.sensor_supported
+                            if preview_only
                                 || min_short_edge.is_none_or(|m| preview_acceptable(iw, ih, m))
                             {
                                 return Ok(mk(img, icc, DecodeKind::EmbeddedPreview));

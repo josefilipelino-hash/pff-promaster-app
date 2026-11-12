@@ -144,9 +144,10 @@ fn calibrate_unknown_camera(
                 amostras = c.samples,
                 erro_antes = c.error_before,
                 erro_depois = c.error_after,
+                preto = ?c.offset,
                 "câmara sem perfil de cor na LibRaw: cores calibradas pela preview embutida"
             );
-            s.apply_matrix(&c.matrix);
+            s.apply_calibration(c.offset, &c.matrix);
             Ok(())
         }
         other => {

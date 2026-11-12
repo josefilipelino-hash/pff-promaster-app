@@ -1,3 +1,11 @@
+# PFF ProMaster 1.1.4-personal
+
+**Correção (1.1.4):** Canon EOS C50 sem dominante magenta/oliva — a calibração retira o
+nível de preto que a LibRaw não subtrai nesta câmara; se não for fiável, usa-se a preview
+da própria câmara (nunca a revelação sem perfil). Ver `CHANGELOG.md` (1.1.3 e 1.1.4).
+
+---
+
 # PFF ProMaster 1.1.2-personal
 
 **Correção (1.1.2):** a Canon EOS C50 já não aparece verde/oliva — a calibração passa a

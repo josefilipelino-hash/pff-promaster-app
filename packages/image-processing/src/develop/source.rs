@@ -73,11 +73,13 @@ pub struct Source {
 }
 
 impl Source {
-    /// Aplica uma matriz de cor a todos os níveis (calibração de câmaras sem perfil).
-    pub fn apply_matrix(&mut self, m: &[[f32; 3]; 3]) {
+    /// Retira um nível de preto por canal e aplica uma matriz de cor a todos os níveis
+    /// (calibração de câmaras sem perfil).
+    pub fn apply_calibration(&mut self, offset: [f32; 3], m: &[[f32; 3]; 3]) {
         for level in &mut self.levels {
             for p in &mut level.px {
-                *p = super::color::mul3(m, *p).map(|c| c.max(0.0));
+                let v = [p[0] - offset[0], p[1] - offset[1], p[2] - offset[2]].map(|c| c.max(0.0));
+                *p = super::color::mul3(m, v).map(|c| c.max(0.0));
             }
         }
     }

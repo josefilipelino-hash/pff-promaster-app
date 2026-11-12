@@ -36,8 +36,13 @@ que têm impacto no uso real, por gravidade.
   C50**). Nesses ficheiros as cores são **calibradas automaticamente** pela preview JPEG que a
   câmara grava no RAW: o resultado segue as cores (e o estilo) da própria câmara, não um
   perfil colorimétrico neutro. A temperatura aparece na escala relativa, sem Kelvin.
-- Se o RAW não tiver preview utilizável, as cores ficam por calibrar (o registo indica-o).
-  A solução definitiva é uma LibRaw mais recente com o perfil desse modelo.
+- Sem esse perfil a LibRaw também não aplica o balanço de brancos nem subtrai o nível de
+  preto: a calibração (1.1.4) estima os dois pela preview. Em RAW reais com estes defeitos
+  simulados recupera as cores; **não foi testada com um ficheiro C50 real** (não temos um).
+- Se a calibração não for fiável, a edição usa a própria preview da câmara: cores certas,
+  mas a resolução dessa preview (na C50, 810×540 — exportações ficam pequenas). O registo
+  indica qual dos dois caminhos foi usado. A solução definitiva é uma LibRaw mais recente
+  com o perfil desse modelo.
 
 ## 2b. Lightroom e temperatura (1.1)
 

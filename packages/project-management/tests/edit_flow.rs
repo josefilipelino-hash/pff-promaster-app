@@ -355,8 +355,12 @@ fn unknown_camera_colors_are_calibrated_from_the_embedded_preview() {
         // misturadas E sem balanço de brancos (verde ~2× mais forte, azul fraco).
         let mix = [[0.40, 0.15, 0.03], [0.30, 1.45, 0.20], [0.03, 0.18, 0.45]];
         let mut fake = t.clone();
+        // … e sem o nível de preto subtraído (valor constante em todos os píxeis, como sem o
+        // bloco de dados da câmara).
+        let black = [0.012, 0.025, 0.010];
         for p in &mut fake.px {
-            *p = mul3(&mix, *p);
+            let m = mul3(&mix, *p);
+            *p = [m[0] + black[0], m[1] + black[1], m[2] + black[2]];
         }
         let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase());
         let format = momento_image_codecs::detect(&data[..data.len().min(4096)], ext.as_deref())
@@ -382,7 +386,10 @@ fn unknown_camera_colors_are_calibrated_from_the_embedded_preview() {
             );
             assert!(c2.framing.starts_with("recortado") && c2.alignment > 0.9, "{name}: {c2:?}");
         }
-        eprintln!("{name}: alinhamento {:.3} ({})", cal.alignment, cal.framing);
+        eprintln!(
+            "{name}: alinhamento {:.3} ({}), preto estimado {:?} (real {black:?})",
+            cal.alignment, cal.framing, cal.offset
+        );
         // Erro de cromaticidade médio face às cores verdadeiras, antes e depois.
         let chroma = |v: [f32; 3]| {
             let s = (v[0] + v[1] + v[2]).max(1e-6);
@@ -405,7 +412,9 @@ fn unknown_camera_colors_are_calibrated_from_the_embedded_preview() {
                 &momento_image_processing::develop::color::SRGB_TO_REC2020,
                 q.map(|c| momento_image_processing::develop::color::eotf(c as f32 / 255.0)),
             );
-            let (a, b, c, d) = (chroma(*f), chroma(mul3(&cal.matrix, *f)), chroma(*tr), chroma(ql));
+            let fo = [f[0] - cal.offset[0], f[1] - cal.offset[1], f[2] - cal.offset[2]]
+                .map(|v| v.max(0.0));
+            let (a, b, c, d) = (chroma(*f), chroma(mul3(&cal.matrix, fo)), chroma(*tr), chroma(ql));
             before += (0..3).map(|i| (a[i] - c[i]).abs()).sum::<f32>();
             after += (0..3).map(|i| (b[i] - c[i]).abs()).sum::<f32>();
             floor += (0..3).map(|i| (d[i] - c[i]).abs()).sum::<f32>();

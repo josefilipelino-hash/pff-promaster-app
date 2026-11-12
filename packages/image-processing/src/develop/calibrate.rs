@@ -18,6 +18,8 @@ use image::RgbImage;
 /// Matriz estimada e qualidade do ajuste.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Calibration {
+    /// Nível de preto em falta, a subtrair antes da matriz (por canal, nas unidades da fonte).
+    pub offset: [f32; 3],
     pub matrix: [[f32; 3]; 3],
     /// Pares de píxeis usados.
     pub samples: usize,
@@ -76,10 +78,72 @@ pub fn calibrate_from_preview(camera: &Plane, preview: &RgbImage) -> Option<Cali
             (f, p, pv, a)
         })
         .max_by(|a, b| a.3.total_cmp(&b.3))?;
-    if alignment < MIN_ALIGNMENT {
-        return None;
+    // Nível de preto: sem o bloco de dados da câmara, a LibRaw também não subtrai o preto do
+    // sensor; fica um valor constante em todos os píxeis (dominante magenta nas sombras, cor
+    // que muda com a luz — nenhuma matriz o corrige). Estima-se nas zonas que a preview mostra
+    // como quase pretas e retira-se; o alinhamento é medido de novo sem ele.
+    // As zonas mais escuras da preview raramente são preto puro: a estimativa pode passar um
+    // pouco do valor real, por isso escolhe-se a fração que melhor ajusta as cores.
+    let estimate = estimate_black_offset(&plane, pv);
+    [0.0f32, 0.5, 0.7, 0.85, 1.0]
+        .iter()
+        .filter_map(|&k| {
+            let offset = estimate.map(|o| o * k);
+            let plane = subtract(&plane, offset);
+            let alignment = luminance_correlation(&plane, pv).max(alignment);
+            if alignment < MIN_ALIGNMENT {
+                return None;
+            }
+            fit(&plane, pv).map(|c| Calibration { alignment, framing, offset, ..c })
+        })
+        .min_by(|a, b| a.error_after.total_cmp(&b.error_after))
+}
+
+fn subtract(p: &Plane, o: [f32; 3]) -> Plane {
+    Plane {
+        w: p.w,
+        h: p.h,
+        px: p
+            .px
+            .iter()
+            .map(|v| [v[0] - o[0], v[1] - o[1], v[2] - o[2]].map(|c| c.max(0.0)))
+            .collect(),
     }
-    fit(&plane, pv).map(|c| Calibration { alignment, framing, ..c })
+}
+
+/// Nível de preto por canal: mediana dos valores do RAW onde a preview é quase preta (ou, se
+/// houver poucos, no 1 % mais escuro da preview). Limitado para nunca apagar sinal real.
+fn estimate_black_offset(camera: &Plane, preview: &RgbImage) -> [f32; 3] {
+    let pv = image::imageops::resize(
+        preview,
+        camera.w as u32,
+        camera.h as u32,
+        image::imageops::FilterType::Triangle,
+    );
+    let lum = |q: [u8; 3]| {
+        let l = q.map(|c| eotf(c as f32 / 255.0));
+        0.2627 * l[0] + 0.6780 * l[1] + 0.0593 * l[2]
+    };
+    let mut by_dark: Vec<(f32, [f32; 3])> = camera
+        .px
+        .iter()
+        .enumerate()
+        .map(|(i, p)| (lum(pv.get_pixel((i % camera.w) as u32, (i / camera.w) as u32).0), *p))
+        .collect();
+    by_dark.sort_by(|a, b| a.0.total_cmp(&b.0));
+    let very_dark = by_dark.iter().take_while(|d| d.0 < 0.003).count();
+    let n = very_dark.max(by_dark.len() / 100).clamp(1, by_dark.len());
+    let mut o = [0f32; 3];
+    for (c, oc) in o.iter_mut().enumerate() {
+        let mut v: Vec<f32> = by_dark[..n].iter().map(|d| d.1[c]).collect();
+        v.sort_by(f32::total_cmp);
+        let median_dark = v[v.len() / 2];
+        let mut all: Vec<f32> = camera.px.iter().step_by(7).map(|p| p[c]).collect();
+        all.sort_by(f32::total_cmp);
+        let median_all = all.get(all.len() / 2).copied().unwrap_or(0.0);
+        *oc = median_dark.clamp(0.0, 0.6 * median_all);
+    }
+    o
 }
 
 /// Retira margens pretas (barras) da preview.
@@ -251,6 +315,7 @@ fn fit(camera: &Plane, preview: &RgbImage) -> Option<Calibration> {
         error_after: after,
         alignment: 1.0,
         framing: "",
+        offset: [0.0; 3],
     })
 }
 

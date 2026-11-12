@@ -5,6 +5,21 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [1.1.4-personal] — 2026-11-12
+
+### Corrigido
+- Canon EOS C50: dominante magenta (1.1.3) / oliva (1.1.2) ao editar. Causa encontrada no
+  registo: sem o perfil desta câmara, a LibRaw também **não subtrai o nível de preto** do
+  sensor — fica um valor constante em todos os píxeis, que nenhuma matriz de cor corrige, e
+  a calibração era recusada (alinhamento 0,86, erro 0,11). A calibração passa a estimar esse
+  nível de preto nas zonas que a preview mostra como pretas e a retirá-lo antes de ajustar
+  as cores (teste com RAW reais com preto em falta: recuperado com 0,001–0,01 de diferença,
+  erro de cor 0,55 → 0,02–0,07).
+- Quando a calibração não é fiável, a edição usava a revelação do sensor sem perfil
+  (magenta) porque a preview da C50 é pequena (810×540). Para câmaras sem perfil passa a
+  usar-se **sempre** a preview da câmara (cores certas, menos resolução).
+- As edições em cache são refeitas (versão do motor 6).
+
 ## [1.1.3-personal] — 2026-11-12
 
 ### Corrigido
