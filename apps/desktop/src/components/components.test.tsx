@@ -1903,7 +1903,7 @@ describe("acessibilidade (Fase 14)", () => {
     await screen.findByRole("dialog", { name: "Galeria do cliente" });
     await act(async () => {});
     await audit("galeria");
-  });
+  }, 20_000); // axe em seis ecrãs: ~5 s numa máquina lenta
 });
 
 describe("cálculos de layout", () => {
