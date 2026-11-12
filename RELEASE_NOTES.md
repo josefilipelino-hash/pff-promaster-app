@@ -1,3 +1,13 @@
+# PFF ProMaster 1.2.0-personal
+
+**Edição a sério de RAW:** copiar/colar a edição para várias fotografias; perspetiva
+projetiva com **Upright** (Auto, Nível, Vertical, Completo, Guiado); **formatos de recorte**
+do mercado por fotografia ou em lote; **perfis de objetiva** automáticos (Lensfun);
+**AI Denoise** com o modelo de ruído do sensor. Detalhes e medições em `CHANGELOG.md`;
+o que ainda não iguala o Lightroom em `KNOWN_LIMITATIONS.md` (secção 2c).
+
+---
+
 # PFF ProMaster 1.1.4-personal
 
 **Correção (1.1.4):** Canon EOS C50 sem dominante magenta/oliva — a calibração retira o

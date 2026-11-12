@@ -1,4 +1,4 @@
-# Limitações conhecidas — PFF ProMaster 1.0.0-personal
+# Limitações conhecidas — PFF ProMaster 1.2.0-personal
 
 **Data:** 2026-11-10 · Resultado da auditoria final (`FINAL_AUDIT.md`). Esta lista não
 esconde nada: o que aqui está **não funciona, funciona só em parte ou não foi verificado**.
@@ -44,6 +44,29 @@ que têm impacto no uso real, por gravidade.
   indica qual dos dois caminhos foi usado. A solução definitiva é uma LibRaw mais recente
   com o perfil desse modelo.
 
+## 2c. Edição face ao Lightroom / Camera Raw (1.2)
+
+Não foi feita nenhuma comparação lado a lado com o Lightroom ou o Camera Raw (não estão
+disponíveis no ambiente de desenvolvimento): **não se afirma que sejam superados**. O que foi
+medido está no `CHANGELOG.md`. Diferenças conhecidas:
+
+- **Perfis de câmara:** a Adobe tem perfis de cor medidos por modelo de câmara; aqui as cores
+  vêm das matrizes da LibRaw (e da calibração pela preview nas câmaras que ela não conhece).
+- **Redução de ruído:** o "Denoise" da Adobe atua nos dados do sensor antes da desmatrização
+  e foi treinado com RAW reais; o AI Denoise daqui (FFDNet, treinado com ruído gaussiano)
+  atua depois da desmatrização, agora com o modelo de ruído do sensor e tratamento do ruído
+  correlacionado. Em ISO muito alto pode ficar ruído de cor de baixa frequência.
+- **Desmatrização e realces:** algoritmo da LibRaw (AHD) e mistura simples nos realces
+  cortados; sem escolha de algoritmo nem reconstrução avançada de realces.
+- **Perfis de objetiva:** só as objetivas da base Lensfun (1577); objetivas recentes podem
+  faltar. Os NEF da Nikon muitas vezes não indicam a objetiva de forma legível para a LibRaw
+  — nesses ficheiros o perfil não é encontrado. Sem perfil para objetivas olho de peixe.
+- **Geometria:** o recorte é sempre restringido (sem zonas vazias, como "Restringir recorte"
+  ligado); não há preenchimento de bordas por IA. O Upright guiado mostra a correção só ao
+  concluir (não em tempo real enquanto se desenha).
+- **Formatos em lote:** o recorte segue os rostos da análise; sem análise feita, usa o
+  centro da composição atual (sem deteção de outros sujeitos).
+
 ## 2b. Lightroom e temperatura (1.1)
 
 - **Não é gerado um catálogo `.lrcat`**: é uma base de dados privada da Adobe, sem
@@ -74,9 +97,9 @@ que têm impacto no uso real, por gravidade.
   preferências entre projetos.
 - **Pessoas e momentos:** mover um rosto para outra pessoa, pessoas principais por
   momento, câmara/objetiva nos momentos, renomear/apagar momentos na interface.
-- **Edição:** microcontraste/textura/perspetiva/distorção automáticos, perfis de objetiva,
-  calibração e perfis de câmara, editar os valores de um preset, sidecars XMP (a receita
-  vive no catálogo e num sidecar JSON).
+- **Edição:** microcontraste/textura automáticos, calibração e perfis de câmara, editar os
+  valores de um preset, sidecars XMP (a receita vive no catálogo e num sidecar JSON).
+  (Perspetiva automática — Upright — e perfis de objetiva existem desde a 1.2.)
 - **Exportação:** HEIF/HEIC (sem codificador HEVC livre), DNG, GIF/MP4, ACEScg, limite de
   tamanho de ficheiro, receitas para redes sociais genéricas/Facebook, registo das
   exportações feitas.

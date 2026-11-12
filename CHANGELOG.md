@@ -5,6 +5,40 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [1.2.0-personal] — 2026-11-12
+
+### Novo
+- **Copiar/colar a edição para várias fotografias:** na grelha, "Copiar edição" e "Colar
+  edição em N fotografias" (menu de contexto, Ctrl/Cmd+Shift+C / V); no editor, Colar
+  aplica a todas as fotografias selecionadas.
+- **Geometria projetiva real:** a perspetiva é uma rotação da câmara (inclinação e guinada)
+  com a focal do EXIF — as linhas retas continuam retas (o trapézio anterior curvava as
+  diagonais); zoom automático sem cantos vazios; novos controlos Proporção, Escala e
+  Deslocar X/Y.
+- **Upright:** Auto, Nível, Vertical, Completo e Guiado (2–4 linhas desenhadas). Deteção de
+  segmentos, pontos de fuga (RANSAC) e rotação da câmara (Levenberg–Marquardt). Em imagens
+  com geometria conhecida recupera a rotação com erro < 0,6°; em RAW reais é consistente
+  (3° → 2,9°/3,1°) e não mexe em fotografias sem linhas fiáveis.
+- **Formatos de recorte do mercado:** 16 formatos (Instagram, Stories/Reels, 10×15, 13×18,
+  20×25, 30×40, A4, 1,91:1, 16:9, cinema, panorâmica…) e personalizado; ⇄ (X) troca a
+  orientação. "Aplicar formato às selecionadas": cada fotografia recebe o seu recorte,
+  centrado nos rostos (olhos no terço superior) ou na composição atual.
+- **Perfis de objetiva automáticos (Lensfun, 1577 objetivas):** distorção, aberração
+  cromática lateral e vinheta medidas, interpoladas para a focal e a abertura de cada
+  fotografia; identificação pelo EXIF (focal, abertura e versão têm de coincidir — "GM II"
+  não usa o perfil da "GM"); aplicar às selecionadas; colar recalcula por fotografia.
+- **AI Denoise com modelo de ruído do sensor:** o ruído (variância a·x + b) é estimado na
+  própria fotografia e passado à rede como mapa por píxel; o ruído correlacionado da
+  desmatrização (RAW reais) é tratado por sub-imagens intercaladas. Medido em RAW reais com
+  ruído simulado: +1,7 dB (mediana) com ruído independente e +5,7 dB com ruído
+  correlacionado, face à versão anterior; num RAW real a ISO 25 600 a diferença é visível
+  (a versão anterior quase não atuava).
+
+### Alterado
+- O botão "Auto" de endireitar foi substituído pelo Upright "Nível" (mais robusto).
+- Edições com perspetiva feitas antes da 1.2 aparecem ligeiramente diferentes (modelo
+  projetivo); as edições em cache são refeitas.
+
 ## [1.1.4-personal] — 2026-11-12
 
 ### Corrigido
