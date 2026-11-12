@@ -7,8 +7,8 @@
 //! câmara → Rec. 2020 linear:
 //! - por cromaticidade (cada par normalizado pela sua soma), para não depender da curva de
 //!   tons da câmara;
-//! - com as linhas a somar 1, para que um cinzento continue cinzento (o balanço da câmara já
-//!   tornou o branco neutro);
+//! - matriz completa: também corrige o balanço de brancos (sem perfil, a LibRaw não aplica
+//!   o da câmara e os dados chegam com dominante verde do sensor);
 //! - só com píxeis de meios-tons (sem sombras com ruído nem realces cortados na preview).
 
 use super::color::{eotf, mul3, SRGB_TO_REC2020};
@@ -46,6 +46,7 @@ pub fn calibrate_from_preview(camera: &Plane, preview: &RgbImage) -> Option<Cali
     );
     // Pares (câmara, alvo) normalizados.
     let mut pairs: Vec<([f32; 3], [f32; 3])> = Vec::new();
+    let mut raws: Vec<[f32; 3]> = Vec::new();
     let step = ((camera.w * camera.h) / 20_000).max(1);
     let max_cam =
         camera.px.iter().step_by(step).map(|p| p[0].max(p[1]).max(p[2])).fold(0f32, f32::max);
@@ -59,33 +60,45 @@ pub fn calibrate_from_preview(camera: &Plane, preview: &RgbImage) -> Option<Cali
         let target = mul3(&SRGB_TO_REC2020, q.map(|c| eotf(c as f32 / 255.0)));
         if let (Some(a), Some(b)) = (norm(*p), norm(target)) {
             pairs.push((a, b));
+            raws.push(*p);
         }
     }
     if pairs.len() < 200 {
         return None;
     }
-    // Cada linha: y_c = a·x0 + b·x1 + (1−a−b)·x2  ⇒  y_c − x2 = a(x0−x2) + b(x1−x2).
-    let mut m = [[0f32; 3]; 3];
-    for (c, row) in m.iter_mut().enumerate() {
-        let (mut s11, mut s12, mut s22, mut t1, mut t2) = (0f64, 0f64, 0f64, 0f64, 0f64);
-        for (x, y) in &pairs {
-            let (u, v) = ((x[0] - x[2]) as f64, (x[1] - x[2]) as f64);
-            let r = (y[c] - x[2]) as f64;
-            s11 += u * u;
-            s12 += u * v;
-            s22 += v * v;
-            t1 += u * r;
-            t2 += v * r;
+    // Matriz completa (9 valores), por mínimos quadrados em cromaticidade: corrige também o
+    // balanço de brancos, porque sem perfil a LibRaw também não aplica o da câmara (os dados
+    // chegam com o verde do sensor muito mais forte — dominante verde/oliva).
+    let mut a = [[0f64; 3]; 3];
+    let mut b = [[0f64; 3]; 3];
+    for (x, y) in &pairs {
+        for r in 0..3 {
+            for c in 0..3 {
+                a[r][c] += (x[r] * x[c]) as f64;
+                b[r][c] += (x[r] * y[c]) as f64;
+            }
         }
-        let det = s11 * s22 - s12 * s12;
-        if det.abs() < 1e-12 {
-            return None;
-        }
-        let a = ((t1 * s22 - t2 * s12) / det) as f32;
-        let b = ((s11 * t2 - s12 * t1) / det) as f32;
-        *row = [a, b, 1.0 - a - b];
     }
-    if m.iter().flatten().any(|v| !v.is_finite() || v.abs() > 4.0) {
+    let inv = invert3(a)?;
+    let mut m = [[0f32; 3]; 3];
+    for (out, row) in m.iter_mut().enumerate() {
+        for (k, v) in row.iter_mut().enumerate() {
+            *v = (0..3).map(|r| inv[k][r] * b[r][out]).sum::<f64>() as f32;
+        }
+    }
+    // Mesma luminância média (a exposição base já foi calculada sobre os dados da câmara).
+    let lum = |v: [f32; 3]| 0.2627 * v[0] + 0.6780 * v[1] + 0.0593 * v[2];
+    let (l0, l1) = raws
+        .iter()
+        .fold((0f64, 0f64), |(a0, a1), p| (a0 + lum(*p) as f64, a1 + lum(mul3(&m, *p)) as f64));
+    if !(l1 > 0.0) {
+        return None;
+    }
+    let k = (l0 / l1) as f32;
+    for v in m.iter_mut().flatten() {
+        *v *= k;
+    }
+    if m.iter().flatten().any(|v| !v.is_finite() || v.abs() > 8.0) {
         return None;
     }
     let err = |f: &dyn Fn([f32; 3]) -> [f32; 3]| {
@@ -106,6 +119,23 @@ pub fn calibrate_from_preview(camera: &Plane, preview: &RgbImage) -> Option<Cali
         error_before: before,
         error_after: after,
     })
+}
+
+/// Inversa de uma matriz 3×3 (`None` se for singular).
+fn invert3(m: [[f64; 3]; 3]) -> Option<[[f64; 3]; 3]> {
+    let det = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+        - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+        + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+    if det.abs() < 1e-18 {
+        return None;
+    }
+    let c =
+        |r0: usize, c0: usize, r1: usize, c1: usize| m[r0][c0] * m[r1][c1] - m[r0][c1] * m[r1][c0];
+    Some([
+        [c(1, 1, 2, 2) / det, -c(0, 1, 2, 2) / det, c(0, 1, 1, 2) / det],
+        [-c(1, 0, 2, 2) / det, c(0, 0, 2, 2) / det, -c(0, 0, 1, 2) / det],
+        [c(1, 0, 2, 1) / det, -c(0, 0, 2, 1) / det, c(0, 0, 1, 1) / det],
+    ])
 }
 
 #[cfg(test)]
@@ -131,8 +161,9 @@ mod tests {
             let srgb = [0.05 + 0.6 * rnd(), 0.05 + 0.6 * rnd(), 0.05 + 0.6 * rnd()];
             truth.push(mul3(&SRGB_TO_REC2020, srgb));
         }
-        // Câmara: mistura os canais (linhas a somar 1: o balanço já tornou o branco neutro).
-        let cam_from_truth = [[0.70, 0.25, 0.05], [0.15, 0.75, 0.10], [0.05, 0.30, 0.65]];
+        // Câmara desconhecida: mistura os canais E sem balanço de brancos (verde do sensor
+        // ~2× mais forte, azul fraco — como os dados que a LibRaw dá sem perfil).
+        let cam_from_truth = [[0.40, 0.15, 0.03], [0.30, 1.45, 0.20], [0.03, 0.18, 0.45]];
         let camera = Plane { w, h, px: truth.iter().map(|t| mul3(&cam_from_truth, *t)).collect() };
         // Preview da câmara: cores verdadeiras com uma curva de tons e sRGB 8 bits.
         let preview = RgbImage::from_fn(w as u32, h as u32, |x, y| {
@@ -143,9 +174,9 @@ mod tests {
         });
         let cal = calibrate_from_preview(&camera, &preview).expect("calibra");
         assert!(cal.error_after < cal.error_before * 0.35, "{cal:?}");
-        // Cinzento continua cinzento.
-        let g = mul3(&cal.matrix, [0.3, 0.3, 0.3]);
-        assert!(g.iter().all(|c| (c - 0.3).abs() < 1e-4), "{g:?}");
+        // O cinzento da cena (que a câmara vê esverdeado) volta a ser cinzento.
+        let g = norm(mul3(&cal.matrix, mul3(&cam_from_truth, [0.3, 0.3, 0.3]))).unwrap();
+        assert!(g.iter().all(|c| (c - 1.0 / 3.0).abs() < 0.02), "{g:?}");
         // Cores recuperadas (cromaticidade).
         // (A curva de tons por canal da preview muda um pouco a cor por si só: nenhuma matriz
         // a desfaz; compara-se com o erro sem calibração.)
@@ -157,7 +188,7 @@ mod tests {
             worst_raw = worst_raw.max(d(norm(*c).unwrap()));
         }
         assert!(
-            worst < 0.06 && worst < worst_raw * 0.5,
+            worst < 0.08 && worst < worst_raw * 0.3,
             "pior erro {worst} (sem calibração {worst_raw})"
         );
     }

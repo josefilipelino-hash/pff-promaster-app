@@ -351,8 +351,9 @@ fn unknown_camera_colors_are_calibrated_from_the_embedded_preview() {
             info.height,
         );
         let t = truth.levels.last().unwrap();
-        // "Câmara desconhecida": cores do sensor misturadas (o branco continua branco).
-        let mix = [[0.62, 0.30, 0.08], [0.20, 0.68, 0.12], [0.06, 0.34, 0.60]];
+        // "Câmara desconhecida" como a LibRaw a entrega sem perfil: cores do sensor
+        // misturadas E sem balanço de brancos (verde ~2× mais forte, azul fraco).
+        let mix = [[0.40, 0.15, 0.03], [0.30, 1.45, 0.20], [0.03, 0.18, 0.45]];
         let mut fake = t.clone();
         for p in &mut fake.px {
             *p = mul3(&mix, *p);

@@ -5,6 +5,15 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [1.1.2-personal] — 2026-11-12
+
+### Corrigido
+- Canon EOS C50 (e outras câmaras sem perfil na LibRaw) com **dominante verde/oliva** depois
+  da correção da 1.1.1: sem perfil, a LibRaw também não aplica o balanço de brancos da
+  câmara. A calibração pela preview passa a usar uma matriz completa (corrige também o
+  balanço). Teste com RAW reais sem balanço: erro de cor 0,56 → 0,02–0,06 (o mínimo
+  possível, igual ao da própria preview). As edições em cache são refeitas (versão do motor).
+
 ## [1.1.1-personal] — 2026-11-12
 
 ### Corrigido

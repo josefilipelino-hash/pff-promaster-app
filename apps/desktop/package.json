@@ -1,7 +1,7 @@
 {
   "name": "@momento/desktop",
   "private": true,
-  "version": "1.1.1-personal",
+  "version": "1.1.2-personal",
   "type": "module",
   "scripts": {
     "dev": "vite",

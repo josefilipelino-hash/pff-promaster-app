@@ -1,3 +1,10 @@
+# PFF ProMaster 1.1.2-personal
+
+**Correção (1.1.2):** a Canon EOS C50 já não aparece verde/oliva — a calibração passa a
+corrigir também o balanço de brancos, que a câmara sem perfil não recebia.
+
+---
+
 # PFF ProMaster 1.1.1-personal
 
 **Correção (1.1.1):** fotografias de câmaras mais recentes do que o motor RAW (ex.: Canon
