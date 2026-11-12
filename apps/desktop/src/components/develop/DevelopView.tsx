@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useTranslation } from "react-i18next";
 import { api, events, isMac } from "../../api";
 import { Icon } from "../Icon";
-import { ASPECTS, cloneSettings, DEFAULT_COPY_BLOCKS, defaultSettings, fitCropToAspect, parseFrame, sameSettings, type Frame } from "../../logic/develop";
+import { ASPECTS, aspectEntry, cloneSettings, orientAspect, parseAspect, swapAspect, DEFAULT_COPY_BLOCKS, defaultSettings, fitCropToAspect, parseFrame, sameSettings, type Frame } from "../../logic/develop";
 import { errorText, useStore } from "../../store";
 import { SETTINGS_BLOCKS, UPRIGHT_MODES, type UprightOutcome, type AutoOptions, type AutoReport, type DevelopSettings, type EditView } from "../../types";
 import { AutoOptionsForm, AutoReportView } from "./AutoPanel";
@@ -721,6 +721,7 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
       if (m && k === "'") return e.preventDefault(), void virtualCopy();
       if (!m && !e.altKey && e.key === "\\") return e.preventDefault(), setBefore((b) => !b);
       if (!m && !e.altKey && k === "r") return e.preventDefault(), setCropMode((c) => !c);
+      if (!m && !e.altKey && k === "x" && cropMode && (parseAspect(settings.geometry.aspect) ?? 1) !== 1) return e.preventDefault(), setAspect(swapAspect(settings.geometry.aspect));
       if (!m && !e.altKey && k === "w") return e.preventDefault(), setWbPicking((w) => !w);
       if (!m && !e.altKey && k === "y") return e.preventDefault(), setSplit((v) => !v);
       if (e.key === "Escape" && guiding) return e.preventDefault(), e.stopPropagation(), setGuiding(false);
@@ -829,7 +830,32 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
     const a = settings.geometry.aspect;
     if (a === "free") return null;
     if (a === "original") return frame && cropMode ? frame.width / frame.height : null;
-    return ASPECTS.find((x) => x[0] === a)?.[1] ?? null;
+    return parseAspect(a);
+  };
+  /** Dimensões da fotografia inteira (o frame mostra o recorte fora do modo de recorte). */
+  const fullFrame = (): [number, number] => {
+    if (!frame) return [3, 2];
+    if (cropMode) return [frame.width, frame.height];
+    return [frame.width / Math.max(crop.w, 1e-3), frame.height / Math.max(crop.h, 1e-3)];
+  };
+  const setAspect = (a: string) =>
+    set("geometry.aspect", (s) => {
+      s.geometry.aspect = a;
+      const [fw, fh] = fullFrame();
+      const r = a === "original" ? fw / fh : parseAspect(a);
+      if (r) s.geometry.crop = fitCropToAspect(s.geometry.crop, r, fw, fh);
+    }, true);
+  const [customAspect, setCustomAspect] = useState<[string, string]>(["3", "2"]);
+  const [customOpen, setCustomOpen] = useState(false);
+  const applyAspectToSelection = async () => {
+    const keys = selection.ids.has(photoKey) ? [...selection.ids] : [photoKey, ...selection.ids];
+    try {
+      const n = await api.applyAspect(keys, settings.geometry.aspect);
+      replace(await api.editView(photoKey));
+      toast("info", t("develop.aspectApplied", { count: n }));
+    } catch (e) {
+      fail(e);
+    }
   };
   const dragCrop = useRef<{ mode: string; x: number; y: number; c: typeof crop } | null>(null);
   const onCropDown = (mode: string) => (e: React.PointerEvent) => {
@@ -880,17 +906,13 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
           <span className="sr-only">{t("develop.aspect")}</span>
           <select
             aria-label={t("develop.aspect")}
-            value={settings.geometry.aspect}
+            value={customOpen ? "custom" : aspectEntry(settings.geometry.aspect)}
             onChange={(e) => {
               const a = e.target.value;
-              set("geometry.aspect", (s) => {
-                s.geometry.aspect = a;
-                const ratio = ASPECTS.find((x) => x[0] === a)?.[1];
-                const fw = frame?.width ?? 3;
-                const fh = frame?.height ?? 2;
-                const r = a === "original" ? fw / fh : ratio;
-                if (r) s.geometry.crop = fitCropToAspect(s.geometry.crop, r, fw, fh);
-              }, true);
+              setCustomOpen(a === "custom");
+              if (a === "custom") return;
+              const [fw, fh] = fullFrame();
+              setAspect(orientAspect(a, fw, fh));
             }}
           >
             {ASPECTS.map(([a]) => (
@@ -898,9 +920,41 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
                 {t(`develop.aspects.${a}`, { defaultValue: a })}
               </option>
             ))}
+            <option value="custom">{t("develop.aspects.custom")}</option>
           </select>
         </label>
+        <button
+          type="button"
+          className="btn small"
+          aria-label={t("develop.aspectSwap")}
+          title={`${t("develop.aspectSwap")} (X)`}
+          disabled={(parseAspect(settings.geometry.aspect) ?? 1) === 1}
+          onClick={() => setAspect(swapAspect(settings.geometry.aspect))}
+        >
+          ⇄
+        </button>
       </div>
+      {(customOpen || aspectEntry(settings.geometry.aspect) === "custom") && (
+        <form
+          className="dev-row"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (parseAspect(`${customAspect[0]}:${customAspect[1]}`)) setAspect(`${customAspect[0]}:${customAspect[1]}`);
+          }}
+        >
+          <input className="aspect-num" aria-label={t("develop.aspectWidth")} inputMode="decimal" value={customAspect[0]} onChange={(e) => setCustomAspect([e.target.value, customAspect[1]])} />
+          <span>:</span>
+          <input className="aspect-num" aria-label={t("develop.aspectHeight")} inputMode="decimal" value={customAspect[1]} onChange={(e) => setCustomAspect([customAspect[0], e.target.value])} />
+          <button type="submit" className="btn small">{t("develop.aspectSet")}</button>
+        </form>
+      )}
+      {selection.ids.size > 1 && (
+        <div className="dev-row">
+          <button type="button" className="btn small" onClick={() => void applyAspectToSelection()} title={t("develop.aspectToSelectionHint")}>
+            {t("develop.aspectToSelection", { count: new Set([...selection.ids, photoKey]).size })}
+          </button>
+        </div>
+      )}
       <div className="dev-row">
         <button type="button" className="btn small" onClick={() => set("geometry.rotateLeft", (s) => void (s.geometry.quarterTurns = (s.geometry.quarterTurns + 3) % 4), true)} title={t("develop.rotateLeft")}>
           ⟲

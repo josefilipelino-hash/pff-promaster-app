@@ -137,6 +137,23 @@ fn non_destructive_editing_end_to_end() {
     // Colar só a luz noutra fotografia; cópia virtual independente.
     assert_eq!(s.paste_settings(&[other], &v.settings, &["light".into()]).unwrap(), 1);
     assert_eq!(s.edit_view(other).unwrap().settings.light.exposure, 1.0);
+    // Formato 4:5 nas duas fotografias (cada uma com o seu recorte): proporção exata em
+    // píxeis, altura toda; "original" volta à fotografia inteira.
+    assert_eq!(s.apply_aspect(&[jpg, other], "4:5").unwrap(), 2);
+    for k in [jpg, other] {
+        let g = s.edit_view(k).unwrap().settings.geometry;
+        assert_eq!(g.aspect, "4:5");
+        assert!(
+            ((g.crop.w * 1800.0) / (g.crop.h * 1200.0) - 0.8).abs() < 1e-3
+                && (g.crop.h - 1.0).abs() < 1e-5,
+            "{:?}",
+            g.crop
+        );
+    }
+    assert!(s.apply_aspect(&[other], "nada").is_err());
+    s.apply_aspect(&[jpg, other], "original").unwrap();
+    let g = s.edit_view(other).unwrap().settings.geometry;
+    assert!((g.crop.w - 1.0).abs() < 1e-5 && (g.crop.h - 1.0).abs() < 1e-5);
     let vc = s.create_virtual_copy(jpg).unwrap();
     let mut vs = s.edit_view(vc).unwrap().settings;
     assert_eq!(vs.light.contrast, 30.0, "a cópia herda os ajustes");

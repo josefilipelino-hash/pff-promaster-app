@@ -608,6 +608,61 @@ impl ProjectSession {
         Ok(n)
     }
 
+    /// Formato de recorte ("4:5", "1.91:1", "original"…) aplicado a cada fotografia: o maior
+    /// recorte com essa proporção, centrado nos rostos da análise (olhos no terço superior)
+    /// ou, sem rostos, no centro do recorte atual. Devolve quantas mudaram.
+    pub fn apply_aspect(self: &Arc<Self>, keys: &[i64], aspect: &str) -> CoreResult<usize> {
+        use momento_image_processing::develop::geometry::{
+            crop_for_aspect, parse_aspect, source_to_view,
+        };
+        let mut n = 0;
+        {
+            let mut c = self.catalog();
+            for &k in keys {
+                let (variant, asset) = c.resolve_key(k)?;
+                let base = c.recipe_of(variant)?;
+                let mut s = DevelopSettings::from_recipe(&base);
+                let Some(d) = c.photo_details(asset)? else { continue };
+                let (mut sw, mut sh) = (d.width.max(1) as f32, d.height.max(1) as f32);
+                if (5..=8).contains(&d.orientation) {
+                    std::mem::swap(&mut sw, &mut sh);
+                }
+                let (fw, fh) = if s.geometry.quarter_turns % 2 == 1 { (sh, sw) } else { (sw, sh) };
+                let ratio = match aspect {
+                    "original" => Some(fw / fh),
+                    "free" => None,
+                    a => Some(
+                        parse_aspect(a)
+                            .ok_or_else(|| CoreError::Other(format!("formato inválido: {a}")))?,
+                    ),
+                };
+                s.geometry.aspect = aspect.to_string();
+                if let Some(ratio) = ratio {
+                    let (gw, gh) = (sw.round() as usize, sh.round() as usize);
+                    let faces: Vec<[f32; 4]> = c
+                        .face_boxes(asset)?
+                        .iter()
+                        .filter_map(|b| {
+                            let p = |x: f32, y: f32| {
+                                source_to_view(gw, gh, &s.geometry, &s.lens, true, x, y)
+                            };
+                            let (a, b2) = (p(b[0], b[1])?, p(b[0] + b[2], b[1] + b[3])?);
+                            Some([a.0.min(b2.0), a.1.min(b2.1), a.0.max(b2.0), a.1.max(b2.1)])
+                        })
+                        .collect();
+                    s.geometry.crop = crop_for_aspect(fw, fh, ratio, &faces, &s.geometry.crop);
+                }
+                let recipe = s.to_recipe(&base);
+                if recipe != base {
+                    c.commit_edit(variant, "geometry.aspect", &recipe)?;
+                    n += 1;
+                }
+            }
+        }
+        self.after_edit(keys.to_vec());
+        Ok(n)
+    }
+
     /// Seletor de balanço de brancos: (temperatura, matiz) que neutralizam o ponto (u, v).
     pub fn pick_white_balance(
         &self,

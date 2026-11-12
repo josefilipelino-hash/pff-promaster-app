@@ -317,6 +317,49 @@ impl GeoMap {
     }
 }
 
+/// Proporção (largura/altura) de um formato "L:A" (aceita decimais: "1.91:1", "1:1.414").
+pub fn parse_aspect(id: &str) -> Option<f32> {
+    let (a, b) = id.split_once(':')?;
+    let (a, b): (f32, f32) =
+        (a.trim().replace(',', ".").parse().ok()?, b.trim().replace(',', ".").parse().ok()?);
+    (a > 0.0 && b > 0.0 && (a / b).is_finite()).then_some(a / b)
+}
+
+/// Recorte com a proporção `ratio` (largura/altura em píxeis) num enquadramento `fw`×`fh`:
+/// o maior possível, dentro da imagem, colocado no sujeito.
+/// * `faces`: caixas [x0, y0, x1, y1] dos rostos no enquadramento (0–1): ficam todas dentro
+///   quando cabem, com os olhos perto do terço superior;
+/// * sem rostos: mantém o centro de `keep` (a composição atual).
+pub fn crop_for_aspect(
+    fw: f32,
+    fh: f32,
+    ratio: f32,
+    faces: &[[f32; 4]],
+    keep: &super::settings::Crop,
+) -> super::settings::Crop {
+    let frame = fw / fh;
+    let (w, h) = if ratio >= frame { (1.0, frame / ratio) } else { (ratio / frame, 1.0) };
+    let (cx, cy) = if faces.is_empty() {
+        (keep.x + keep.w * 0.5, keep.y + keep.h * 0.5)
+    } else {
+        let (x0, y0, x1, y1) = faces.iter().fold((1f32, 1f32, 0f32, 0f32), |a, f| {
+            (a.0.min(f[0]), a.1.min(f[1]), a.2.max(f[2]), a.3.max(f[3]))
+        });
+        // Olhos a ~40 % da altura do rosto, no terço superior do recorte (se couber).
+        let eyes = y0 + (y1 - y0) * 0.4;
+        let cy = eyes + h * (0.5 - 1.0 / 3.0);
+        // Todos os rostos dentro, se couberem: corrige o centro o mínimo necessário.
+        let cy = cy.max(y1 - h * 0.5 + 0.02 * h).min(y0 + h * 0.5 - 0.02 * h);
+        ((x0 + x1) * 0.5, cy)
+    };
+    super::settings::Crop {
+        x: (cx - w * 0.5).clamp(0.0, 1.0 - w),
+        y: (cy - h * 0.5).clamp(0.0, 1.0 - h),
+        w,
+        h,
+    }
+}
+
 /// Ponto da vista (0–1, depois da geometria) → ponto da fotografia orientada.
 pub fn view_to_source(
     src_w: usize,
@@ -516,5 +559,34 @@ mod tests {
             let (x2, y2) = m.backward(a, b);
             assert!((x - x2).abs() < 1e-4 && (y - y2).abs() < 1e-4, "{x},{y} → {x2},{y2}");
         }
+    }
+
+    #[test]
+    fn crop_for_aspect_fits_formats_and_follows_faces() {
+        use super::super::settings::Crop;
+        assert!((parse_aspect("1.91:1").unwrap() - 1.91).abs() < 1e-6);
+        assert!((parse_aspect("1:1,414").unwrap() - 1.0 / 1.414).abs() < 1e-6);
+        assert!(parse_aspect("free").is_none() && parse_aspect("0:1").is_none());
+        let full = Crop::default();
+        // 4:5 numa fotografia 3:2 → recorte vertical com a altura toda e proporção exata.
+        let c = crop_for_aspect(3000.0, 2000.0, 0.8, &[], &full);
+        assert!((c.h - 1.0).abs() < 1e-6 && ((c.w * 3000.0) / (c.h * 2000.0) - 0.8).abs() < 1e-4);
+        assert!((c.x + c.w / 2.0 - 0.5).abs() < 1e-6);
+        // Com um rosto à direita: o recorte vai para lá e contém o rosto.
+        let face = [0.78, 0.2, 0.86, 0.35];
+        let c = crop_for_aspect(3000.0, 2000.0, 0.8, &[face], &full);
+        assert!(
+            c.x <= face[0] && c.x + c.w >= face[2] && c.y <= face[1] && c.y + c.h >= face[3],
+            "{c:?}"
+        );
+        // 16:9 numa fotografia 3:2 com rosto em cima: olhos no terço superior, rosto dentro.
+        let c = crop_for_aspect(3000.0, 2000.0, 16.0 / 9.0, &[[0.45, 0.1, 0.55, 0.3]], &full);
+        assert!(c.y <= 0.1 && c.y + c.h >= 0.3 && (c.w - 1.0).abs() < 1e-6, "{c:?}");
+        // Panorâmica numa vertical: largura toda.
+        let c = crop_for_aspect(2000.0, 3000.0, 65.0 / 24.0, &[], &full);
+        assert!(
+            (c.w - 1.0).abs() < 1e-6
+                && ((c.w * 2000.0) / (c.h * 3000.0) - 65.0 / 24.0).abs() < 1e-3
+        );
     }
 }

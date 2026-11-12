@@ -129,6 +129,7 @@ const apiMock = {
   createVirtualCopy: vi.fn(async () => 2 ** 40 + 77),
   deleteVirtualCopy: vi.fn(async () => {}),
   pasteSettings: vi.fn(async (keys: number[]) => keys.length),
+  applyAspect: vi.fn(async (keys: number[]) => keys.length),
   upright: vi.fn(async () => ({ vertical: 31.23, horizontal: 0, straighten: -1.249, focal35: 24, mode: "vertical", verticalLines: 12, horizontalLines: 0, deviationBefore: 4.2, deviationAfter: 0.2 })),
   pickWhiteBalance: vi.fn(async () => [23.4, -7.6] as [number, number]),
   autoStraighten: vi.fn(async () => 2.34),
@@ -894,6 +895,7 @@ describe("edição (Fase 5)", () => {
   });
 
   it("recorte: renderiza sem recorte, proporção e sair com Esc volta à grelha", async () => {
+    const lastGeometry = () => (apiMock.commitEdit.mock.calls.at(-1)![2] as DevelopSettings).geometry;
     await openDevelop();
     await act(async () => {});
     apiMock.renderEdit.mockClear();
@@ -908,6 +910,26 @@ describe("edição (Fase 5)", () => {
     expect(last[1]).toBe("geometry.aspect");
     const crop = (last[2] as { geometry: { crop: { w: number; h: number } } }).geometry.crop;
     expect(crop.w * 40).toBeCloseTo(crop.h * 30, 3); // 1:1 em píxeis do frame 40×30
+    // Formato do mercado na orientação da fotografia (frame 40×30, horizontal): 4:5 → 5:4;
+    // ⇄ troca a orientação; personalizado; aplicar às selecionadas.
+    fireEvent.change(screen.getByRole("combobox", { name: "Proporção" }), { target: { value: "4:5" } });
+    await act(async () => {});
+    expect(lastGeometry().aspect).toBe("5:4");
+    fireEvent.click(screen.getByRole("button", { name: "Trocar orientação" }));
+    await act(async () => {});
+    const g45 = lastGeometry();
+    expect(g45.aspect).toBe("4:5");
+    expect(g45.crop.w * 40).toBeCloseTo(g45.crop.h * 30 * 0.8, 3);
+    fireEvent.change(screen.getByRole("combobox", { name: "Proporção" }), { target: { value: "custom" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Largura" }), { target: { value: "7" } });
+    fireEvent.change(screen.getByRole("textbox", { name: "Altura" }), { target: { value: "2" } });
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar" }));
+    await act(async () => {});
+    expect(lastGeometry().aspect).toBe("7:2");
+    act(() => useStore.getState().setSelection({ ids: new Set([2, 3, 4]), focus: 2, anchor: 2 }));
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar formato às 3 selecionadas" }));
+    await act(async () => {});
+    expect(apiMock.applyAspect).toHaveBeenCalledWith([2, 3, 4], "7:2");
     fireEvent.keyDown(window, { key: "Escape" });
     expect(useStore.getState().view).toBe("grid");
   });

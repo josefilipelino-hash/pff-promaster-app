@@ -46,18 +46,57 @@ export function parseFrame(buf: ArrayBuffer): Frame {
   return { width, height, histogram: [hist.slice(0, 256), hist.slice(256, 512), hist.slice(512, 768)], rgba };
 }
 
-/** Proporções do recorte (largura/altura); "original" = proporção da fotografia, "free" = livre. */
+/**
+ * Formatos de recorte do mercado (largura:altura). A orientação troca-se com ⇄ ("4:5" ↔
+ * "5:4"); "original" = proporção da fotografia, "free" = livre, qualquer "L:A" é aceite.
+ */
 export const ASPECTS: [string, number | null][] = [
   ["original", null],
   ["free", null],
   ["1:1", 1],
   ["4:5", 4 / 5],
-  ["5:4", 5 / 4],
   ["2:3", 2 / 3],
-  ["3:2", 3 / 2],
-  ["16:9", 16 / 9],
+  ["3:4", 3 / 4],
+  ["5:7", 5 / 7],
+  ["1:1.414", 1 / 1.414],
+  ["8.5:11", 8.5 / 11],
   ["9:16", 9 / 16],
+  ["16:9", 16 / 9],
+  ["16:10", 16 / 10],
+  ["1.91:1", 1.91],
+  ["21:9", 21 / 9],
+  ["3:1", 3],
+  ["65:24", 65 / 24],
 ];
+
+/** Proporção (largura/altura) de um formato "L:A"; `null` para "free"/"original"/inválido. */
+export function parseAspect(id: string): number | null {
+  const m = /^\s*([\d.,]+)\s*:\s*([\d.,]+)\s*$/.exec(id);
+  if (!m) return null;
+  const a = Number(m[1]!.replace(",", "."));
+  const b = Number(m[2]!.replace(",", "."));
+  return a > 0 && b > 0 && Number.isFinite(a / b) ? a / b : null;
+}
+
+/** "4:5" → "5:4" (os outros ficam iguais). */
+export function swapAspect(id: string): string {
+  const m = /^\s*([\d.,]+)\s*:\s*([\d.,]+)\s*$/.exec(id);
+  return m ? `${m[2]}:${m[1]}` : id;
+}
+
+/** Entrada da lista correspondente a um formato (na orientação da lista ou trocada), ou "custom". */
+export function aspectEntry(id: string): string {
+  if (ASPECTS.some(([a]) => a === id)) return id;
+  const sw = swapAspect(id);
+  return ASPECTS.some(([a]) => a === sw) ? sw : "custom";
+}
+
+/** Formato na orientação da fotografia (horizontal numa fotografia horizontal e vice-versa). */
+export function orientAspect(id: string, frameW: number, frameH: number): string {
+  const r = parseAspect(id);
+  if (r === null || r === 1) return id;
+  return r > 1 !== frameW >= frameH ? swapAspect(id) : id;
+}
 
 /**
  * Ajusta um recorte (normalizado) à proporção `ratio` (largura/altura, em píxeis) dentro de

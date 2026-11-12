@@ -827,3 +827,4 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px var(--accent-s
 .tool-guides .guide line, .tool-guides .guide-new { stroke: var(--accent, #ff7a59); stroke-width: 2; }
 .tool-guides .guide circle { fill: #fff; stroke: var(--accent, #ff7a59); stroke-width: 2; }
 .tool-guides .guide-new { stroke-dasharray: 6 4; }
+.aspect-num { width: 64px; text-align: right; font-variant-numeric: tabular-nums; }

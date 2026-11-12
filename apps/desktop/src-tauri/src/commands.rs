@@ -522,6 +522,15 @@ pub async fn auto_straighten(
 }
 
 #[tauri::command]
+pub async fn apply_aspect(
+    state: State<'_, AppState>,
+    keys: Vec<i64>,
+    aspect: String,
+) -> CmdResult<usize> {
+    state.session().and_then(|s| s.apply_aspect(&keys, &aspect)).map_err(err)
+}
+
+#[tauri::command]
 pub async fn upright(
     state: State<'_, AppState>,
     key: i64,
