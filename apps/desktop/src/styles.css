@@ -821,3 +821,9 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px var(--accent-s
 .lightroom-dialog label.check { display: flex; align-items: flex-start; gap: 8px; cursor: pointer; }
 .lightroom-dialog label.check input { margin-top: 2px; accent-color: var(--accent); }
 .lightroom-dialog .notice { border: 1px solid var(--border); background: var(--surface-2); border-radius: var(--r-md); padding: 8px 10px; }
+
+/* Upright guiado: guias desenhadas sobre a fotografia. */
+.tool-guides { cursor: crosshair; }
+.tool-guides .guide line, .tool-guides .guide-new { stroke: var(--accent, #ff7a59); stroke-width: 2; }
+.tool-guides .guide circle { fill: #fff; stroke: var(--accent, #ff7a59); stroke-width: 2; }
+.tool-guides .guide-new { stroke-dasharray: 6 4; }

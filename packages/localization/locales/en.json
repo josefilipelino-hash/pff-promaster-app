@@ -823,7 +823,11 @@
     "uprightHint": "Corrects perspective from the photo's lines (vanishing points), using the camera focal length.",
     "uprightNone": "No reliable lines were found for this mode.",
     "uprightDone": "{{mode}}: {{lines}} lines, deviation {{before}}° → {{after}}°.",
-    "perspective": "Perspective"
+    "perspective": "Perspective",
+    "guidesHint": "Draw 2 to 4 lines over edges that should be vertical or horizontal ({{count}}/4). The correction shows when you finish.",
+    "guidesClear": "Clear guides",
+    "guidesDone": "Done",
+    "guidesLabel": "Upright guides"
   },
   "auto": {
     "intensity": "Intensity",

@@ -837,6 +837,23 @@ describe("edição (Fase 5)", () => {
       "geometry.upright",
       expect.objectContaining({ geometry: expect.objectContaining({ upright: "vertical", vertical: 31.2, horizontal: 0, straighten: -1.25, focal35: 24 }) }),
     );
+    // Guiado: a fotografia aparece sem perspetiva e sem recorte; duas guias desenhadas → correção.
+    apiMock.renderEdit.mockClear();
+    fireEvent.click(within(upright).getByRole("button", { name: "Guiado" }));
+    await act(async () => {});
+    await waitFor(() => expect(apiMock.renderEdit.mock.calls.some((c) => c[5] === true && (c[1] as DevelopSettings).geometry.vertical === 0 && (c[1] as DevelopSettings).geometry.straighten === 0)).toBe(true));
+    const guides = screen.getByRole("application", { name: "Guias do Upright" });
+    for (const x of [0.1, 0.9]) {
+      fireEvent.pointerDown(guides, { clientX: x, clientY: 0.1, pointerId: 1 });
+      fireEvent.pointerMove(guides, { clientX: x + 0.02, clientY: 0.9, pointerId: 1 });
+      fireEvent.pointerUp(guides, { pointerId: 1 });
+      await act(async () => {});
+    }
+    expect(apiMock.upright).toHaveBeenLastCalledWith(2, expect.objectContaining({ geometry: expect.objectContaining({ guides: [expect.any(Array), expect.any(Array)] }) }), "guided");
+    expect(apiMock.commitEdit).toHaveBeenLastCalledWith(2, "geometry.upright", expect.objectContaining({ geometry: expect.objectContaining({ upright: "guided", vertical: 31.2 }) }));
+    fireEvent.click(screen.getByRole("button", { name: "Concluir" }));
+    await act(async () => {});
+    expect(screen.queryByRole("application", { name: "Guias do Upright" })).toBeNull();
     // Desligado repõe a perspetiva.
     fireEvent.click(within(upright).getByRole("button", { name: "Desligado" }));
     await act(async () => {});

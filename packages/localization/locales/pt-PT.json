@@ -823,7 +823,11 @@
     "uprightHint": "Corrige a perspetiva pelas linhas da fotografia (pontos de fuga), com a distância focal da câmara.",
     "uprightNone": "Não foram encontradas linhas fiáveis para este modo.",
     "uprightDone": "{{mode}}: {{lines}} linhas, desvio {{before}}° → {{after}}°.",
-    "perspective": "Perspetiva"
+    "perspective": "Perspetiva",
+    "guidesHint": "Desenhe 2 a 4 linhas sobre arestas que deviam ficar verticais ou horizontais ({{count}}/4). A correção aparece ao concluir.",
+    "guidesClear": "Limpar guias",
+    "guidesDone": "Concluir",
+    "guidesLabel": "Guias do Upright"
   },
   "auto": {
     "intensity": "Intensidade",

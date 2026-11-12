@@ -4,7 +4,7 @@ import { api, events, isMac } from "../../api";
 import { Icon } from "../Icon";
 import { ASPECTS, cloneSettings, DEFAULT_COPY_BLOCKS, defaultSettings, fitCropToAspect, parseFrame, sameSettings, type Frame } from "../../logic/develop";
 import { errorText, useStore } from "../../store";
-import { SETTINGS_BLOCKS, UPRIGHT_MODES, type AutoOptions, type AutoReport, type DevelopSettings, type EditView } from "../../types";
+import { SETTINGS_BLOCKS, UPRIGHT_MODES, type UprightOutcome, type AutoOptions, type AutoReport, type DevelopSettings, type EditView } from "../../types";
 import { AutoOptionsForm, AutoReportView } from "./AutoPanel";
 import { CreatePresetDialog, ImportReportDialog, importPresets, PresetList, PresetManager } from "../Presets";
 import { MasksPanel, PortraitPanel, RetouchTools, type BrushSettings, type Tool } from "./LocalPanels";
@@ -327,7 +327,17 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
       /* ImageData indisponível (testes) */
     }
   }, []);
-  const renderer = useRenderer(photoKey, preview ?? settings, before, cropMode, box, onFrame, fail, maskOverlay && selMask !== null && selMask < settings.masks.length ? selMask : null);
+  // Upright guiado: enquanto se desenham as guias, a fotografia aparece sem perspetiva nem
+  // recorte — as coordenadas da vista são as do plano onde as guias são definidas.
+  const [guiding, setGuiding] = useState(false);
+  const [guideDrag, setGuideDrag] = useState<[number, number][] | null>(null);
+  const guideView = useMemo(() => {
+    if (!guiding) return null;
+    const s = cloneSettings(settings);
+    Object.assign(s.geometry, { vertical: 0, horizontal: 0, straighten: 0, aspectAdjust: 0, scale: 100, offsetX: 0, offsetY: 0 });
+    return s;
+  }, [guiding, settings]);
+  const renderer = useRenderer(photoKey, preview ?? guideView ?? settings, before, cropMode || guiding, box, onFrame, fail, maskOverlay && selMask !== null && selMask < settings.masks.length ? selMask : null);
   useEffect(() => {
     if (view) renderer.request(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -362,7 +372,7 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
   useEffect(() => {
     if (loaded) renderer.request(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded, before, cropMode, box.w, box.h, photoKey]);
+  }, [loaded, before, cropMode, guiding, box.w, box.h, photoKey]);
 
   // Sincronização automática (como o "Auto Sync" do Lightroom): com várias fotografias
   // selecionadas, cada alteração gravada aqui vai também para as outras selecionadas — só os
@@ -568,6 +578,30 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
     const r = canvas.current!.getBoundingClientRect();
     return [Math.min(1, Math.max(0, (e.clientX - r.left) / (r.width || 1))), Math.min(1, Math.max(0, (e.clientY - r.top) / (r.height || 1)))];
   };
+  const addGuide = async (a: [number, number], b: [number, number]) => {
+    if (Math.hypot(b[0] - a[0], b[1] - a[1]) < 0.03) return;
+    const guides = [...(settings.geometry.guides ?? []), [a[0], a[1], b[0], b[1]] as [number, number, number, number]].slice(-4);
+    const next = cloneSettings(settings);
+    next.geometry.guides = guides;
+    let r: UprightOutcome | null = null;
+    if (guides.length >= 2) {
+      try {
+        r = await api.upright(photoKey, next, "guided");
+      } catch (e) {
+        fail(e);
+      }
+    }
+    set("geometry.upright", (s) => {
+      s.geometry.guides = guides;
+      s.geometry.upright = "guided";
+      if (r) {
+        s.geometry.vertical = Math.round(r.vertical * 10) / 10;
+        s.geometry.horizontal = Math.round(r.horizontal * 10) / 10;
+        s.geometry.straighten = Math.round(r.straighten * 100) / 100;
+        s.geometry.focal35 = r.focal35;
+      }
+    }, true);
+  };
   const toSource = async (pts: [number, number][]) => (await api.mapPoints(photoKey, settings, pts, true, false)).map((p, i) => p ?? pts[i]!);
 
   const finishDrag = async (pts: [number, number][]) => {
@@ -689,6 +723,7 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
       if (!m && !e.altKey && k === "r") return e.preventDefault(), setCropMode((c) => !c);
       if (!m && !e.altKey && k === "w") return e.preventDefault(), setWbPicking((w) => !w);
       if (!m && !e.altKey && k === "y") return e.preventDefault(), setSplit((v) => !v);
+      if (e.key === "Escape" && guiding) return e.preventDefault(), e.stopPropagation(), setGuiding(false);
       if (e.key === "Escape" && tool) return e.preventDefault(), e.stopPropagation(), setTool(null);
       if (!m && !e.altKey && k === "o" && selMask !== null) return e.preventDefault(), setMaskOverlay((v) => !v);
       if (m && !e.shiftKey && k === "u") return e.preventDefault(), void runAuto(autoOptions);
@@ -885,6 +920,7 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
           onClick={() =>
             set("geometry.upright", (s) => {
               s.geometry.upright = "";
+              s.geometry.guides = [];
               s.geometry.vertical = 0;
               s.geometry.horizontal = 0;
               s.geometry.straighten = 0;
@@ -930,7 +966,31 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
             {t(`develop.uprightMode.${m}`)}
           </button>
         ))}
+        <button
+          type="button"
+          className={`btn small${guiding || settings.geometry.upright === "guided" ? " active" : ""}`}
+          aria-pressed={guiding}
+          onClick={() => {
+            setCropMode(false);
+            setTool(null);
+            setBefore(false);
+            setGuiding((g) => !g);
+          }}
+        >
+          {t("develop.uprightMode.guided")}
+        </button>
       </div>
+      {guiding && (
+        <div className="dev-row">
+          <p className="small muted">{t("develop.guidesHint", { count: (settings.geometry.guides ?? []).length })}</p>
+          <button type="button" className="btn small" disabled={(settings.geometry.guides ?? []).length === 0} onClick={() => set("geometry.upright", (s) => void (s.geometry.guides = []), true)}>
+            {t("develop.guidesClear")}
+          </button>
+          <button type="button" className="btn small primary" onClick={() => setGuiding(false)}>
+            {t("develop.guidesDone")}
+          </button>
+        </div>
+      )}
       <Slider label={t("develop.field.geometry.straighten")} value={settings.geometry.straighten} min={-45} max={45} step={0.1} digits={1} onChange={(v, done) => set("geometry.straighten", (s) => void (s.geometry.straighten = v), done)} />
       <Slider label={t("develop.field.geometry.vertical")} value={settings.geometry.vertical} min={-100} max={100} onChange={(v, done) => set("geometry.vertical", (s) => void (s.geometry.vertical = v), done)} />
       <Slider label={t("develop.field.geometry.horizontal")} value={settings.geometry.horizontal} min={-100} max={100} onChange={(v, done) => set("geometry.horizontal", (s) => void (s.geometry.horizontal = v), done)} />
@@ -1124,6 +1184,36 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
                     strokeWidth={2}
                   />
                 )}
+              </svg>
+            )}
+            {guiding && !before && shown && (
+              <svg
+                className="tool-layer tool-guides"
+                role="application"
+                aria-label={t("develop.guidesLabel")}
+                width={shown.w}
+                height={shown.h}
+                onPointerDown={(e) => {
+                  (e.target as Element).setPointerCapture?.(e.pointerId);
+                  const p = viewUv(e);
+                  setGuideDrag([p, p]);
+                }}
+                onPointerMove={(e) => guideDrag && setGuideDrag([guideDrag[0]!, viewUv(e)])}
+                onPointerUp={() => {
+                  if (!guideDrag) return;
+                  const [a, b] = guideDrag;
+                  setGuideDrag(null);
+                  void addGuide(a!, b!);
+                }}
+              >
+                {(settings.geometry.guides ?? []).map((g, i) => (
+                  <g key={i} className="guide">
+                    <line x1={g[0] * shown.w} y1={g[1] * shown.h} x2={g[2] * shown.w} y2={g[3] * shown.h} />
+                    <circle cx={g[0] * shown.w} cy={g[1] * shown.h} r={4} />
+                    <circle cx={g[2] * shown.w} cy={g[3] * shown.h} r={4} />
+                  </g>
+                ))}
+                {guideDrag && <line className="guide-new" x1={guideDrag[0]![0] * shown.w} y1={guideDrag[0]![1] * shown.h} x2={guideDrag[1]![0] * shown.w} y2={guideDrag[1]![1] * shown.h} />}
               </svg>
             )}
             {split && !before && !cropMode && (
