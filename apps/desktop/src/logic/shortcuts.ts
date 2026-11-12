@@ -19,7 +19,9 @@ export type Action =
     | { type: "compare" }
   | { type: "develop" }
   | { type: "delete" }
-  | { type: "menu" };
+  | { type: "menu" }
+  | { type: "copyEdit" }
+  | { type: "pasteEdit" };
 
 export interface KeyLike {
   key: string;
@@ -37,6 +39,8 @@ export function keyToAction(e: KeyLike, mac: boolean): Action | null {
     if (e.key.toLowerCase() === "a" && !e.shiftKey) return { type: "selectAll" };
     if (e.key.toLowerCase() === "i" && e.shiftKey) return { type: "import" };
     if (e.key.toLowerCase() === "e" && e.shiftKey) return { type: "export" };
+    if (e.key.toLowerCase() === "c" && e.shiftKey) return { type: "copyEdit" };
+    if (e.key.toLowerCase() === "v" && e.shiftKey) return { type: "pasteEdit" };
     return null;
   }
   if (e.metaKey || e.ctrlKey || e.altKey) return null;

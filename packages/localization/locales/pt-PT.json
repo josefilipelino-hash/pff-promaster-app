@@ -1767,7 +1767,10 @@
     "unflag": "Sem marca",
     "noStars": "Sem estrelas",
     "remove_one": "Remover…",
-    "remove_other": "Remover {{count}}…"
+    "remove_other": "Remover {{count}}…",
+    "copyEdit": "Copiar edição",
+    "pasteEdit_one": "Colar edição na fotografia",
+    "pasteEdit_other": "Colar edição em {{count}} fotografias"
   },
   "privacy": {
     "hint": "Tudo fica neste computador. Aqui pode apagar o que a aplicação gerou sobre este trabalho. Os originais nunca são apagados.",

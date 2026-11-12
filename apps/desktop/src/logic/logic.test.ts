@@ -96,6 +96,8 @@ describe("atalhos", () => {
     expect(keyToAction(k("a", { ctrlKey: true }), false)).toEqual({ type: "selectAll" });
     expect(keyToAction(k("a", { ctrlKey: true }), true)).toBeNull();
     expect(keyToAction(k("I", { ctrlKey: true, shiftKey: true }), false)).toEqual({ type: "import" });
+    expect(keyToAction(k("C", { ctrlKey: true, shiftKey: true }), false)).toEqual({ type: "copyEdit" });
+    expect(keyToAction(k("v", { metaKey: true, shiftKey: true }), true)).toEqual({ type: "pasteEdit" });
     // Atalhos do sistema (ex.: Cmd+3) não classificam.
     expect(keyToAction(k("3", { metaKey: true }), true)).toBeNull();
   });

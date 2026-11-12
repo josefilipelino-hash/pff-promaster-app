@@ -698,10 +698,13 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
 
   const paste = async () => {
     if (!clipboard) return toast("info", t("develop.clipboardEmpty"));
+    // Como no Lightroom: com várias fotografias selecionadas (na tira), cola em todas.
+    const keys = selection.ids.has(photoKey) && selection.ids.size > 1 ? [...selection.ids] : [photoKey];
     try {
-      await api.pasteSettings([photoKey], clipboard.settings, clipboard.blocks);
+      const n = await api.pasteSettings(keys, clipboard.settings, clipboard.blocks);
       replace(await api.editView(photoKey));
-      toast("info", t("develop.pasted", { count: 1 }));
+      if (keys.length > 1) void reloadPhotos();
+      toast("info", t("develop.pasted", { count: keys.length > 1 ? n : 1 }));
     } catch (e) {
       fail(e);
     }

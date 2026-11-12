@@ -841,6 +841,10 @@ describe("edição (Fase 5)", () => {
     await act(async () => {});
     expect(apiMock.pasteSettings).toHaveBeenCalledWith([2], expect.anything(), expect.not.arrayContaining(["geometry"]));
     act(() => useStore.getState().setSelection({ ids: new Set([2, 3, 4]), focus: 2, anchor: 2 }));
+    // Com várias selecionadas, Colar aplica a todas (como no Lightroom).
+    fireEvent.click(screen.getByRole("button", { name: "Colar" }));
+    await act(async () => {});
+    expect(apiMock.pasteSettings).toHaveBeenLastCalledWith([2, 3, 4], expect.anything(), expect.any(Array));
     fireEvent.click(screen.getByRole("button", { name: "Sincronizar" }));
     const syncDlg = screen.getByRole("dialog", { name: "Sincronizar com 2 fotografias" });
     fireEvent.click(within(syncDlg).getByRole("radio", { name: "Copiar os mesmos valores" }));
@@ -1657,6 +1661,27 @@ describe("UX profissional (Fase 14)", () => {
     expect(document.activeElement?.textContent).toContain("Revelar");
     fireEvent.keyDown(document.activeElement!, { key: "r" });
     expect(document.activeElement?.textContent).toContain("Rejeitar");
+  });
+
+  it("copiar a edição de uma fotografia e colar em várias, na grelha (menu e Ctrl+Shift+C/V)", async () => {
+    await openProj();
+    act(() => useStore.getState().setClipboard(null));
+    act(() => useStore.getState().setSelection({ ids: new Set([2]), focus: 2, anchor: 2 }));
+    fireEvent.contextMenu(document.querySelector('[data-id="2"]')!, { clientX: 100, clientY: 100 });
+    const menu = screen.getByRole("menu", { name: "Ações da fotografia" });
+    expect((within(menu).getByRole("menuitem", { name: /Colar edição/ }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(within(menu).getByRole("menuitem", { name: /Copiar edição/ }));
+    await act(async () => {});
+    expect(apiMock.editView).toHaveBeenCalledWith(2);
+    const clip = useStore.getState().clipboard!;
+    expect(clip.blocks).not.toContain("geometry");
+    // Seleciona três fotografias e cola com o atalho: aplica a todas.
+    act(() => useStore.getState().setSelection({ ids: new Set([3, 4, 5]), focus: 3, anchor: 3 }));
+    fireEvent.keyDown(window, { key: "V", ctrlKey: true, shiftKey: true });
+    await act(async () => {});
+    expect(apiMock.pasteSettings).toHaveBeenLastCalledWith([3, 4, 5], clip.settings, clip.blocks);
+    fireEvent.contextMenu(document.querySelector('[data-id="4"]')!, { clientX: 100, clientY: 100 });
+    expect(within(screen.getByRole("menu", { name: "Ações da fotografia" })).getByRole("menuitem", { name: /Colar edição em 3 fotografias/ })).toBeTruthy();
   });
 
   it("barra numa linha: importar e mais num menu; tema escuro por omissão e claro opcional", async () => {

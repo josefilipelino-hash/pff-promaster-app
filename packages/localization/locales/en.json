@@ -1767,7 +1767,10 @@
     "unflag": "No flag",
     "noStars": "No stars",
     "remove_one": "Remove…",
-    "remove_other": "Remove {{count}}…"
+    "remove_other": "Remove {{count}}…",
+    "copyEdit": "Copy edit",
+    "pasteEdit_one": "Paste edit to photo",
+    "pasteEdit_other": "Paste edit to {{count}} photos"
   },
   "privacy": {
     "hint": "Everything stays on this computer. Here you can delete what the application generated about this job. Originals are never deleted.",

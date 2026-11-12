@@ -7,6 +7,7 @@ import { api, events, isMac } from "../api";
 import { applyFilter, collectionCounts, labelCounts } from "../logic/filters";
 import { clickSelect, moveFocus, restrict, selectAll, targets } from "../logic/selection";
 import { keyToAction, type Action } from "../logic/shortcuts";
+import { cloneSettings, DEFAULT_COPY_BLOCKS } from "../logic/develop";
 import { errorText, useStore } from "../store";
 import type {
   ImportSafety, Color, GroupRow, ImportMode, Label } from "../types";
@@ -406,6 +407,9 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
       ...[5, 4, 3, 2, 1].map((v) => ({ label: "★".repeat(v), onSelect: act({ type: "stars", value: v }), shortcut: String(v) })),
       { label: t("menu.noStars"), onSelect: act({ type: "stars", value: 0 }), shortcut: "0" },
       { kind: "separator" },
+      { label: t("menu.copyEdit"), icon: "copy", disabled: focus === null, onSelect: act({ type: "copyEdit" }), shortcut: shortcutLabel("Mod+Shift+C") },
+      { label: t("menu.pasteEdit", { count: n }), icon: "paste", disabled: !st.clipboard || n === 0, onSelect: act({ type: "pasteEdit" }), shortcut: shortcutLabel("Mod+Shift+V") },
+      { kind: "separator" },
       { label: t("safety.reveal"), icon: "folder", disabled: !ph || (ph.availability ?? "ok") !== "ok" || n !== 1, onSelect: () => focus !== null && api.revealOriginal(focus).catch(fail) },
       { label: t("menu.remove", { count: n }), icon: "trash", danger: true, onSelect: act({ type: "delete" }), shortcut: shortcutLabel("Delete") },
     ];
@@ -530,6 +534,34 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
         case "delete": {
           const keys = targets(st.selection);
           if (keys.length > 0 && (st.view === "grid" || st.view === "sequences")) st.setDeleteRequest(keys);
+          return;
+        }
+        case "copyEdit": {
+          // Copia a edição da fotografia em foco (sem recorte/rotação, máscaras nem retoque,
+          // como no editor: são próprios de cada fotografia).
+          const f = st.viewerId ?? st.selection.focus;
+          if (f === null) return;
+          api
+            .editView(f)
+            .then((v) => {
+              st.setClipboard({ settings: cloneSettings(v.settings), blocks: DEFAULT_COPY_BLOCKS });
+              st.toast("info", t("develop.copied"));
+            })
+            .catch(fail);
+          return;
+        }
+        case "pasteEdit": {
+          const clip = st.clipboard;
+          if (!clip) return st.toast("info", t("develop.clipboardEmpty"));
+          const keys = st.viewerId !== null ? [st.viewerId] : targets(st.selection);
+          if (keys.length === 0) return;
+          api
+            .pasteSettings(keys, clip.settings, clip.blocks)
+            .then((n) => {
+              st.toast("info", t("develop.pasted", { count: n }));
+              return st.reloadPhotos();
+            })
+            .catch(fail);
           return;
         }
       }
