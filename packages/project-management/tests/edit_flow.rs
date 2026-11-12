@@ -118,6 +118,18 @@ fn non_destructive_editing_end_to_end() {
     assert!(frame_mean(&f1) > frame_mean(&f0) + 15.0);
     assert!(s.edit_view(jpg).unwrap().settings.is_identity(), "render não grava");
 
+    // Zoom: tamanho nativo e render só da zona visível, a partir da fonte em resolução total.
+    assert_eq!(s.native_size(jpg, &v.settings).unwrap(), (1800, 1200));
+    let mut z = v.settings.clone();
+    z.geometry.crop = momento_image_processing::develop::Crop { x: 0.4, y: 0.4, w: 0.25, h: 0.25 };
+    let fz =
+        s.render_edit_overlay(jpg, &z, 450, 300, RenderQuality::Final, false, None, true).unwrap();
+    assert_eq!(frame_dims(&fz), (450, 300), "zona de 450×300 px do original a 100 %");
+    // Mesma zona pela fonte de edição: imagens equivalentes (média igual a ±2 níveis).
+    let fl =
+        s.render_edit_overlay(jpg, &z, 450, 300, RenderQuality::Final, false, None, false).unwrap();
+    assert!((frame_mean(&fz) - frame_mean(&fl)).abs() < 2.0);
+
     // Gravar, desfazer, refazer.
     let v = s.commit_edit(jpg, "exposure", &st).unwrap();
     assert_eq!((v.state.position, v.state.can_undo), (1, true));

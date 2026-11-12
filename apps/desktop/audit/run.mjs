@@ -107,11 +107,12 @@ await page.evaluate(() => window.__store.getState().setSelection({ ids: new Set(
 await store("setView", "develop");
 await page.waitForTimeout(800);
 await check("07-editor");
-// Abrir todas as secções do painel de edição.
-for (const b of await page.$$(".develop-panel .section-head, .develop-panel button[aria-expanded='false']")) {
-  await b.click().catch(() => {});
+// Cada separador do painel, com todas as secções abertas.
+for (const [i, tab] of ["Ajustes", "Locais", "Geometria e ótica"].entries()) {
+  await page.getByRole("tab", { name: tab }).click();
+  for (const b of await page.$$(".develop-panel button.dev-section-title[aria-expanded='false']")) await b.click().catch(() => {});
+  await check(`08-editor-${i + 1}`);
 }
-await check("08-editor-secoes");
 await store("setView", "grid");
 await page.evaluate(() => window.__store.getState().openViewer(1));
 await check("09-visualizador");

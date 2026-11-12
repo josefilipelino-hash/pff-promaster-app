@@ -421,15 +421,26 @@ pub async fn render_edit(
     quality: String,
     uncropped: bool,
     overlay: Option<usize>,
+    hi_res: Option<bool>,
 ) -> CmdResult<tauri::ipc::Response> {
     let q = if quality == "fast" { RenderQuality::Fast } else { RenderQuality::Final };
+    let hi = hi_res.unwrap_or(false);
     let bytes = state
         .session()
         .and_then(|s| {
-            s.render_edit_overlay(key, &settings, max_width, max_height, q, uncropped, overlay)
+            s.render_edit_overlay(key, &settings, max_width, max_height, q, uncropped, overlay, hi)
         })
         .map_err(err)?;
     Ok(tauri::ipc::Response::new(bytes))
+}
+
+#[tauri::command]
+pub async fn native_size(
+    state: State<'_, AppState>,
+    key: i64,
+    settings: DevelopSettings,
+) -> CmdResult<(u32, u32)> {
+    state.session().and_then(|s| s.native_size(key, &settings)).map_err(err)
 }
 
 #[tauri::command]

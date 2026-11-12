@@ -277,6 +277,8 @@ pub type AiKey = (AssetId, bool, u32);
 
 pub struct EditService {
     cache: Mutex<VecDeque<(AssetId, Arc<Source>)>>,
+    /// Fonte em resolução total (zoom a 100 % e exportação): só uma em memória (~300–600 MB).
+    full: Mutex<Option<(AssetId, Arc<Source>)>>,
     ai: Mutex<VecDeque<(AiKey, Arc<Source>)>>,
 }
 
@@ -288,7 +290,11 @@ impl Default for EditService {
 
 impl EditService {
     pub fn new() -> Self {
-        EditService { cache: Mutex::new(VecDeque::new()), ai: Mutex::new(VecDeque::new()) }
+        EditService {
+            cache: Mutex::new(VecDeque::new()),
+            full: Mutex::new(None),
+            ai: Mutex::new(VecDeque::new()),
+        }
     }
 
     pub fn ai_cached(&self, key: AiKey) -> Option<Arc<Source>> {
@@ -313,6 +319,23 @@ impl EditService {
             full_seen |= full;
             keep
         });
+    }
+
+    /// Fonte em resolução total (em cache, uma de cada vez).
+    pub fn source_full(
+        &self,
+        catalog: &Catalog,
+        registry: &CodecRegistry,
+        asset: AssetId,
+    ) -> CoreResult<Arc<Source>> {
+        if let Some((a, s)) = self.full.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
+            if *a == asset {
+                return Ok(s.clone());
+            }
+        }
+        let s = Arc::new(load_source(catalog, registry, asset, None)?);
+        *self.full.lock().unwrap_or_else(|e| e.into_inner()) = Some((asset, s.clone()));
+        Ok(s)
     }
 
     /// Fonte de edição (em cache).

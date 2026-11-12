@@ -26,6 +26,14 @@ const SECTIONS: [string, Field[]][] = [
     ["color", "vibrance", -100, 100, 1, 0],
     ["color", "saturation", -100, 100, 1, 0],
   ]],
+  // Presença (como no Lightroom): textura, claridade, neblina, vibração e saturação.
+  ["presence", [
+    ["effects", "texture", -100, 100, 1, 0],
+    ["effects", "clarity", -100, 100, 1, 0],
+    ["effects", "dehaze", -100, 100, 1, 0],
+    ["color", "vibrance", -100, 100, 1, 0],
+    ["color", "saturation", -100, 100, 1, 0],
+  ]],
   ["detail", [
     ["detail", "sharpenAmount", 0, 150, 1, 0],
     ["detail", "sharpenRadius", 0.5, 3, 0.1, 1, 1],
@@ -36,9 +44,6 @@ const SECTIONS: [string, Field[]][] = [
     ["detail", "noiseColor", 0, 100, 1, 0],
   ]],
   ["effects", [
-    ["effects", "texture", -100, 100, 1, 0],
-    ["effects", "clarity", -100, 100, 1, 0],
-    ["effects", "dehaze", -100, 100, 1, 0],
     ["effects", "vignette", -100, 100, 1, 0],
     ["effects", "vignetteMidpoint", 0, 100, 1, 50],
     ["effects", "vignetteFeather", 0, 100, 1, 50],
@@ -76,13 +81,15 @@ const HSL_KEYS = ["red", "orange", "yellow", "green", "aqua", "blue", "purple", 
 
 export type SetField = (label: string, mutate: (s: DevelopSettings) => void, done: boolean) => void;
 
-function Section({ id, open, toggle, children, onReset }: { id: string; open: boolean; toggle: () => void; children: React.ReactNode; onReset?: () => void }) {
+function Section({ id, open, toggle, children, onReset, changed }: { id: string; open: boolean; toggle: () => void; children: React.ReactNode; onReset?: () => void; changed?: boolean }) {
   const { t } = useTranslation();
   return (
     <section className={`dev-section${open ? " open" : ""}`} aria-label={t(`develop.section.${id}`)}>
       <header>
         <button type="button" className="dev-section-title" aria-expanded={open} onClick={toggle}>
-          {open ? "▾" : "▸"} {t(`develop.section.${id}`)}
+          <span className="chev" aria-hidden="true">›</span>
+          {t(`develop.section.${id}`)}
+          {changed && <span className="changed-dot" title={t("develop.sectionChanged")} />}
         </button>
         {onReset && (
           <button type="button" className="btn small ghost" onClick={onReset} title={t("develop.resetSection")}>
@@ -93,6 +100,22 @@ function Section({ id, open, toggle, children, onReset }: { id: string; open: bo
       {open && <div className="dev-section-body">{children}</div>}
     </section>
   );
+}
+
+function Sub({ children }: { children: React.ReactNode }) {
+  return <h4 className="dev-sub">{children}</h4>;
+}
+
+type PanelTab = "adjust" | "local" | "optics";
+const PANEL_KEY = "pff.developPanel";
+function loadPanel(): { tab: PanelTab; open: Record<string, boolean> } {
+  const def = { tab: "adjust" as PanelTab, open: { auto: true, basic: true } as Record<string, boolean> };
+  try {
+    const v = JSON.parse(localStorage.getItem(PANEL_KEY) ?? "null");
+    return v && typeof v === "object" ? { tab: v.tab ?? def.tab, open: { ...def.open, ...(v.open ?? {}) } } : def;
+  } catch {
+    return def;
+  }
 }
 
 /** Painel de ajustes (à direita no modo Revelar). */
@@ -135,9 +158,20 @@ export function DevelopPanel({
   ai?: { available: boolean; progress: number | null };
 }) {
   const { t } = useTranslation();
-  const [open, setOpen] = useState<Record<string, boolean>>({ auto: true, presets: true, light: true, wb: true, color: true });
+  const [panel, setPanel] = useState(loadPanel);
+  const open = panel.open;
+  const tab = panel.tab;
+  const save = (v: typeof panel) => {
+    setPanel(v);
+    try {
+      localStorage.setItem(PANEL_KEY, JSON.stringify(v));
+    } catch {
+      /* armazenamento indisponível */
+    }
+  };
   const [hslTab, setHslTab] = useState<"hue" | "saturation" | "luminance">("hue");
-  const toggle = (k: string) => setOpen((o) => ({ ...o, [k]: !o[k] }));
+  const toggle = (k: string) => save({ ...panel, open: { ...open, [k]: !open[k] } });
+  const setTab = (t2: PanelTab) => save({ ...panel, tab: t2 });
   const fieldSlider = ([block, key, min, max, step, def, digits]: Field) => {
     const value = (settings[block] as unknown as Record<string, number>)[key]!;
     const label = `${block}.${key}`;
@@ -165,6 +199,8 @@ export function DevelopPanel({
     );
   };
   const sectionFields = (id: string) => SECTIONS.find((s) => s[0] === id)![1];
+  const changed = (...ids: string[]) =>
+    ids.some((id) => sectionFields(id).some(([b, k, , , , def]) => (settings[b] as unknown as Record<string, number>)[k] !== def));
   const resetBlock = (id: keyof DevelopSettings, fields: Field[]) => () =>
     set(`reset.${id}`, (s) => {
       for (const [b, k, , , , def] of fields) (s[b] as unknown as Record<string, number>)[k] = def;
@@ -172,7 +208,48 @@ export function DevelopPanel({
   const c = settings.curve;
   return (
     <aside className="develop-panel" aria-label={t("develop.panel")}>
-      <Histogram data={histogram} />
+      <div className="dev-panel-top">
+        <Histogram data={histogram} />
+        <div className="dev-tabs" role="tablist" aria-label={t("develop.panel")}>
+          {(["adjust", "local", "optics"] as const).map((k) => (
+            <button key={k} type="button" role="tab" aria-selected={tab === k} className={`dev-tab${tab === k ? " active" : ""}`} onClick={() => setTab(k)}>
+              {t(`develop.tab.${k}`)}
+            </button>
+          ))}
+        </div>
+      </div>
+      {tab === "local" && (
+        <>
+          {masks && (
+            <Section id="masks" open={open.masks !== false} toggle={() => save({ ...panel, open: { ...open, masks: open.masks === false } })}>
+              {masks}
+            </Section>
+          )}
+          {portrait && (
+            <Section id="portrait" open={!!open.portrait} toggle={() => toggle("portrait")}>
+              {portrait}
+            </Section>
+          )}
+          {retouch && (
+            <Section id="retouch" open={!!open.retouch} toggle={() => toggle("retouch")}>
+              {retouch}
+            </Section>
+          )}
+        </>
+      )}
+      {tab === "optics" && (
+        <>
+          <Section id="geometry" open={open.geometry !== false} toggle={() => save({ ...panel, open: { ...open, geometry: open.geometry === false } })}>
+            {geometry}
+          </Section>
+          <Section id="lens" open={open.lens !== false} toggle={() => save({ ...panel, open: { ...open, lens: open.lens === false } })} onReset={resetBlock("lens", sectionFields("lens"))} changed={changed("lens") || settings.lens.profile?.enabled}>
+            {lensProfile}
+            {sectionFields("lens").map(fieldSlider)}
+          </Section>
+        </>
+      )}
+      {tab === "adjust" && (
+        <>
       {auto && (
         <Section id="auto" open={!!open.auto} toggle={() => toggle("auto")}>
           {auto}
@@ -183,27 +260,28 @@ export function DevelopPanel({
           {presets}
         </Section>
       )}
-      {masks && (
-        <Section id="masks" open={!!open.masks} toggle={() => toggle("masks")}>
-          {masks}
-        </Section>
-      )}
-      {portrait && (
-        <Section id="portrait" open={!!open.portrait} toggle={() => toggle("portrait")}>
-          {portrait}
-        </Section>
-      )}
-      <Section id="light" open={!!open.light} toggle={() => toggle("light")} onReset={resetBlock("light", sectionFields("light"))}>
-        {sectionFields("light").map(fieldSlider)}
-      </Section>
-      <Section id="wb" open={!!open.wb} toggle={() => toggle("wb")} onReset={resetBlock("wb", sectionFields("wb"))}>
-        <button type="button" className={`btn small${wbPicking ? " active" : ""}`} aria-pressed={wbPicking} onClick={onPickWb} title={t("develop.wbPickerHint")}>
-          ⊙ {t("develop.wbPicker")}
-        </button>
+      <Section
+        id="basic"
+        open={!!open.basic}
+        toggle={() => toggle("basic")}
+        changed={changed("wb", "light", "presence")}
+        onReset={() =>
+          set("reset.basic", (s) => {
+            for (const id of ["wb", "light", "presence"]) for (const [b, k, , , , def] of sectionFields(id)) (s[b] as unknown as Record<string, number>)[k] = def;
+          }, true)
+        }
+      >
+        <div className="dev-sub-row">
+          <Sub>{t("develop.section.wb")}</Sub>
+          <button type="button" className={`btn small ghost${wbPicking ? " active" : ""}`} aria-pressed={wbPicking} onClick={onPickWb} title={t("develop.wbPickerHint")}>
+            ⊙ {t("develop.wbPicker")}
+          </button>
+        </div>
         {sectionFields("wb").map(fieldSlider)}
-      </Section>
-      <Section id="color" open={!!open.color} toggle={() => toggle("color")} onReset={resetBlock("color", sectionFields("color"))}>
-        {sectionFields("color").map(fieldSlider)}
+        <Sub>{t("develop.group.tone")}</Sub>
+        {sectionFields("light").map(fieldSlider)}
+        <Sub>{t("develop.group.presence")}</Sub>
+        {sectionFields("presence").map(fieldSlider)}
       </Section>
       <Section
         id="hsl"
@@ -263,7 +341,7 @@ export function DevelopPanel({
           <Slider key={k} label={t(`develop.field.curve.${k}`)} value={c[k]} min={5} max={95} def={[25, 50, 75][i]} onChange={(v, done) => set(`curve.${k}`, (s) => void (s.curve[k] = v), done)} />
         ))}
       </Section>
-      <Section id="detail" open={!!open.detail} toggle={() => toggle("detail")} onReset={resetBlock("detail", sectionFields("detail"))}>
+      <Section id="detail" open={!!open.detail} toggle={() => toggle("detail")} onReset={resetBlock("detail", sectionFields("detail"))} changed={changed("detail") || settings.detail.aiDenoise > 0}>
         <p className="small muted dev-note">{t("develop.detailNote")}</p>
         {sectionFields("detail").map(fieldSlider)}
         <div className="dev-ai">
@@ -282,10 +360,10 @@ export function DevelopPanel({
           )}
         </div>
       </Section>
-      <Section id="effects" open={!!open.effects} toggle={() => toggle("effects")} onReset={resetBlock("effects", sectionFields("effects"))}>
+      <Section id="effects" open={!!open.effects} toggle={() => toggle("effects")} onReset={resetBlock("effects", sectionFields("effects"))} changed={changed("effects")}>
         {sectionFields("effects").map(fieldSlider)}
       </Section>
-      <Section id="grading" open={!!open.grading} toggle={() => toggle("grading")} onReset={resetBlock("grading", sectionFields("grading"))}>
+      <Section id="grading" open={!!open.grading} toggle={() => toggle("grading")} onReset={resetBlock("grading", sectionFields("grading"))} changed={changed("grading") || !!settings.lut.id}>
         {sectionFields("grading").map(fieldSlider)}
         {settings.lut.id && (
           <div className="dev-ai">
@@ -324,17 +402,7 @@ export function DevelopPanel({
             />
           ))}
       </Section>
-      <Section id="geometry" open={!!open.geometry} toggle={() => toggle("geometry")}>
-        {geometry}
-      </Section>
-      <Section id="lens" open={!!open.lens} toggle={() => toggle("lens")} onReset={resetBlock("lens", sectionFields("lens"))}>
-        {lensProfile}
-        {sectionFields("lens").map(fieldSlider)}
-      </Section>
-      {retouch && (
-        <Section id="retouch" open={!!open.retouch} toggle={() => toggle("retouch")}>
-          {retouch}
-        </Section>
+        </>
       )}
     </aside>
   );

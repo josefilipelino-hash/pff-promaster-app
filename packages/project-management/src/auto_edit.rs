@@ -225,7 +225,7 @@ impl ProjectSession {
         key: i64,
     ) -> CoreResult<(Arc<Source>, bool)> {
         let base = if full {
-            Arc::new(edit::load_source(cat, self.registry(), asset, None)?)
+            self.edits.source_full(cat, self.registry(), asset)?
         } else {
             self.edits.source(cat, self.registry(), asset)?
         };

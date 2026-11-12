@@ -193,6 +193,7 @@ pub fn run() {
             commands::pick_white_balance,
             commands::auto_straighten,
             commands::upright,
+            commands::native_size,
             commands::apply_aspect,
             commands::lens_profile,
             commands::apply_lens_profiles,

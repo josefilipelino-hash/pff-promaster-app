@@ -607,7 +607,8 @@
       "bw": "Black & white",
       "lut": "LUT",
       "masks": "Masks (local adjustments)",
-      "portrait": "Portrait"
+      "portrait": "Portrait",
+      "basic": "Basic"
     },
     "resetSection": "Reset this section",
     "panel": "Adjustments",
@@ -864,7 +865,20 @@
     "lensProfileOffSelection_other": "Disable profile on the {{count}} selected",
     "lensProfileApplied_one": "Profile updated on {{count}} photo ({{missing}} without an available profile).",
     "lensProfileApplied_other": "Profile updated on {{count}} photos ({{missing}} without an available profile).",
-    "lensProfileSource": "Profiles: Lensfun database (CC BY-SA 3.0)."
+    "lensProfileSource": "Profiles: Lensfun database (CC BY-SA 3.0).",
+    "tab": {
+      "adjust": "Adjust",
+      "local": "Local",
+      "optics": "Geometry & optics"
+    },
+    "group": {
+      "tone": "Tone",
+      "presence": "Presence"
+    },
+    "sectionChanged": "This section has adjustments",
+    "zoom": "Zoom",
+    "zoomFit": "Fit",
+    "zoomHint": "Zoom: double-click or Z toggles fit and 100%; mouse wheel zooms at the cursor; drag to pan"
   },
   "auto": {
     "intensity": "Intensity",

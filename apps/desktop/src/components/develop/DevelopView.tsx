@@ -15,6 +15,7 @@ import type { MatchOptions, Preset, PresetImportResult } from "../../types";
 import { Modal } from "../Modal";
 import { DevelopPanel, type SetField } from "./DevelopPanel";
 import { Slider } from "./Slider";
+import { anchorCenter, fitZoom, stepZoom, zoomRegion } from "../../logic/zoom";
 
 /** Opções para só detetar olhos vermelhos ou manchas (o resto da receita fica igual). */
 function onlyRetouch(kind: "redEye" | "dust"): AutoOptions {
@@ -64,10 +65,10 @@ export function historyLabel(label: string, t: (k: string, o?: Record<string, un
  * Renderização com qualidade dinâmica: um pedido de cada vez; durante a interação, render
  * rápido (resolução menor, sem nitidez/ruído); ao parar, render final à resolução do ecrã.
  */
-function useRenderer(key: number, settings: DevelopSettings, before: boolean, uncropped: boolean, box: { w: number; h: number }, onFrame: (f: Frame) => void, fail: (e: unknown) => void, overlay: number | null = null) {
+function useRenderer(key: number, settings: DevelopSettings, before: boolean, uncropped: boolean, box: { w: number; h: number }, onFrame: (f: Frame) => void, fail: (e: unknown) => void, overlay: number | null = null, hiRes = false) {
   const st = useRef({ inFlight: false, dirty: false, lastChange: 0, timer: 0 as unknown as ReturnType<typeof setTimeout> | 0 });
-  const latest = useRef({ key, settings, before, uncropped, box, overlay });
-  latest.current = { key, settings, before, uncropped, box, overlay };
+  const latest = useRef({ key, settings, before, uncropped, box, overlay, hiRes });
+  latest.current = { key, settings, before, uncropped, box, overlay, hiRes };
   const run = useCallback(async () => {
     const r = st.current;
     if (r.inFlight) {
@@ -86,7 +87,7 @@ function useRenderer(key: number, settings: DevelopSettings, before: boolean, un
     const w = Math.max(64, Math.min(cap, Math.round(L.box.w * dpr * scale)));
     const h = Math.max(64, Math.min(cap, Math.round(L.box.h * dpr * scale)));
     try {
-      const buf = await api.renderEdit(L.key, L.before ? defaultSettings() : L.settings, w, h, quality, L.uncropped && !L.before, L.before ? null : L.overlay);
+      const buf = await api.renderEdit(L.key, L.before ? defaultSettings() : L.settings, w, h, quality, L.uncropped && !L.before, L.before ? null : L.overlay, L.hiRes && !L.before);
       onFrame(parseFrame(buf));
     } catch (e) {
       fail(e);
@@ -227,6 +228,11 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
   const [aiProgress, setAiProgress] = useState<number | null>(null);
   /** Vista dividida antes/depois e posição da divisória (0–1). */
   const [split, setSplit] = useState(false);
+  // Zoom (null = ajustar à janela): mantém-se ao mudar de fotografia (comparar focagem).
+  const [zoom, setZoom] = useState<number | null>(null);
+  const [zoomCenter, setZoomCenter] = useState({ x: 0.5, y: 0.5 });
+  const [native, setNative] = useState<{ id: string; w: number; h: number } | null>(null);
+  const panRef = useRef<{ x: number; y: number; c: { x: number; y: number } } | null>(null);
   const [splitX, setSplitX] = useState(0.5);
   const beforeCanvas = useRef<HTMLCanvasElement>(null);
   // Presets: pré-visualização ao passar o rato, Amount e diálogos.
@@ -337,7 +343,21 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
     Object.assign(s.geometry, { vertical: 0, horizontal: 0, straighten: 0, aspectAdjust: 0, scale: 100, offsetX: 0, offsetY: 0 });
     return s;
   }, [guiding, settings]);
-  const renderer = useRenderer(photoKey, preview ?? guideView ?? settings, before, cropMode || guiding, box, onFrame, fail, maskOverlay && selMask !== null && selMask < settings.masks.length ? selMask : null);
+  // Zoom: só a zona visível é revelada (sub-recorte), ao tamanho do ecrã.
+  const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+  const nativeId = `${photoKey}:${JSON.stringify(settings.geometry)}`;
+  const zoomActive = zoom !== null && !cropMode && !guiding && !tool && !split && !before;
+  const region = zoomActive && native && native.id === nativeId ? zoomRegion(settings.geometry.crop, native, { w: box.w * dpr, h: box.h * dpr }, zoom, zoomCenter) : null;
+  const viewSettings = useMemo(() => {
+    const base = preview ?? guideView ?? settings;
+    if (!region) return base;
+    const s = cloneSettings(base);
+    s.geometry.crop = region.crop;
+    return s;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preview, guideView, settings, region?.crop.x, region?.crop.y, region?.crop.w, region?.crop.h]);
+  const renderBox = region ? { w: region.outW / dpr, h: region.outH / dpr } : box;
+  const renderer = useRenderer(photoKey, viewSettings, before, cropMode || guiding, renderBox, onFrame, fail, maskOverlay && selMask !== null && selMask < settings.masks.length ? selMask : null, region?.hiRes ?? false);
   useEffect(() => {
     if (view) renderer.request(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -721,6 +741,9 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
       if (m && k === "'") return e.preventDefault(), void virtualCopy();
       if (!m && !e.altKey && e.key === "\\") return e.preventDefault(), setBefore((b) => !b);
       if (!m && !e.altKey && k === "r") return e.preventDefault(), setCropMode((c) => !c);
+      if (!m && !e.altKey && k === "z" && zoomTools) return e.preventDefault(), void zoomTo(zoomActive ? null : 1);
+      if (m && !e.shiftKey && (k === "0" || k === "1") && zoomTools) return e.preventDefault(), void zoomTo(k === "0" ? null : 1);
+      if (m && !e.shiftKey && (k === "=" || k === "+" || k === "-") && zoomTools) return e.preventDefault(), void zoomStep(k === "-" ? -1 : 1);
       if (!m && !e.altKey && k === "x" && cropMode && (parseAspect(settings.geometry.aspect) ?? 1) !== 1) return e.preventDefault(), setAspect(swapAspect(settings.geometry.aspect));
       if (!m && !e.altKey && k === "w") return e.preventDefault(), setWbPicking((w) => !w);
       if (!m && !e.altKey && k === "y") return e.preventDefault(), setSplit((v) => !v);
@@ -807,7 +830,7 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
     const [u, v] = uvOf(e);
     setWbPicking(false);
     try {
-      const r = await api.pickWhiteBalance(photoKey, settings, u, v);
+      const r = await api.pickWhiteBalance(photoKey, viewSettings, u, v);
       if (!r) return toast("info", t("develop.wbNoSample"));
       set("wb.picker", (s) => {
         s.wb.temperature = Math.round(r[0]);
@@ -819,10 +842,64 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
   };
 
   // Tamanho visível da imagem dentro do palco (para o recorte sobreposto).
-  const shown = frame ? (() => {
-    const k = Math.min(box.w / frame.width, box.h / frame.height);
-    return { w: frame.width * k, h: frame.height * k };
-  })() : null;
+  const shown = region
+    ? { w: region.outW / dpr, h: region.outH / dpr }
+    : frame
+      ? (() => {
+          const k = Math.min(box.w / frame.width, box.h / frame.height);
+          return { w: frame.width * k, h: frame.height * k };
+        })()
+      : null;
+
+  // ---- zoom
+  const nativeFor = async () => {
+    if (native && native.id === nativeId) return native;
+    const [w, h] = await api.nativeSize(photoKey, settings);
+    const n = { id: nativeId, w: Math.max(1, w), h: Math.max(1, h) };
+    setNative(n);
+    return n;
+  };
+  useEffect(() => {
+    if (zoom !== null && (!native || native.id !== nativeId)) nativeFor().catch(fail);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoom, nativeId]);
+  useEffect(() => {
+    if (loaded) renderer.request(panRef.current !== null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoomActive, region?.crop.x, region?.crop.y, region?.crop.w, region?.crop.h, region?.outW, region?.outH]);
+  const viewport = { w: box.w * dpr, h: box.h * dpr };
+  /** Muda o zoom mantendo o ponto (u, v) da vista (0–1) no mesmo sítio. */
+  const zoomTo = async (next: number | null, u = 0.5, v = 0.5) => {
+    try {
+      const n = await nativeFor();
+      if (next === null) return setZoom(null);
+      const cur = region ? { cx: region.center.x, cy: region.center.y, rw: region.crop.w / settings.geometry.crop.w, rh: region.crop.h / settings.geometry.crop.h } : { cx: 0.5, cy: 0.5, rw: 1, rh: 1 };
+      const rw = Math.min(1, viewport.w / (next * n.w));
+      const rh = Math.min(1, viewport.h / (next * n.h));
+      setZoomCenter(anchorCenter(cur, u, v, { rw, rh }));
+      setZoom(next);
+    } catch (e) {
+      fail(e);
+    }
+  };
+  const zoomStep = async (dir: 1 | -1, u = 0.5, v = 0.5) => {
+    const n = await nativeFor().catch(() => null);
+    if (!n) return;
+    void zoomTo(stepZoom(zoomActive ? zoom : null, fitZoom(n, viewport), dir), u, v);
+  };
+  const zoomTools = !cropMode && !guiding && !tool && !wbPicking;
+  useEffect(() => {
+    const el = stage.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!zoomTools || !canvas.current) return;
+      e.preventDefault();
+      const [u, v] = uvOf(e);
+      void zoomStep(e.deltaY < 0 ? 1 : -1, Math.min(1, Math.max(0, u)), Math.min(1, Math.max(0, v)));
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  });
 
   // ---- recorte
   const crop = settings.geometry.crop;
@@ -967,7 +1044,7 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
         </button>
       </div>
       <h4 className="small muted">{t("develop.upright")}</h4>
-      <div className="dev-row" role="group" aria-label={t("develop.upright")} title={t("develop.uprightHint")}>
+      <div className="segmented wrap upright-modes" role="group" aria-label={t("develop.upright")} title={t("develop.uprightHint")}>
         <button
           type="button"
           className={`btn small${settings.geometry.upright === "" ? " active" : ""}`}
@@ -1049,7 +1126,7 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
       <Slider label={t("develop.field.geometry.vertical")} value={settings.geometry.vertical} min={-100} max={100} onChange={(v, done) => set("geometry.vertical", (s) => void (s.geometry.vertical = v), done)} />
       <Slider label={t("develop.field.geometry.horizontal")} value={settings.geometry.horizontal} min={-100} max={100} onChange={(v, done) => set("geometry.horizontal", (s) => void (s.geometry.horizontal = v), done)} />
       <Slider label={t("develop.field.geometry.aspectAdjust")} value={settings.geometry.aspectAdjust ?? 0} min={-100} max={100} onChange={(v, done) => set("geometry.aspectAdjust", (s) => void (s.geometry.aspectAdjust = v), done)} />
-      <Slider label={t("develop.field.geometry.scale")} value={settings.geometry.scale ?? 100} min={100} max={200} onChange={(v, done) => set("geometry.scale", (s) => void (s.geometry.scale = v), done)} />
+      <Slider label={t("develop.field.geometry.scale")} value={settings.geometry.scale ?? 100} min={100} max={200} def={100} onChange={(v, done) => set("geometry.scale", (s) => void (s.geometry.scale = v), done)} />
       <Slider label={t("develop.field.geometry.offsetX")} value={settings.geometry.offsetX ?? 0} min={-100} max={100} onChange={(v, done) => set("geometry.offsetX", (s) => void (s.geometry.offsetX = v), done)} />
       <Slider label={t("develop.field.geometry.offsetY")} value={settings.geometry.offsetY ?? 0} min={-100} max={100} onChange={(v, done) => set("geometry.offsetY", (s) => void (s.geometry.offsetY = v), done)} />
       <button type="button" className="btn small ghost" onClick={() => set("reset.geometry", (s) => void (s.geometry = defaultSettings().geometry), true)}>
@@ -1112,6 +1189,22 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
   return (
     <div className="develop">
       <aside className="develop-side" aria-label={t("develop.historyTitle")}>
+        <h3 className="sidebar-title">{t("develop.section.presets")}</h3>
+          <div className="dev-presets" role="region" aria-label={t("develop.section.presets")}>
+            <Slider label={t("presets.amount")} value={presetAmount} min={0} max={150} def={100} onChange={(v) => setPresetAmount(v)} />
+            <PresetList presets={presets} onPick={(p) => void applyPresetHere(p)} onHover={hoverPreset} />
+            <div className="dev-row">
+              <button type="button" className="btn small" onClick={() => setPresetDialog("create")}>
+                + {t("presets.create")}
+              </button>
+              <button type="button" className="btn small" onClick={() => void importPresets(t, setImportReport)}>
+                {t("presets.import")}
+              </button>
+              <button type="button" className="btn small" onClick={() => setPresetDialog("manage")}>
+                {t("presets.manage")}
+              </button>
+            </div>
+          </div>
         <h3 className="sidebar-title">{t("develop.historyTitle")}</h3>
         <ol className="history-list">
           {(view?.history ?? []).map((h) => (
@@ -1212,6 +1305,20 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
             <Icon name="compare" />
             <span className="act-label">{t("develop.split")}</span>
           </button>
+          <select
+            className="zoom-select"
+            aria-label={t("develop.zoom")}
+            title={`${t("develop.zoomHint")} (Z, ${mod}+0, ${mod}+1)`}
+            value={zoomActive && zoom !== null ? String(zoom) : "fit"}
+            onChange={(e) => void zoomTo(e.target.value === "fit" ? null : Number(e.target.value))}
+          >
+            <option value="fit">{t("develop.zoomFit")}</option>
+            {[0.25, 0.5, 1, 2, 4].map((z) => (
+              <option key={z} value={String(z)}>
+                {Math.round(z * 100)} %
+              </option>
+            ))}
+          </select>
           <span className="sep" />
           <button type="button" className="btn small act" aria-label={t("develop.copy")} onClick={() => setDialog("copy")} title={`${mod}+Shift+C`}>
             <Icon name="copy" />
@@ -1242,7 +1349,33 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
           </button>
         </div>
         <div ref={stage} className={`develop-stage${wbPicking ? " picking" : ""}`}>
-          <div className="develop-image" style={shown ? { width: shown.w, height: shown.h } : undefined} onClick={pickWb}>
+          <div
+            className={`develop-image${zoomActive ? " zoomed" : ""}`}
+            style={shown ? { width: shown.w, height: shown.h } : undefined}
+            onClick={pickWb}
+            onDoubleClick={(e) => {
+              if (!zoomTools) return;
+              const [u, v] = uvOf(e);
+              void zoomTo(zoomActive ? null : 1, u, v);
+            }}
+            onPointerDown={(e) => {
+              if (!zoomActive || !zoomTools || e.button !== 0) return;
+              (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
+              panRef.current = { x: e.clientX, y: e.clientY, c: region?.center ?? zoomCenter };
+            }}
+            onPointerMove={(e) => {
+              const p = panRef.current;
+              if (!p || !native || zoom === null) return;
+              const dx = ((e.clientX - p.x) * dpr) / (zoom * native.w);
+              const dy = ((e.clientY - p.y) * dpr) / (zoom * native.h);
+              setZoomCenter({ x: p.c.x - dx, y: p.c.y - dy });
+            }}
+            onPointerUp={() => {
+              if (!panRef.current) return;
+              panRef.current = null;
+              renderer.request(false);
+            }}
+          >
             <canvas ref={canvas} aria-label={t("develop.image")} role="img" style={shown ? { width: shown.w, height: shown.h } : undefined} />
             {tool && !before && !cropMode && shown && (
               <svg
@@ -1416,23 +1549,6 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
           />
         }
         portrait={<PortraitPanel settings={settings} set={set} onDetect={() => void detectPortrait()} busy={localBusy} />}
-        presets={
-          <div className="dev-presets">
-            <Slider label={t("presets.amount")} value={presetAmount} min={0} max={150} def={100} onChange={(v) => setPresetAmount(v)} />
-            <PresetList presets={presets} onPick={(p) => void applyPresetHere(p)} onHover={hoverPreset} />
-            <div className="dev-row">
-              <button type="button" className="btn small" onClick={() => setPresetDialog("create")}>
-                + {t("presets.create")}
-              </button>
-              <button type="button" className="btn small" onClick={() => void importPresets(t, setImportReport)}>
-                {t("presets.import")}
-              </button>
-              <button type="button" className="btn small" onClick={() => setPresetDialog("manage")}>
-                {t("presets.manage")}
-              </button>
-            </div>
-          </div>
-        }
         ai={{ available: aiAvailable, progress: settings.detail.aiDenoise > 0 ? aiProgress : null }}
         auto={
           <div className="dev-auto">

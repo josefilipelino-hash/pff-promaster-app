@@ -36,7 +36,7 @@ export function Slider({
   return (
     <div className={`dev-slider${value !== def ? " changed" : ""}`}>
       <label>
-        <span className="dev-label" onDoubleClick={() => onChange(def, true)} title={t("develop.resetHint")}>
+        <span className="dev-label" onDoubleClick={() => onChange(def, true)} title={`${label} — ${t("develop.resetHint")}`}>
           {label}
         </span>
         <input

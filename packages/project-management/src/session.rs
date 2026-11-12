@@ -478,13 +478,28 @@ impl ProjectSession {
         quality: RenderQuality,
         uncropped: bool,
         overlay: Option<usize>,
+        hi_res: bool,
     ) -> CoreResult<Vec<u8>> {
+        let _fg = momento_task_queue::foreground::Interactive::begin();
         let (_, asset) = self.catalog().resolve_key(key)?;
+        // Zoom a 100 % ou mais: a fonte em resolução total (em cache para a fotografia aberta).
         let (src, _) =
-            self.source_for(&*self.open_catalog()?, asset, settings, false, false, key)?;
+            self.source_for(&*self.open_catalog()?, asset, settings, hi_res, false, key)?;
         Ok(self
             .edits
             .render_frame_overlay(&src, settings, max_w, max_h, quality, uncropped, overlay))
+    }
+
+    /// Tamanho nativo do resultado (recorte incluído) em píxeis do original.
+    pub fn native_size(&self, key: i64, settings: &DevelopSettings) -> CoreResult<(u32, u32)> {
+        let cat = self.open_catalog()?;
+        let (_, asset) = cat.resolve_key(key)?;
+        let src = self.edits.source(&cat, &self.registry, asset)?;
+        Ok(momento_image_processing::develop::geometry::native_size(
+            src.full_width as usize,
+            src.full_height as usize,
+            &settings.geometry,
+        ))
     }
 
     /// Ligação própria para operações longas (não bloqueia a do resto da interface).

@@ -148,8 +148,10 @@ export const api = {
     setCameraOffsets: (offsets: CameraOffset[]) => invoke<OrganizeSummary>("set_camera_offsets", { offsets }),
   // Edição não destrutiva (os originais nunca são escritos).
   editView: (key: number) => invoke<EditView>("edit_view", { key }),
-  renderEdit: (key: number, settings: DevelopSettings, maxWidth: number, maxHeight: number, quality: "fast" | "final", uncropped: boolean, overlay: number | null = null) =>
-    invoke<ArrayBuffer>("render_edit", { key, settings, maxWidth, maxHeight, quality, uncropped, overlay }),
+  renderEdit: (key: number, settings: DevelopSettings, maxWidth: number, maxHeight: number, quality: "fast" | "final", uncropped: boolean, overlay: number | null = null, hiRes = false) =>
+    invoke<ArrayBuffer>("render_edit", { key, settings, maxWidth, maxHeight, quality, uncropped, overlay, hiRes }),
+  /** Tamanho nativo (px do original) do resultado com o recorte da geometria. */
+  nativeSize: (key: number, settings: DevelopSettings) => invoke<[number, number]>("native_size", { key, settings }),
   commitEdit: (key: number, label: string, settings: DevelopSettings) => invoke<EditView>("commit_edit", { key, label, settings }),
   undoEdit: (key: number) => invoke<EditView>("undo_edit", { key }),
   redoEdit: (key: number) => invoke<EditView>("redo_edit", { key }),

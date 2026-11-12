@@ -131,6 +131,7 @@ const apiMock = {
   pasteSettings: vi.fn(async (keys: number[]) => keys.length),
   lensProfile: vi.fn(async () => ({ enabled: true, name: "Sony FE 24-70mm f/2.8 GM II", distortion: 100, vignetting: 100, chromatic: true, distModel: 3, dist: [0.0045, -0.0042, 0.0034], distScale: 1.8, tcaModel: 1, tca: [1, 1, 0, 0, 0, 0], vig: [-0.3, -0.1, 0.06], vigScale: 1 })),
   applyLensProfiles: vi.fn(async (keys: number[]) => [keys.length, 0]),
+  nativeSize: vi.fn(async () => [6000, 4000]),
   applyAspect: vi.fn(async (keys: number[]) => keys.length),
   upright: vi.fn(async () => ({ vertical: 31.23, horizontal: 0, straighten: -1.249, focal35: 24, mode: "vertical", verticalLines: 12, horizontalLines: 0, deviationBefore: 4.2, deviationAfter: 0.2 })),
   pickWhiteBalance: vi.fn(async () => [23.4, -7.6] as [number, number]),
@@ -340,6 +341,7 @@ const rows = (n: number): PhotoRow[] =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.removeItem("pff.developPanel");
   useStore.getState().setProject(null);
 });
 afterEach(cleanup);
@@ -829,7 +831,7 @@ describe("edição (Fase 5)", () => {
     await act(async () => {});
     expect(apiMock.pickWhiteBalance).toHaveBeenCalled();
     expect(apiMock.commitEdit).toHaveBeenCalledWith(2, "wb.picker", expect.objectContaining({ wb: { temperature: 23, tint: -8 } }));
-    fireEvent.click(screen.getByRole("button", { name: /Geometria/ }));
+    fireEvent.click(screen.getByRole("tab", { name: "Geometria e ótica" }));
     // Upright: modo Vertical aplica a correção calculada (perspetiva + endireitar + focal).
     const upright = screen.getByRole("group", { name: "Upright" });
     fireEvent.click(within(upright).getByRole("button", { name: "Vertical" }));
@@ -863,9 +865,28 @@ describe("edição (Fase 5)", () => {
     expect(apiMock.commitEdit).toHaveBeenLastCalledWith(2, "geometry.upright", expect.objectContaining({ geometry: expect.objectContaining({ upright: "", vertical: 0, straighten: 0 }) }));
   });
 
+  it("zoom: Z e duplo clique alternam ajustar/100 %, só a zona visível é revelada (resolução total)", async () => {
+    await openDevelop();
+    await act(async () => {});
+    apiMock.renderEdit.mockClear();
+    fireEvent.keyDown(window, { key: "z" });
+    await waitFor(() => expect(apiMock.renderEdit.mock.calls.some((c) => c[7] === true)).toBe(true));
+    expect(apiMock.nativeSize).toHaveBeenCalledWith(2, expect.anything());
+    const call = apiMock.renderEdit.mock.calls.find((c) => c[7] === true)!;
+    const crop = (call[1] as DevelopSettings).geometry.crop;
+    // 6000×4000 a 100 % numa área de 900×600 (jsdom): só 15 % da largura é revelada.
+    expect(crop.w).toBeCloseTo(0.15, 2);
+    expect(crop.x).toBeCloseTo(0.425, 2);
+    expect((screen.getByRole("combobox", { name: "Zoom" }) as HTMLSelectElement).value).toBe("1");
+    // Escolher "Ajustar" volta à fotografia inteira.
+    fireEvent.change(screen.getByRole("combobox", { name: "Zoom" }), { target: { value: "fit" } });
+    await act(async () => {});
+    expect((apiMock.renderEdit.mock.calls.at(-1)![1] as DevelopSettings).geometry.crop.w).toBe(1);
+  });
+
   it("perfil da objetiva: ativar (coeficientes desta fotografia), intensidade e aplicar às selecionadas", async () => {
     await openDevelop();
-    fireEvent.click(screen.getByRole("button", { name: /Correções da objetiva/ }));
+    fireEvent.click(screen.getByRole("tab", { name: "Geometria e ótica" }));
     const enable = screen.getByRole("checkbox", { name: "Ativar correções de perfil" });
     apiMock.lensProfile.mockResolvedValueOnce(null as unknown as Awaited<ReturnType<typeof apiMock.lensProfile>>);
     fireEvent.click(enable);
@@ -930,7 +951,7 @@ describe("edição (Fase 5)", () => {
     await act(async () => {});
     expect(apiMock.renderEdit.mock.calls.at(-1)![5]).toBe(true);
     expect(screen.getByRole("group", { name: /Área de recorte/ })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: /Geometria/ }));
+    fireEvent.click(screen.getByRole("tab", { name: "Geometria e ótica" }));
     fireEvent.change(screen.getByRole("combobox", { name: "Proporção" }), { target: { value: "1:1" } });
     await act(async () => {});
     const last = apiMock.commitEdit.mock.calls.at(-1)!;
@@ -1031,6 +1052,7 @@ describe("edição (Fase 5)", () => {
     });
     await openDevelop();
     const panel = screen.getByRole("complementary", { name: "Ajustes" });
+    fireEvent.click(within(panel).getByRole("tab", { name: "Locais" }));
     fireEvent.click(within(panel).getByRole("button", { name: /Retoque/ }));
     fireEvent.click(within(panel).getAllByRole("button", { name: "Detetar" })[0]!);
     await act(async () => {});
@@ -1068,8 +1090,8 @@ describe("presets e consistência (Fase 7)", () => {
     fireEvent.mouseDown(document.querySelector('[data-id="2"]')!);
     fireEvent.keyDown(window, { key: "d" });
     await act(async () => {});
-    const panel = screen.getByRole("complementary", { name: "Ajustes" });
-    const sec = within(panel).getByRole("region", { name: "Presets" });
+    expect(screen.getByRole("complementary", { name: "Ajustes" })).toBeTruthy();
+    const sec = screen.getByRole("region", { name: "Presets" });
     expect(within(sec).getByText(/Preto e branco/)).toBeTruthy();
     fireEvent.change(within(sec).getByRole("slider", { name: "Intensidade (%)" }), { target: { value: "60" } });
     apiMock.renderEdit.mockClear();
@@ -1184,7 +1206,7 @@ describe("edição localizada (Fase 8)", () => {
     await act(async () => {});
     await waitFor(() => expect(apiMock.renderEdit).toHaveBeenCalled());
     const panel = screen.getByRole("complementary", { name: "Ajustes" });
-    fireEvent.click(within(panel).getByRole("button", { name: /Máscaras/ }));
+    fireEvent.click(within(panel).getByRole("tab", { name: "Locais" }));
     return panel;
   }
   const lastCommit = () => apiMock.commitEdit.mock.calls.at(-1)! as [number, string, DevelopSettings];
@@ -1261,6 +1283,7 @@ describe("edição localizada (Fase 8)", () => {
 
   it("retoque (corrigir/clonar/remover) e retrato (detetar, ajustar, remover)", async () => {
     const panel = await openDevelop();
+    fireEvent.click(within(panel).getByRole("tab", { name: "Locais" }));
     fireEvent.click(within(panel).getByRole("button", { name: /Retoque/ }));
     fireEvent.click(within(panel).getByRole("button", { name: "Corrigir" }));
     fireEvent.click(screen.getByRole("application", { name: "Clique na mancha a remover" }), { clientX: 0, clientY: 0 });

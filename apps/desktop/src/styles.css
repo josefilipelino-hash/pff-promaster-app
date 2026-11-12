@@ -828,3 +828,48 @@ input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px var(--accent-s
 .tool-guides .guide circle { fill: #fff; stroke: var(--accent, #ff7a59); stroke-width: 2; }
 .tool-guides .guide-new { stroke-dasharray: 6 4; }
 .aspect-num { width: 64px; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---- Editor 1.3: painéis reorganizados ---------------------------------------------- */
+.develop { grid-template-columns: 240px minmax(0, 1fr) 344px; }
+.develop-side { padding: 12px 10px; gap: 4px; }
+.develop-side .dev-presets { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.develop-panel { padding: 0; gap: 0; }
+.dev-panel-top { position: sticky; top: 0; z-index: 3; background: var(--surface); padding: 10px 12px 0; border-bottom: 1px solid var(--border); }
+.dev-tabs { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 8px; }
+.dev-tab { background: none; border: 0; color: var(--text-muted); padding: 9px 4px 8px; font-weight: 600; font-size: var(--fs-sm); cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+.dev-tab:hover { color: var(--text); }
+.dev-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+.dev-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.develop-panel .dev-section { border-top: 0; border-bottom: 1px solid var(--border); padding: 0 12px; }
+.develop-panel .dev-section header { min-height: 38px; }
+.dev-section-title { display: flex; align-items: center; gap: 8px; padding: 10px 0; font-size: var(--fs-md); letter-spacing: 0.01em; }
+.dev-section-title .chev { display: inline-block; width: 10px; color: var(--text-muted); transition: transform var(--dur); }
+.dev-section.open .dev-section-title .chev { transform: rotate(90deg); }
+.changed-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-left: 2px; }
+.dev-section header .btn.ghost { opacity: 0.5; }
+.dev-section header:hover .btn.ghost { opacity: 1; }
+.dev-section-body { gap: 2px; padding-bottom: 12px; }
+.dev-sub { margin: 10px 0 2px; font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.dev-sub-row { display: flex; align-items: center; justify-content: space-between; }
+.dev-sub-row .dev-sub { margin-bottom: 0; }
+/* Um controlo por linha: nome | deslizador | valor. */
+.dev-slider { grid-template-columns: 132px minmax(0, 1fr) 44px; gap: 8px; min-height: 26px; }
+.dev-slider label { display: contents; }
+.dev-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dev-slider .dev-value { width: 44px; min-height: 22px; border: 1px solid transparent; background: transparent; padding: 0 2px; color: var(--text-muted); box-shadow: none; font-size: var(--fs-sm); }
+.dev-slider.changed .dev-value { color: var(--text); }
+.dev-slider .dev-value:hover, .dev-slider .dev-value:focus { border-color: var(--border); background: var(--bg); color: var(--text); }
+/* No painel estreito da esquerda (presets): nome por cima. */
+.develop-side .dev-slider { grid-template-columns: minmax(0, 1fr) 44px; }
+.develop-side .dev-slider .dev-label { grid-column: 1 / -1; }
+.dev-slider input[type="range"] { -webkit-appearance: none; appearance: none; height: 16px; background-color: transparent; background-size: 100% 3px; cursor: pointer; }
+.dev-slider input[type="range"]:not([style*="background-image"]) { background-image: linear-gradient(var(--border-strong), var(--border-strong)); }
+.dev-slider input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: var(--text); border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--border-strong); margin-top: 0; }
+.dev-slider.changed input[type="range"]::-webkit-slider-thumb { background: var(--accent); }
+.dev-slider input[type="range"]::-moz-range-thumb { width: 10px; height: 10px; border-radius: 50%; background: var(--text); border: 2px solid var(--surface); }
+.dev-slider input[type="range"]:focus-visible { outline: none; }
+.dev-slider input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--accent-soft); }
+/* Zoom do editor */
+.develop-image.zoomed { cursor: grab; }
+.develop-image.zoomed:active { cursor: grabbing; }
+.zoom-select { min-height: 28px; padding: 0 6px; font-size: var(--fs-sm); min-width: 92px; }

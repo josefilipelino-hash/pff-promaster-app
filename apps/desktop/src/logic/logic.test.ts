@@ -280,3 +280,39 @@ describe("contraste dos temas (Fase 14)", async () => {
     }
   });
 });
+
+describe("zoom do editor", async () => {
+  const { zoomRegion, stepZoom, fitZoom, anchorCenter } = await import("./zoom");
+  const full = { x: 0, y: 0, w: 1, h: 1 };
+  it("100 % numa fotografia de 6000×4000 mostra só a zona do ecrã, em resolução total", () => {
+    const r = zoomRegion(full, { w: 6000, h: 4000 }, { w: 1500, h: 1000 }, 1, { x: 0.5, y: 0.5 });
+    expect(r.outW).toBe(1500);
+    expect(r.outH).toBe(1000);
+    expect(r.crop.w).toBeCloseTo(0.25);
+    expect(r.crop.x).toBeCloseTo(0.375);
+    expect(r.hiRes).toBe(true);
+    // A vista nunca sai da fotografia (centro corrigido junto à borda).
+    const edge = zoomRegion(full, { w: 6000, h: 4000 }, { w: 1500, h: 1000 }, 1, { x: 0, y: 1 });
+    expect(edge.crop.x).toBeCloseTo(0);
+    expect(edge.crop.y + edge.crop.h).toBeCloseTo(1);
+  });
+  it("dentro de um recorte e com zoom baixo usa a fonte de edição", () => {
+    const crop = { x: 0.2, y: 0.1, w: 0.5, h: 0.5 };
+    const r = zoomRegion(crop, { w: 3000, h: 2000 }, { w: 1500, h: 1000 }, 0.5, { x: 0.5, y: 0.5 });
+    expect(r.crop).toMatchObject({ x: 0.2, y: 0.1 });
+    expect(r.crop.w).toBeCloseTo(0.5);
+    expect(r.hiRes).toBe(false);
+  });
+  it("passos e âncora no cursor", () => {
+    const fit = fitZoom({ w: 6000, h: 4000 }, { w: 1500, h: 1000 });
+    expect(fit).toBeCloseTo(0.25);
+    expect(stepZoom(null, fit, 1)).toBe(0.5);
+    expect(stepZoom(1, fit, 1)).toBe(2);
+    expect(stepZoom(0.5, fit, -1)).toBeNull();
+    expect(stepZoom(4, fit, 1)).toBe(4);
+    // O ponto sob o cursor fica no mesmo sítio.
+    const c = anchorCenter({ cx: 0.5, cy: 0.5, rw: 1, rh: 1 }, 0.8, 0.2, { rw: 0.25, rh: 0.25 });
+    expect(c.x - 0.125 + 0.8 * 0.25).toBeCloseTo(0.8);
+    expect(c.y - 0.125 + 0.2 * 0.25).toBeCloseTo(0.2);
+  });
+});

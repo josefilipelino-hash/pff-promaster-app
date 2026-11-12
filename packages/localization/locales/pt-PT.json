@@ -607,7 +607,8 @@
       "bw": "Preto e branco",
       "lut": "LUT",
       "masks": "Máscaras (ajustes locais)",
-      "portrait": "Retrato"
+      "portrait": "Retrato",
+      "basic": "Básico"
     },
     "resetSection": "Repor esta secção",
     "panel": "Ajustes",
@@ -864,7 +865,20 @@
     "lensProfileOffSelection_other": "Desativar perfil nas {{count}} selecionadas",
     "lensProfileApplied_one": "Perfil atualizado em {{count}} fotografia ({{missing}} sem perfil disponível).",
     "lensProfileApplied_other": "Perfil atualizado em {{count}} fotografias ({{missing}} sem perfil disponível).",
-    "lensProfileSource": "Perfis: base de dados Lensfun (CC BY-SA 3.0)."
+    "lensProfileSource": "Perfis: base de dados Lensfun (CC BY-SA 3.0).",
+    "tab": {
+      "adjust": "Ajustes",
+      "local": "Locais",
+      "optics": "Geometria e ótica"
+    },
+    "group": {
+      "tone": "Tom",
+      "presence": "Presença"
+    },
+    "sectionChanged": "Esta secção tem ajustes",
+    "zoom": "Zoom",
+    "zoomFit": "Ajustar",
+    "zoomHint": "Zoom: duplo clique ou Z alterna entre ajustar e 100 %; roda do rato aproxima no cursor; arraste para deslocar"
   },
   "auto": {
     "intensity": "Intensidade",
