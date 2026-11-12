@@ -60,8 +60,10 @@ pub fn load_source(
             s.as_shot_k = info.as_shot_white.and_then(develop::color::kelvin_of_white);
             // Câmara que esta LibRaw não conhece (sem matriz de cor, ex.: Canon EOS C50):
             // calibrar pela preview JPEG que a própria câmara gravou no ficheiro.
+            // Sem calibração fiável, o erro leva ao caminho da preview embutida (abaixo): as
+            // cores nunca saem erradas.
             if !info.color_matrix_known {
-                calibrate_unknown_camera(&mut s, registry, &data, format, src.orientation, asset);
+                calibrate_unknown_camera(&mut s, registry, &data, format, src.orientation, asset)?;
             }
             Ok(s)
         }) {
@@ -115,7 +117,11 @@ pub fn load_source(
     Ok(Source::from_srgb(&img, fw, fh))
 }
 
+/// Erro de cor máximo aceite depois da calibração (nos RAW de teste: 0,02–0,065).
+const MAX_CALIBRATED_ERROR: f32 = 0.09;
+
 /// Calibração de cor de um RAW de câmara sem perfil na LibRaw (ver `develop::calibrate`).
+/// Erro = sem calibração fiável (a edição usa então a preview embutida).
 fn calibrate_unknown_camera(
     s: &mut Source,
     registry: &CodecRegistry,
@@ -123,30 +129,36 @@ fn calibrate_unknown_camera(
     format: momento_image_codecs::FileFormat,
     orientation: u8,
     asset: AssetId,
-) {
-    let preview = match registry.decode(data, format, Some(480)) {
-        Ok(d) => apply_orientation(d.image, orientation),
-        Err(e) => {
-            tracing::warn!(asset = asset.0, erro = %e, "câmara sem perfil de cor e sem preview: cores por calibrar");
-            return;
-        }
-    };
-    let Some(level) = s.levels.last() else { return };
+) -> CoreResult<()> {
+    let preview = apply_orientation(registry.decode(data, format, Some(480))?.image, orientation);
+    let level = s.levels.last().ok_or_else(|| CoreError::Other("fonte vazia".into()))?;
+    let (lw, lh, pw, ph) = (level.w, level.h, preview.width(), preview.height());
     match develop::calibrate::calibrate_from_preview(level, &preview) {
-        Some(c) => {
+        Some(c) if c.error_after <= MAX_CALIBRATED_ERROR => {
             tracing::info!(
                 asset = asset.0,
+                raw = %format!("{lw}x{lh}"),
+                preview = %format!("{pw}x{ph}"),
+                enquadramento = c.framing,
+                alinhamento = c.alignment,
                 amostras = c.samples,
                 erro_antes = c.error_before,
                 erro_depois = c.error_after,
                 "câmara sem perfil de cor na LibRaw: cores calibradas pela preview embutida"
             );
             s.apply_matrix(&c.matrix);
+            Ok(())
         }
-        None => tracing::warn!(
-            asset = asset.0,
-            "câmara sem perfil de cor: calibração pela preview impossível"
-        ),
+        other => {
+            tracing::warn!(
+                asset = asset.0,
+                raw = %format!("{lw}x{lh}"),
+                preview = %format!("{pw}x{ph}"),
+                resultado = ?other.map(|c| (c.framing, c.alignment, c.error_after)),
+                "câmara sem perfil de cor: calibração pouco fiável — edição a partir da preview embutida"
+            );
+            Err(CoreError::Other("câmara sem perfil de cor e calibração pouco fiável".into()))
+        }
     }
 }
 

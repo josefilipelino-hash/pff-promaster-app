@@ -5,6 +5,16 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [1.1.3-personal] — 2026-11-12
+
+### Corrigido
+- Canon EOS C50: cores ainda "lavadas" (folhagem amarela, pessoas acinzentadas). A preview
+  de câmaras de cinema pode ter outro enquadramento ou barras pretas: a calibração retira as
+  barras e escolhe o enquadramento que melhor coincide com o RAW (correlação de luminância;
+  testado com previews 16:9 com barras a partir de RAW reais). Se não houver alinhamento ou
+  o erro for alto, a edição usa a preview embutida (cores da câmara) em vez de cores
+  erradas. O registo indica tamanhos, enquadramento, alinhamento e erro.
+
 ## [1.1.2-personal] — 2026-11-12
 
 ### Corrigido

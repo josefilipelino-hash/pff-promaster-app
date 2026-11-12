@@ -367,6 +367,22 @@ fn unknown_camera_colors_are_calibrated_from_the_embedded_preview() {
             info.orientation,
         );
         let cal = calibrate_from_preview(&fake, &preview).expect("calibra");
+        // Preview de câmara de cinema: recortada a 16:9 e com barras pretas em cima e em baixo.
+        {
+            let (pw, ph) = preview.dimensions();
+            let ch = (pw as f32 * 9.0 / 16.0) as u32;
+            let crop = image::imageops::crop_imm(&preview, 0, (ph - ch) / 2, pw, ch).to_image();
+            let bar = ch / 8;
+            let mut boxed = image::RgbImage::new(pw, ch + 2 * bar);
+            image::imageops::replace(&mut boxed, &crop, 0, bar as i64);
+            let c2 = calibrate_from_preview(&fake, &boxed).expect("calibra com barras e 16:9");
+            eprintln!(
+                "{name}: 16:9 com barras → enquadramento {:?}, alinhamento {:.3}, erro {:.4}",
+                c2.framing, c2.alignment, c2.error_after
+            );
+            assert!(c2.framing.starts_with("recortado") && c2.alignment > 0.9, "{name}: {c2:?}");
+        }
+        eprintln!("{name}: alinhamento {:.3} ({})", cal.alignment, cal.framing);
         // Erro de cromaticidade médio face às cores verdadeiras, antes e depois.
         let chroma = |v: [f32; 3]| {
             let s = (v[0] + v[1] + v[2]).max(1e-6);

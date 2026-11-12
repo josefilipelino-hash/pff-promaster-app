@@ -24,6 +24,11 @@ pub struct Calibration {
     /// Erro médio de cromaticidade antes e depois (0–1, menor é melhor).
     pub error_before: f32,
     pub error_after: f32,
+    /// Correlação (0–1) entre a luminância do RAW e a da preview no enquadramento escolhido:
+    /// mede se os píxeis comparados são mesmo os mesmos pontos da imagem.
+    pub alignment: f32,
+    /// Enquadramento usado (para diagnóstico).
+    pub framing: &'static str,
 }
 
 fn norm(v: [f32; 3]) -> Option<[f32; 3]> {
@@ -31,13 +36,139 @@ fn norm(v: [f32; 3]) -> Option<[f32; 3]> {
     (s > 1e-6 && v.iter().all(|c| c.is_finite())).then(|| v.map(|c| c / s))
 }
 
-/// Estima a matriz que leva `camera` (linear, balanceado, já orientado) às cores de `preview`
-/// (sRGB 8 bits, a mesma imagem e orientação; é redimensionada para o tamanho de `camera`).
-/// `None` se houver poucos píxeis utilizáveis ou o ajuste não melhorar nada.
+/// Correlação mínima para confiar no alinhamento RAW ↔ preview.
+const MIN_ALIGNMENT: f32 = 0.85;
+
+/// Estima a matriz que leva `camera` (linear, já orientado) às cores de `preview` (sRGB 8
+/// bits da mesma fotografia). A preview pode ter barras pretas ou outro enquadramento (ex.:
+/// câmaras de cinema): retiram-se as barras e escolhe-se, entre os enquadramentos possíveis,
+/// o que melhor coincide com o RAW. `None` se nenhum coincidir bem, se houver poucos píxeis
+/// utilizáveis ou se o ajuste não melhorar nada.
 pub fn calibrate_from_preview(camera: &Plane, preview: &RgbImage) -> Option<Calibration> {
     if camera.w < 16 || camera.h < 16 {
         return None;
     }
+    let preview = trim_black_borders(preview);
+    let rotated = image::imageops::rotate180(&preview);
+    let mut candidates: Vec<(&'static str, Plane, &RgbImage)> =
+        vec![("inteiro", camera.clone(), &preview)];
+    let (ac, ap) = (
+        camera.w as f32 / camera.h as f32,
+        preview.width() as f32 / preview.height().max(1) as f32,
+    );
+    if (ac / ap - 1.0).abs() > 0.005 {
+        candidates.push(("recortado à proporção da preview", crop_to_aspect(camera, ap), &preview));
+    }
+    let n = candidates.len();
+    for i in 0..n {
+        let (name, plane, _) = &candidates[i];
+        let label = if *name == "inteiro" {
+            "inteiro, preview rodada 180°"
+        } else {
+            "recortado, preview rodada 180°"
+        };
+        candidates.push((label, plane.clone(), &rotated));
+    }
+    let (framing, plane, pv, alignment) = candidates
+        .into_iter()
+        .map(|(f, p, pv)| {
+            let a = luminance_correlation(&p, pv);
+            (f, p, pv, a)
+        })
+        .max_by(|a, b| a.3.total_cmp(&b.3))?;
+    if alignment < MIN_ALIGNMENT {
+        return None;
+    }
+    fit(&plane, pv).map(|c| Calibration { alignment, framing, ..c })
+}
+
+/// Retira margens pretas (barras) da preview.
+fn trim_black_borders(img: &RgbImage) -> RgbImage {
+    let (w, h) = img.dimensions();
+    let dark_row =
+        |y: u32| (0..w).step_by(4).all(|x| img.get_pixel(x, y).0.iter().all(|&c| c < 10));
+    let dark_col =
+        |x: u32| (0..h).step_by(4).all(|y| img.get_pixel(x, y).0.iter().all(|&c| c < 10));
+    let (mut top, mut bottom, mut left, mut right) = (0, h, 0, w);
+    while top < h / 3 && dark_row(top) {
+        top += 1;
+    }
+    while bottom > 2 * h / 3 && dark_row(bottom - 1) {
+        bottom -= 1;
+    }
+    while left < w / 3 && dark_col(left) {
+        left += 1;
+    }
+    while right > 2 * w / 3 && dark_col(right - 1) {
+        right -= 1;
+    }
+    if (top, bottom, left, right) == (0, h, 0, w) {
+        return img.clone();
+    }
+    image::imageops::crop_imm(img, left, top, right - left, bottom - top).to_image()
+}
+
+/// Recorte central do plano para a proporção `aspect` (largura/altura).
+fn crop_to_aspect(p: &Plane, aspect: f32) -> Plane {
+    let (w, h) = (p.w as f32, p.h as f32);
+    let (cw, ch) = if w / h > aspect {
+        ((h * aspect).round() as usize, p.h)
+    } else {
+        (p.w, (w / aspect).round() as usize)
+    };
+    let (x0, y0) = ((p.w - cw.min(p.w)) / 2, (p.h - ch.min(p.h)) / 2);
+    let mut px = Vec::with_capacity(cw * ch);
+    for y in y0..y0 + ch.min(p.h) {
+        px.extend_from_slice(&p.px[y * p.w + x0..y * p.w + x0 + cw.min(p.w)]);
+    }
+    Plane { w: cw.min(p.w), h: ch.min(p.h), px }
+}
+
+/// Correlação de Pearson entre log-luminâncias do plano e da preview, numa grelha pequena.
+fn luminance_correlation(p: &Plane, preview: &RgbImage) -> f32 {
+    const GW: usize = 64;
+    let gh = ((GW as f32 * p.h as f32 / p.w as f32).round() as usize).clamp(8, 128);
+    let pv = image::imageops::resize(
+        preview,
+        GW as u32,
+        gh as u32,
+        image::imageops::FilterType::Triangle,
+    );
+    let lum = |v: [f32; 3]| 0.2627 * v[0] + 0.6780 * v[1] + 0.0593 * v[2];
+    let (mut a, mut b) = (Vec::with_capacity(GW * gh), Vec::with_capacity(GW * gh));
+    for gy in 0..gh {
+        for gx in 0..GW {
+            // Média do bloco correspondente no plano.
+            let (x0, x1) = (gx * p.w / GW, ((gx + 1) * p.w / GW).max(gx * p.w / GW + 1));
+            let (y0, y1) = (gy * p.h / gh, ((gy + 1) * p.h / gh).max(gy * p.h / gh + 1));
+            let (mut s, mut n) = (0f32, 0f32);
+            for y in (y0..y1.min(p.h)).step_by(2) {
+                for x in (x0..x1.min(p.w)).step_by(2) {
+                    s += lum(p.px[y * p.w + x]);
+                    n += 1.0;
+                }
+            }
+            let q = pv.get_pixel(gx as u32, gy as u32).0.map(|c| eotf(c as f32 / 255.0));
+            a.push((s / n.max(1.0) + 1e-4).ln());
+            b.push((lum(q) + 1e-4).ln());
+        }
+    }
+    let n = a.len() as f32;
+    let (ma, mb) = (a.iter().sum::<f32>() / n, b.iter().sum::<f32>() / n);
+    let (mut sab, mut saa, mut sbb) = (0f32, 0f32, 0f32);
+    for (x, y) in a.iter().zip(&b) {
+        sab += (x - ma) * (y - mb);
+        saa += (x - ma) * (x - ma);
+        sbb += (y - mb) * (y - mb);
+    }
+    if saa <= 0.0 || sbb <= 0.0 {
+        return 0.0;
+    }
+    sab / (saa.sqrt() * sbb.sqrt())
+}
+
+/// Ajuste com a preview já no mesmo enquadramento que `camera`.
+fn fit(camera: &Plane, preview: &RgbImage) -> Option<Calibration> {
     let pv = image::imageops::resize(
         preview,
         camera.w as u32,
@@ -118,6 +249,8 @@ pub fn calibrate_from_preview(camera: &Plane, preview: &RgbImage) -> Option<Cali
         samples: pairs.len(),
         error_before: before,
         error_after: after,
+        alignment: 1.0,
+        framing: "",
     })
 }
 
@@ -149,18 +282,23 @@ mod tests {
     fn recovers_the_colors_of_an_unknown_camera() {
         // Cena com cores variadas em Rec. 2020 linear (dentro do sRGB).
         let (w, h) = (160usize, 120usize);
-        let mut truth = Vec::with_capacity(w * h);
+        // Zonas de cor (blocos de 10×10) com luz variada — estrutura como numa fotografia.
         let mut s = 0x9e37_79b9u32;
-        for _ in 0..w * h {
-            let mut rnd = || {
-                s ^= s << 13;
-                s ^= s >> 17;
-                s ^= s << 5;
-                (s % 1000) as f32 / 1000.0
-            };
-            let srgb = [0.05 + 0.6 * rnd(), 0.05 + 0.6 * rnd(), 0.05 + 0.6 * rnd()];
-            truth.push(mul3(&SRGB_TO_REC2020, srgb));
-        }
+        let mut rnd = || {
+            s ^= s << 13;
+            s ^= s >> 17;
+            s ^= s << 5;
+            (s % 1000) as f32 / 1000.0
+        };
+        let blocks: Vec<[f32; 3]> = (0..(w / 10) * (h / 10))
+            .map(|_| {
+                let l = 0.15 + 0.7 * rnd();
+                [l * (0.3 + 0.7 * rnd()), l * (0.3 + 0.7 * rnd()), l * (0.3 + 0.7 * rnd())]
+            })
+            .collect();
+        let truth: Vec<[f32; 3]> = (0..w * h)
+            .map(|i| mul3(&SRGB_TO_REC2020, blocks[(i / w / 10) * (w / 10) + (i % w) / 10]))
+            .collect();
         // Câmara desconhecida: mistura os canais E sem balanço de brancos (verde do sensor
         // ~2× mais forte, azul fraco — como os dados que a LibRaw dá sem perfil).
         let cam_from_truth = [[0.40, 0.15, 0.03], [0.30, 1.45, 0.20], [0.03, 0.18, 0.45]];
