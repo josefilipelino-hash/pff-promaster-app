@@ -41,7 +41,8 @@ async function check(name) {
   current = name;
   await page.waitForTimeout(600);
   await page.screenshot({ path: path.join(out, `${name}.png`) });
-  const found = await page.evaluate(({ W, H }) => {
+  const found = await page.evaluate(() => {
+    const [W, H] = [window.innerWidth, window.innerHeight];
     const res = [];
     const visible = (el) => {
       const r = el.getBoundingClientRect();
@@ -79,7 +80,7 @@ async function check(name) {
     // Página com deslocamento horizontal.
     if (document.documentElement.scrollWidth > W + 1) res.push({ kind: "página mais larga que a janela", detail: `${document.documentElement.scrollWidth}px` });
     return res;
-  }, { W, H });
+  });
   // Uma entrada por tipo+detalhe (as grelhas repetem o mesmo problema).
   const seen = new Set();
   for (const f of found) {
@@ -120,6 +121,43 @@ await page.evaluate(() => window.__store.getState().openViewer(null));
 await page.evaluate(() => window.__store.getState().setExportDialog(true));
 await check("10-exportar");
 await page.evaluate(() => window.__store.getState().setExportDialog(false));
+// Diálogos e vistas secundárias (cada um aberto e fechado pela store).
+const dialogs = [
+  ["11-ajuda", "setHelpOpen"],
+  ["12-relogios", "setClockOpen"],
+  ["13-auto", "setAutoDialog"],
+  ["14-presets", "setPresetDialog"],
+  ["15-galeria", "setGalleryDialog"],
+  ["16-seguranca", "setSafetyDialog"],
+];
+for (const [name, fn] of dialogs) {
+  await store(fn, true);
+  await check(name);
+  await store(fn, false);
+  await page.keyboard.press("Escape").catch(() => {});
+}
+await page.evaluate(() => window.__store.getState().setSelection({ ids: new Set([1, 2, 3]), focus: 1, anchor: 1 }));
+await page.evaluate(() => window.__store.getState().openCompare([1, 2, 3]));
+await check("17-comparar");
+await page.evaluate(() => window.__store.getState().openCompare(null));
+// Menu "mais" da barra e menu de contexto de uma fotografia.
+await page.locator('[data-id="2"]').first().click({ button: "right" }).catch(() => {});
+await check("18-menu-fotografia");
+await page.keyboard.press("Escape");
+// Ecrã inicial com o diálogo de projeto novo.
+await page.evaluate(() => window.__store.getState().setProject(null));
+await page.waitForTimeout(400);
+await page.getByRole("button", { name: /Novo projeto/ }).first().click().catch(() => {});
+await check("19-novo-projeto");
+// Janela mais pequena (portátil 1366×768).
+await page.keyboard.press("Escape");
+await page.setViewportSize({ width: 1366, height: 768 });
+await page.evaluate(() => window.__openProject());
+await page.waitForTimeout(600);
+await check("20-grelha-1366");
+await page.evaluate(() => window.__store.getState().setSelection({ ids: new Set([1]), focus: 1, anchor: 1 }));
+await store("setView", "develop");
+await check("21-editor-1366");
 
 fs.writeFileSync(path.join(out, "problemas.json"), JSON.stringify(problems, null, 1));
 const byScreen = problems.reduce((a, p) => ((a[p.screen] = (a[p.screen] ?? 0) + 1), a), {});

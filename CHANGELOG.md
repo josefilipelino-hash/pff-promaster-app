@@ -5,6 +5,26 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [1.2.1-personal] — 2026-11-12
+
+### Corrigido
+- **"Luz semelhante" e Pessoas:** as miniaturas apareciam reduzidas a tiras finas (as linhas
+  da grelha eram comprimidas para caber na altura da janela). Encontrado e confirmado num
+  browser Chromium, o mesmo motor do WebView2 do Windows.
+
+### Novo
+- **Editor reorganizado:** separadores Ajustes / Locais / Geometria e ótica, com histograma e
+  separadores sempre visíveis; secção **Básico** (balanço de brancos, tom e presença, como no
+  Lightroom); um controlo por linha (nome | deslizador | valor); ponto de cor nas secções com
+  ajustes; a disposição fica guardada. Presets no painel da esquerda.
+- **Zoom no editor:** Z ou duplo clique (ajustar ↔ 100 %), roda do rato no cursor (25–400 %),
+  arrastar para deslocar, Ctrl+0 / Ctrl+1 e seletor na barra. Só a zona visível é revelada,
+  a partir do original em resolução total (em cache para a fotografia aberta), e o zoom
+  mantém-se ao mudar de fotografia — para comparar a focagem numa rajada.
+- **Auditoria visual automática** (`apps/desktop/audit`): a interface real num Chromium
+  percorre 21 ecrãs e diálogos (1920×1000 e 1366×768) e verifica imagens esmagadas, texto
+  cortado, elementos fora do ecrã e erros na consola.
+
 ## [1.2.0-personal] — 2026-11-12
 
 ### Novo

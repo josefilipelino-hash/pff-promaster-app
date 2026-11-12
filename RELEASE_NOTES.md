@@ -1,3 +1,11 @@
+# PFF ProMaster 1.2.1-personal
+
+**Correção:** miniaturas esmagadas em "Luz semelhante" e Pessoas. **Editor reorganizado**
+(separadores, secção Básico, controlos numa linha) e **zoom rápido** (Z, duplo clique, roda
+do rato, arrastar). Ver `CHANGELOG.md`.
+
+---
+
 # PFF ProMaster 1.2.0-personal
 
 **Edição a sério de RAW:** copiar/colar a edição para várias fotografias; perspetiva
