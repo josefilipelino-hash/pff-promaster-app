@@ -60,13 +60,68 @@ impl Denoiser {
         sigma: f32,
         progress: &(dyn Fn(usize, usize) -> bool + Sync),
     ) -> CoreResult<bool> {
+        let map = vec![sigma.clamp(0.0, 75.0 / 255.0); w * h];
+        self.denoise_map(px, w, h, &map, progress)
+    }
+
+    /// Redução de ruído por sub-imagens intercaladas (*pixel-shuffle down-sampling*, Zhou et al.,
+    /// "When AWGN-based denoiser meets real noises", AAAI 2020): os píxeis a 2 de distância têm
+    /// ruído quase independente, que é o que a rede conhece. As quatro sub-imagens (x, y pares
+    /// e ímpares) são tratadas em separado e intercaladas de novo.
+    pub fn denoise_map_shuffled(
+        &self,
+        px: &mut [[f32; 3]],
+        w: usize,
+        h: usize,
+        sigma_map: &[f32],
+        progress: &(dyn Fn(usize, usize) -> bool + Sync),
+    ) -> CoreResult<bool> {
+        if w < 16 || h < 16 {
+            return self.denoise_map(px, w, h, sigma_map, progress);
+        }
+        for (k, (ox, oy)) in [(0, 0), (1, 0), (0, 1), (1, 1)].into_iter().enumerate() {
+            let (sw, sh) = ((w - ox).div_ceil(2), (h - oy).div_ceil(2));
+            let mut sub = Vec::with_capacity(sw * sh);
+            let mut sm = Vec::with_capacity(sw * sh);
+            for y in 0..sh {
+                for x in 0..sw {
+                    let i = (oy + 2 * y) * w + ox + 2 * x;
+                    sub.push(px[i]);
+                    sm.push(sigma_map[i]);
+                }
+            }
+            let part = |d: usize, t: usize| progress(k * t + d, 4 * t);
+            if !self.denoise_map(&mut sub, sw, sh, &sm, &part)? {
+                return Ok(false);
+            }
+            for y in 0..sh {
+                for x in 0..sw {
+                    px[(oy + 2 * y) * w + ox + 2 * x] = sub[y * sw + x];
+                }
+            }
+        }
+        Ok(true)
+    }
+
+    /// Como `denoise`, com o nível de ruído por píxel (`sigma_map`, `w`×`h`, escala 0–1): o
+    /// ruído real depende do sinal (muito mais forte nas sombras depois da curva sRGB).
+    pub fn denoise_map(
+        &self,
+        px: &mut [[f32; 3]],
+        w: usize,
+        h: usize,
+        sigma_map: &[f32],
+        progress: &(dyn Fn(usize, usize) -> bool + Sync),
+    ) -> CoreResult<bool> {
+        if sigma_map.len() != w * h {
+            return Err(CoreError::Other("AI Denoise: mapa de ruído com outro tamanho".into()));
+        }
         let step = TILE - 2 * OVERLAP;
         let (nx, ny) = (w.div_ceil(step), h.div_ceil(step));
         let total = nx * ny;
         let done = std::sync::atomic::AtomicUsize::new(0);
         let cancelled = std::sync::atomic::AtomicBool::new(false);
         let src: &[[f32; 3]] = px;
-        let sigma = sigma.clamp(0.0, 75.0 / 255.0);
         // Cada mosaico produz o seu núcleo (sem a sobreposição) — sem costuras.
         let tiles: Vec<CoreResult<Option<TileCore>>> = (0..total)
             .into_par_iter()
@@ -83,7 +138,7 @@ impl Denoiser {
                     h,
                     x0 as isize - OVERLAP as isize,
                     y0 as isize - OVERLAP as isize,
-                    sigma,
+                    sigma_map,
                 )?;
                 let mut core = Vec::with_capacity(cw * ch);
                 for y in 0..ch {
@@ -119,7 +174,7 @@ impl Denoiser {
         h: usize,
         x0: isize,
         y0: isize,
-        sigma: f32,
+        sigma_map: &[f32],
     ) -> CoreResult<Vec<[f32; 3]>> {
         let half = TILE / 2;
         let reflect = |v: isize, n: usize| -> usize {
@@ -140,11 +195,15 @@ impl Denoiser {
         };
         // Pixel unshuffle (ordem do KAIR): canal = c·4 + i·2 + j.
         let mut x = vec![0f32; 12 * half * half];
+        // Mapa do nível de ruído a meia resolução (média de cada 2×2).
+        let mut sig = vec![0f32; half * half];
         for yy in 0..TILE {
             let sy = reflect(y0 + yy as isize, h);
             for xx in 0..TILE {
                 let sx = reflect(x0 + xx as isize, w);
                 let p = src[sy * w + sx];
+                sig[(yy / 2) * half + xx / 2] +=
+                    sigma_map[sy * w + sx].clamp(0.0, 75.0 / 255.0) * 0.25;
                 let (i, j) = (yy % 2, xx % 2);
                 for (c, v) in p.iter().enumerate() {
                     x[((c * 4 + i * 2 + j) * half + yy / 2) * half + xx / 2] = v.clamp(0.0, 1.0);
@@ -153,7 +212,7 @@ impl Denoiser {
         }
         let err = |e: TractError| CoreError::Other(format!("AI Denoise: {e:#}"));
         let xt = Tensor::from_shape(&[1, 12, half, half], &x).map_err(err)?;
-        let st = Tensor::from_shape(&[1, 1, half, half], &vec![sigma; half * half]).map_err(err)?;
+        let st = Tensor::from_shape(&[1, 1, half, half], &sig).map_err(err)?;
         let out = self.plan.run(tvec!(xt.into(), st.into())).map_err(err)?;
         let y = out[0].to_plain_array_view::<f32>().map_err(err)?;
         let y = y.as_slice().ok_or_else(|| CoreError::Other("AI Denoise: saída".into()))?;

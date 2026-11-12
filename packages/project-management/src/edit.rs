@@ -224,11 +224,32 @@ pub fn ai_denoised(
     progress: &(dyn Fn(usize, usize) -> bool + Sync),
 ) -> CoreResult<Option<Source>> {
     let p = &src.levels[0];
-    let (lum, chroma) = develop::auto::measure_noise(src, 1.0);
-    let measured = lum.max(chroma * 0.5).max(1.0) / 255.0;
-    let sigma = (measured * (strength.clamp(1.0, 100.0) / 50.0)).clamp(1.0 / 255.0, 50.0 / 255.0);
     let mut disp: Vec<[f32; 3]> = p.px.iter().map(|q| q.map(|c| oetf(c.clamp(0.0, 1.0)))).collect();
-    if !dn.denoise(&mut disp, p.w, p.h, sigma, progress)? {
+    // Modelo de ruído do sensor estimado na fotografia → nível por píxel (mais forte nas
+    // sombras) e, se o ruído for correlacionado (grão da desmatrização), rede aplicada às
+    // sub-imagens intercaladas. Ganho medido em `tests/denoise_quality.rs`.
+    let done = match develop::noise::denoise_plan(p, strength) {
+        Some(plan) => {
+            tracing::info!(
+                correlacionado = plan.shuffled,
+                ruido_18 = plan.model.sigma(1, 0.18),
+                "AI Denoise: modelo de ruído estimado"
+            );
+            if plan.shuffled {
+                dn.denoise_map_shuffled(&mut disp, p.w, p.h, &plan.map, progress)?
+            } else {
+                dn.denoise_map(&mut disp, p.w, p.h, &plan.map, progress)?
+            }
+        }
+        None => {
+            let (lum, chroma) = develop::auto::measure_noise(src, 1.0);
+            let measured = lum.max(chroma * 0.5).max(1.0) / 255.0;
+            let sigma =
+                (measured * (strength.clamp(1.0, 100.0) / 50.0)).clamp(1.0 / 255.0, 50.0 / 255.0);
+            dn.denoise(&mut disp, p.w, p.h, sigma, progress)?
+        }
+    };
+    if !done {
         return Ok(None);
     }
     let px =

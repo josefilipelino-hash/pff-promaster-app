@@ -6,7 +6,7 @@
 /// Versão do motor de revelação. Entra na chave das edições em cache: quando o motor muda
 /// (ex.: auditoria final — realces/sombras locais e perfis ICC de entrada), as imagens
 /// guardadas com a versão anterior deixam de ser usadas e são geradas de novo.
-pub const PIPELINE_VERSION: u32 = 8;
+pub const PIPELINE_VERSION: u32 = 9;
 
 pub mod auto;
 pub mod calibrate;
@@ -17,6 +17,7 @@ pub mod filters;
 pub mod geometry;
 pub mod local;
 pub mod lut;
+pub mod noise;
 pub mod portrait;
 pub mod render;
 pub mod settings;
