@@ -526,3 +526,64 @@ fn upright_on_real_raws() {
     // As amostras públicas têm poucas fotografias com arquitetura (2: Olympus E-M10, Nikon D70).
     assert!(checked >= 2, "poucas fotografias com linhas: {checked}");
 }
+
+/// Perfis de objetiva (Lensfun) nos RAW reais (`MOMENTO_SAMPLES_DIR`): lista o que é
+/// identificado; onde há perfil com distorção, corrigir não pode criar cantos vazios.
+#[test]
+fn lens_profiles_on_real_raws() {
+    use momento_image_processing::develop::{geometry::GeoMap, Geometry, Lens};
+    use momento_project_management::lensprofile::{profile_for, ProfileQuery};
+    let Some(dir) = std::env::var("MOMENTO_SAMPLES_DIR").ok().map(PathBuf::from) else {
+        eprintln!("SALTADO: MOMENTO_SAMPLES_DIR não definido");
+        return;
+    };
+    let mut found = 0;
+    for p in std::fs::read_dir(&dir).unwrap().flatten().map(|e| e.path()) {
+        let Ok(data) = std::fs::read(&p) else { continue };
+        let Ok(raw) = momento_raw_engine::RawFile::open(&data) else { continue };
+        let i = raw.info().clone();
+        let q = ProfileQuery {
+            camera_make: i.make.clone(),
+            camera_model: i.model.clone(),
+            lens: i.lens.clone().unwrap_or_default(),
+            focal: i.focal_length.map(|f| f as f32),
+            focal35: i.focal_length_35mm.map(|f| f as f32),
+            aperture: i.aperture.map(|a| a as f32),
+        };
+        let prof = profile_for(&q);
+        eprintln!(
+            "{:<34} {:<22} {:<38} {:>5.1}mm f{:<4.1} → {}",
+            p.file_name().unwrap().to_string_lossy(),
+            format!("{} {}", i.make, i.model).chars().take(22).collect::<String>(),
+            q.lens.chars().take(38).collect::<String>(),
+            q.focal.unwrap_or(0.0),
+            q.aperture.unwrap_or(0.0),
+            prof.as_ref().map_or("—".into(), |p| format!(
+                "{} (dist {} {:?}, tca {}, vinheta {:?})",
+                p.name, p.dist_model, p.dist, p.tca_model, p.vig
+            ))
+        );
+        if let Some(prof) = prof {
+            found += 1;
+            let lens = Lens { profile: prof, ..Default::default() };
+            let m = GeoMap::new(
+                i.width as usize,
+                i.height as usize,
+                &Geometry::default(),
+                &lens,
+                false,
+            );
+            for k in 0..=20 {
+                let t = k as f32 / 20.0;
+                for (u, v) in [(t, 0.0), (t, 1.0), (0.0, t), (1.0, t)] {
+                    let q = m.map(u, v).0[1];
+                    assert!(
+                        (-2e-3..=1.002).contains(&q.0) && (-2e-3..=1.002).contains(&q.1),
+                        "{p:?}: canto vazio em ({u},{v}) → {q:?}"
+                    );
+                }
+            }
+        }
+    }
+    eprintln!("{found} RAW com perfil");
+}

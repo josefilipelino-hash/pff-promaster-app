@@ -21,6 +21,7 @@ pub mod edit;
 pub mod export;
 pub mod export_store;
 pub mod gallery;
+pub mod lensprofile;
 pub mod lightroom;
 pub mod local_edit;
 pub mod organize;

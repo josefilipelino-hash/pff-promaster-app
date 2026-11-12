@@ -28,6 +28,9 @@ pub struct GeoMap {
     k_dist: f32,
     ca_r: f32,
     ca_b: f32,
+    /// Perfil da objetiva (distorção/TCA) e escala que o mantém sem cantos vazios.
+    profile: Option<super::settings::LensProfile>,
+    profile_fit: f32,
     /// Ignora o recorte (modo de recorte na interface mostra a imagem toda).
     pub uncropped: bool,
     /// 1 / (meia-diagonal)² — constante, calculada uma vez (antes: `sqrt` por píxel).
@@ -254,6 +257,11 @@ impl GeoMap {
         let scale = if g.scale > 0.0 { g.scale.clamp(100.0, 400.0) / 100.0 } else { 1.0 };
         let zoom = persp.min_zoom(canvas_w, canvas_h) * scale;
         let c = &g.crop;
+        let profile = (lens.profile.enabled
+            && (lens.profile.dist_model != 0 || lens.profile.tca_model != 0))
+            .then(|| lens.profile.clone());
+        let inv_hd2 = 4.0 / (src_aspect * src_aspect + 1.0);
+        let profile_fit = profile.as_ref().map_or(1.0, |p| profile_fit(p, src_aspect, inv_hd2));
         GeoMap {
             src_aspect,
             canvas_w,
@@ -272,7 +280,9 @@ impl GeoMap {
             ca_r: lens.ca_red / 100.0 * 0.004,
             ca_b: lens.ca_blue / 100.0 * 0.004,
             uncropped,
-            inv_hd2: 4.0 / (src_aspect * src_aspect + 1.0),
+            inv_hd2,
+            profile,
+            profile_fit,
         }
     }
 
@@ -298,14 +308,26 @@ impl GeoMap {
         if self.flip {
             ox = -ox;
         }
-        // Distorção da objetiva (raio normalizado pela meia-diagonal).
+        // Perfil da objetiva: distorção medida (com a escala que evita cantos vazios).
+        let (mut tr, mut tb) = (1.0, 1.0);
+        if let Some(p) = &self.profile {
+            ox *= self.profile_fit;
+            oy *= self.profile_fit;
+            let r = ((ox * ox + oy * oy) * self.inv_hd2).sqrt();
+            let k = p.distortion_factor(r);
+            ox *= k;
+            oy *= k;
+            (tr, tb) = p.tca_factors(r * k);
+        }
+        // Distorção manual (raio normalizado pela meia-diagonal).
         let r2 = (ox * ox + oy * oy) * self.inv_hd2;
         let k = 1.0 + self.k_dist * r2;
         ox *= k;
         oy *= k;
         let to_uv = |s: f32| (ox * s / self.src_aspect + 0.5, oy * s + 0.5);
         let g = to_uv(1.0);
-        ([to_uv(1.0 + self.ca_r * r2), g, to_uv(1.0 + self.ca_b * r2)], r2.sqrt())
+        let rd = ((ox * ox + oy * oy) * self.inv_hd2).sqrt();
+        ([to_uv(tr * (1.0 + self.ca_r * r2)), g, to_uv(tb * (1.0 + self.ca_b * r2))], rd)
     }
 
     /// Ponto do enquadramento sem recorte (0–1) → ponto do plano antes da perspetiva
@@ -315,6 +337,50 @@ impl GeoMap {
             self.persp.apply((u - 0.5) * self.canvas_w, (v - 0.5) * self.canvas_h, self.zoom);
         (x / self.canvas_w + 0.5, y / self.canvas_h + 0.5)
     }
+}
+
+/// Maior escala (≤ 1,5) com toda a imagem corrigida pelo perfil dentro da fotografia: sem
+/// cantos vazios depois de corrigir a distorção (como o "ajustar" do Lightroom/Lensfun).
+fn profile_fit(p: &super::settings::LensProfile, aspect: f32, inv_hd2: f32) -> f32 {
+    if p.dist_model == 0 || p.distortion == 0.0 {
+        return 1.0;
+    }
+    let (hw, hh) = (aspect * 0.5, 0.5);
+    const N: usize = 32;
+    let border: Vec<(f32, f32)> = (0..=N)
+        .flat_map(|i| {
+            let t = i as f32 / N as f32;
+            [
+                ((t - 0.5) * 2.0 * hw, -hh),
+                ((t - 0.5) * 2.0 * hw, hh),
+                (-hw, (t - 0.5) * 2.0 * hh),
+                (hw, (t - 0.5) * 2.0 * hh),
+            ]
+        })
+        .collect();
+    let inside = |f: f32| {
+        border.iter().all(|&(x, y)| {
+            let (x, y) = (x * f, y * f);
+            let k = p.distortion_factor(((x * x + y * y) * inv_hd2).sqrt());
+            (x * k).abs() <= hw * 1.0005 && (y * k).abs() <= hh * 1.0005
+        })
+    };
+    let (mut lo, mut hi) = (0.5f32, 1.5f32);
+    if inside(hi) {
+        return hi;
+    }
+    if !inside(lo) {
+        return lo;
+    }
+    for _ in 0..30 {
+        let m = 0.5 * (lo + hi);
+        if inside(m) {
+            lo = m
+        } else {
+            hi = m
+        }
+    }
+    lo
 }
 
 /// Proporção (largura/altura) de um formato "L:A" (aceita decimais: "1.91:1", "1:1.414").

@@ -235,6 +235,10 @@ impl<'a> Prep<'a> {
                 {
                     p = self.retouch(src, &pts, p);
                 }
+                if self.s.lens.profile.enabled {
+                    let k = self.s.lens.profile.vignetting_gain(r);
+                    p = [p[0] * k, p[1] * k, p[2] * k];
+                }
                 let lv = self.s.lens.vignetting;
                 if lv != 0.0 {
                     let m = 0.5 + (50.0 - self.s.lens.vignetting_midpoint) / 100.0;

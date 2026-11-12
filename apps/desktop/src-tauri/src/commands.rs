@@ -522,6 +522,24 @@ pub async fn auto_straighten(
 }
 
 #[tauri::command]
+pub async fn lens_profile(
+    state: State<'_, AppState>,
+    key: i64,
+) -> CmdResult<Option<momento_project_management::LensProfile>> {
+    state.session().and_then(|s| s.lens_profile(key)).map_err(err)
+}
+
+#[tauri::command]
+pub async fn apply_lens_profiles(
+    state: State<'_, AppState>,
+    keys: Vec<i64>,
+    enable: bool,
+    template: momento_project_management::LensProfile,
+) -> CmdResult<(usize, usize)> {
+    state.session().and_then(|s| s.apply_lens_profiles(&keys, enable, &template)).map_err(err)
+}
+
+#[tauri::command]
 pub async fn apply_aspect(
     state: State<'_, AppState>,
     keys: Vec<i64>,

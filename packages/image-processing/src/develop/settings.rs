@@ -222,7 +222,98 @@ impl Default for Geometry {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+/// Perfil de objetiva (base de dados Lensfun) já resolvido para esta fotografia: os
+/// coeficientes interpolados para a focal e a abertura ficam na receita (render determinístico,
+/// sem consultar a base de dados).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct LensProfile {
+    pub enabled: bool,
+    /// Objetiva (e câmara) do perfil, para mostrar.
+    pub name: String,
+    /// Intensidade da correção da distorção e da vinheta, % (100 = perfil; 0–200).
+    pub distortion: f32,
+    pub vignetting: f32,
+    /// Corrigir a aberração cromática lateral (TCA) do perfil.
+    pub chromatic: bool,
+    /// Modelo de distorção: 0 nenhum, 1 poly3 (k1), 2 poly5 (k1, k2), 3 ptlens (a, b, c).
+    pub dist_model: u8,
+    pub dist: [f32; 3],
+    /// Raio na unidade da calibração (Hugin) por unidade de meia-diagonal desta imagem.
+    pub dist_scale: f32,
+    /// TCA: 0 nenhum, 1 poly3 [vr, vb, cr, cb, br, bb], 2 linear [kr, kb].
+    pub tca_model: u8,
+    pub tca: [f32; 6],
+    /// Vinheta "pa": [k1, k2, k3] e escala do raio (meia-diagonal da calibração).
+    pub vig: [f32; 3],
+    pub vig_scale: f32,
+}
+
+impl Default for LensProfile {
+    fn default() -> Self {
+        LensProfile {
+            enabled: false,
+            name: String::new(),
+            distortion: 100.0,
+            vignetting: 100.0,
+            chromatic: true,
+            dist_model: 0,
+            dist: [0.0; 3],
+            dist_scale: 1.0,
+            tca_model: 0,
+            tca: [1.0, 1.0, 0.0, 0.0, 0.0, 0.0],
+            vig: [0.0; 3],
+            vig_scale: 1.0,
+        }
+    }
+}
+
+impl LensProfile {
+    /// Fator radial da distorção (raio da fonte / raio corrigido) no raio `r` (meia-diagonal = 1).
+    #[inline]
+    pub fn distortion_factor(&self, r: f32) -> f32 {
+        if !self.enabled || self.dist_model == 0 || self.distortion == 0.0 {
+            return 1.0;
+        }
+        let h = r * self.dist_scale;
+        let [a, b, c] = self.dist;
+        let p = match self.dist_model {
+            1 => 1.0 - a + a * h * h,
+            2 => 1.0 + a * h * h + b * h.powi(4),
+            3 => a * h.powi(3) + b * h * h + c * h + (1.0 - a - b - c),
+            _ => 1.0,
+        };
+        1.0 + (p - 1.0) * self.distortion.clamp(0.0, 200.0) / 100.0
+    }
+
+    /// Fatores radiais do vermelho e do azul em relação ao verde (TCA), no raio `r`.
+    #[inline]
+    pub fn tca_factors(&self, r: f32) -> (f32, f32) {
+        if !self.enabled || !self.chromatic || self.tca_model == 0 {
+            return (1.0, 1.0);
+        }
+        let [vr, vb, cr, cb, br, bb] = self.tca;
+        if self.tca_model == 2 {
+            return (vr, vb);
+        }
+        let h = r * self.dist_scale;
+        (br * h * h + cr * h + vr, bb * h * h + cb * h + vb)
+    }
+
+    /// Ganho que corrige a vinheta no raio `r` (meia-diagonal desta imagem = 1).
+    #[inline]
+    pub fn vignetting_gain(&self, r: f32) -> f32 {
+        if !self.enabled || self.vignetting == 0.0 || self.vig == [0.0; 3] {
+            return 1.0;
+        }
+        let r2 = (r * self.vig_scale).powi(2);
+        let [k1, k2, k3] = self.vig;
+        let c = (1.0 + k1 * r2 + k2 * r2 * r2 + k3 * r2 * r2 * r2).max(0.05);
+        c.powf(-self.vignetting.clamp(0.0, 200.0) / 100.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Lens {
     /// Distorção, −100…+100 (positivo corrige barril).
@@ -233,6 +324,8 @@ pub struct Lens {
     /// Correção da vinheta da objetiva, −100…+100 (positivo clareia os cantos).
     pub vignetting: f32,
     pub vignetting_midpoint: f32,
+    /// Correções do perfil da objetiva (aplicadas antes das manuais).
+    pub profile: LensProfile,
 }
 
 impl Default for Lens {
@@ -243,6 +336,7 @@ impl Default for Lens {
             ca_blue: 0.0,
             vignetting: 0.0,
             vignetting_midpoint: 50.0,
+            profile: LensProfile::default(),
         }
     }
 }

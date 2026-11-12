@@ -428,7 +428,7 @@ export interface DevelopSettings {
     upright: string;
     guides: [number, number, number, number][];
   };
-  lens: { distortion: number; caRed: number; caBlue: number; vignetting: number; vignettingMidpoint: number };
+  lens: { distortion: number; caRed: number; caBlue: number; vignetting: number; vignettingMidpoint: number; profile: LensProfile };
   retouch: {
     redEyes: { x: number; y: number; r: number }[];
     spots: Spot[];
@@ -1065,3 +1065,19 @@ export interface UprightOutcome {
 }
 
 export const UPRIGHT_MODES = ["auto", "level", "vertical", "full"] as const;
+
+/** Perfil de objetiva (Lensfun) resolvido para uma fotografia. */
+export interface LensProfile {
+  enabled: boolean;
+  name: string;
+  distortion: number;
+  vignetting: number;
+  chromatic: boolean;
+  distModel: number;
+  dist: [number, number, number];
+  distScale: number;
+  tcaModel: number;
+  tca: [number, number, number, number, number, number];
+  vig: [number, number, number];
+  vigScale: number;
+}

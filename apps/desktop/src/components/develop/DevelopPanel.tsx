@@ -110,8 +110,11 @@ export function DevelopPanel({
   retouch,
   ai,
   asShotKelvin,
+  lensProfile,
 }: {
   settings: DevelopSettings;
+  /** Correções do perfil da objetiva (Lensfun), no topo da secção Objetiva. */
+  lensProfile?: React.ReactNode;
   /** RAW: temperatura do balanço da câmara (K) — a temperatura é mostrada em Kelvin. */
   asShotKelvin?: number | null;
   set: SetField;
@@ -325,6 +328,7 @@ export function DevelopPanel({
         {geometry}
       </Section>
       <Section id="lens" open={!!open.lens} toggle={() => toggle("lens")} onReset={resetBlock("lens", sectionFields("lens"))}>
+        {lensProfile}
         {sectionFields("lens").map(fieldSlider)}
       </Section>
       {retouch && (

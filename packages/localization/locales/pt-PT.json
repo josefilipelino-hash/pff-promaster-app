@@ -657,7 +657,9 @@
         "caRed": "Aberração vermelho/ciano",
         "caBlue": "Aberração azul/amarelo",
         "vignetting": "Vinheta da objetiva",
-        "vignettingMidpoint": "Ponto médio"
+        "vignettingMidpoint": "Ponto médio",
+        "profileDistortion": "Distorção (perfil)",
+        "profileVignetting": "Vinheta (perfil)"
       },
       "curve": {
         "highlights": "Realces",
@@ -851,7 +853,18 @@
     "aspectToSelection_other": "Aplicar formato às {{count}} selecionadas",
     "aspectToSelectionHint": "Cada fotografia recebe o seu recorte, centrado nos rostos (olhos no terço superior) ou na composição atual.",
     "aspectApplied_one": "Formato aplicado a {{count}} fotografia.",
-    "aspectApplied_other": "Formato aplicado a {{count}} fotografias."
+    "aspectApplied_other": "Formato aplicado a {{count}} fotografias.",
+    "lensProfileEnable": "Ativar correções de perfil",
+    "lensProfileName": "Perfil",
+    "lensProfileChromatic": "Remover aberração cromática",
+    "lensProfileNone": "A objetiva desta fotografia não está na base de dados de perfis (Lensfun), ou o ficheiro não indica a objetiva.",
+    "lensProfileToSelection_one": "Aplicar perfil a {{count}} fotografia",
+    "lensProfileToSelection_other": "Aplicar perfil às {{count}} selecionadas",
+    "lensProfileOffSelection_one": "Desativar perfil em {{count}} fotografia",
+    "lensProfileOffSelection_other": "Desativar perfil nas {{count}} selecionadas",
+    "lensProfileApplied_one": "Perfil atualizado em {{count}} fotografia ({{missing}} sem perfil disponível).",
+    "lensProfileApplied_other": "Perfil atualizado em {{count}} fotografias ({{missing}} sem perfil disponível).",
+    "lensProfileSource": "Perfis: base de dados Lensfun (CC BY-SA 3.0)."
   },
   "auto": {
     "intensity": "Intensidade",

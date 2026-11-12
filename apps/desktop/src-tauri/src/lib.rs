@@ -194,6 +194,8 @@ pub fn run() {
             commands::auto_straighten,
             commands::upright,
             commands::apply_aspect,
+            commands::lens_profile,
+            commands::apply_lens_profiles,
             commands::auto_edit_photo,
             commands::start_auto_edit,
             commands::auto_edit_status,

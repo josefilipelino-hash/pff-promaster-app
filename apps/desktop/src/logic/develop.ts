@@ -1,4 +1,4 @@
-import type { AutoOptions, DevelopSettings, LocalAdjust, LocalMask, MatchOptions, Preset } from "../types";
+import type { AutoOptions, DevelopSettings, LensProfile, LocalAdjust, LocalMask, MatchOptions, Preset } from "../types";
 
 /** Ajustes neutros (iguais aos do núcleo: uma receita vazia reproduz o original). */
 export function defaultSettings(): DevelopSettings {
@@ -11,7 +11,7 @@ export function defaultSettings(): DevelopSettings {
     detail: { sharpenAmount: 0, sharpenRadius: 1, sharpenDetail: 25, sharpenMasking: 0, noiseLuminance: 0, noiseColor: 0, noiseDetail: 50, aiDenoise: 0 },
     effects: { texture: 0, clarity: 0, dehaze: 0, vignette: 0, vignetteMidpoint: 50, vignetteFeather: 50, vignetteRoundness: 0, grain: 0, grainSize: 25, grainRoughness: 50 },
     geometry: { crop: { x: 0, y: 0, w: 1, h: 1 }, quarterTurns: 0, flipHorizontal: false, straighten: 0, aspect: "original", vertical: 0, horizontal: 0, aspectAdjust: 0, scale: 100, offsetX: 0, offsetY: 0, focal35: 0, upright: "", guides: [] },
-    lens: { distortion: 0, caRed: 0, caBlue: 0, vignetting: 0, vignettingMidpoint: 50 },
+    lens: { distortion: 0, caRed: 0, caBlue: 0, vignetting: 0, vignettingMidpoint: 50, profile: defaultLensProfile() },
     retouch: { redEyes: [], spots: [], patches: [] },
     grading: { shadowsHue: 220, shadowsSat: 0, highlightsHue: 45, highlightsSat: 0, balance: 0 },
     bw: { enabled: false, mix: Array(8).fill(0) },
@@ -175,4 +175,8 @@ export function longDist(a: [number, number], b: [number, number], ru: number, r
 export function unitScale(width: number, height: number): [number, number] {
   const l = Math.max(width, height, 1);
   return [width / l, height / l];
+}
+
+export function defaultLensProfile(): LensProfile {
+  return { enabled: false, name: "", distortion: 100, vignetting: 100, chromatic: true, distModel: 0, dist: [0, 0, 0], distScale: 1, tcaModel: 0, tca: [1, 1, 0, 0, 0, 0], vig: [0, 0, 0], vigScale: 1 };
 }

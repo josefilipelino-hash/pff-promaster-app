@@ -6,7 +6,7 @@
 /// Versão do motor de revelação. Entra na chave das edições em cache: quando o motor muda
 /// (ex.: auditoria final — realces/sombras locais e perfis ICC de entrada), as imagens
 /// guardadas com a versão anterior deixam de ser usadas e são geradas de novo.
-pub const PIPELINE_VERSION: u32 = 7;
+pub const PIPELINE_VERSION: u32 = 8;
 
 pub mod auto;
 pub mod calibrate;
@@ -53,7 +53,7 @@ pub fn auto_straighten(src: &Source, s: &Settings) -> Option<f32> {
             flip_horizontal: s.geometry.flip_horizontal,
             ..Default::default()
         },
-        lens: s.lens,
+        lens: s.lens.clone(),
         ..Default::default()
     };
     let img = render_rgb(src, &base, 1024, Quality::Fast);
@@ -76,7 +76,7 @@ pub fn upright(
             flip_horizontal: s.geometry.flip_horizontal,
             ..Default::default()
         },
-        lens: s.lens,
+        lens: s.lens.clone(),
         ..Default::default()
     };
     let img = render_rgb(src, &base, 1280, Quality::Fast);

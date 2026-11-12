@@ -129,6 +129,8 @@ const apiMock = {
   createVirtualCopy: vi.fn(async () => 2 ** 40 + 77),
   deleteVirtualCopy: vi.fn(async () => {}),
   pasteSettings: vi.fn(async (keys: number[]) => keys.length),
+  lensProfile: vi.fn(async () => ({ enabled: true, name: "Sony FE 24-70mm f/2.8 GM II", distortion: 100, vignetting: 100, chromatic: true, distModel: 3, dist: [0.0045, -0.0042, 0.0034], distScale: 1.8, tcaModel: 1, tca: [1, 1, 0, 0, 0, 0], vig: [-0.3, -0.1, 0.06], vigScale: 1 })),
+  applyLensProfiles: vi.fn(async (keys: number[]) => [keys.length, 0]),
   applyAspect: vi.fn(async (keys: number[]) => keys.length),
   upright: vi.fn(async () => ({ vertical: 31.23, horizontal: 0, straighten: -1.249, focal35: 24, mode: "vertical", verticalLines: 12, horizontalLines: 0, deviationBefore: 4.2, deviationAfter: 0.2 })),
   pickWhiteBalance: vi.fn(async () => [23.4, -7.6] as [number, number]),
@@ -859,6 +861,31 @@ describe("edição (Fase 5)", () => {
     fireEvent.click(within(upright).getByRole("button", { name: "Desligado" }));
     await act(async () => {});
     expect(apiMock.commitEdit).toHaveBeenLastCalledWith(2, "geometry.upright", expect.objectContaining({ geometry: expect.objectContaining({ upright: "", vertical: 0, straighten: 0 }) }));
+  });
+
+  it("perfil da objetiva: ativar (coeficientes desta fotografia), intensidade e aplicar às selecionadas", async () => {
+    await openDevelop();
+    fireEvent.click(screen.getByRole("button", { name: /Correções da objetiva/ }));
+    const enable = screen.getByRole("checkbox", { name: "Ativar correções de perfil" });
+    apiMock.lensProfile.mockResolvedValueOnce(null as unknown as Awaited<ReturnType<typeof apiMock.lensProfile>>);
+    fireEvent.click(enable);
+    await act(async () => {});
+    expect(apiMock.lensProfile).toHaveBeenCalledWith(2);
+    expect(screen.getByText(/não está na base de dados de perfis/)).toBeTruthy();
+    fireEvent.click(enable);
+    await act(async () => {});
+    const [, label, st] = apiMock.commitEdit.mock.calls.at(-1)! as [number, string, DevelopSettings];
+    expect(label).toBe("lens.profile");
+    expect(st.lens.profile).toMatchObject({ enabled: true, name: "Sony FE 24-70mm f/2.8 GM II", distModel: 3, distortion: 100 });
+    expect(screen.getByText("Sony FE 24-70mm f/2.8 GM II")).toBeTruthy();
+    fireEvent.change(screen.getByRole("slider", { name: "Distorção (perfil)" }), { target: { value: "60" } });
+    fireEvent.pointerUp(screen.getByRole("slider", { name: "Distorção (perfil)" }), { target: { value: "60" } });
+    await act(async () => {});
+    expect((apiMock.commitEdit.mock.calls.at(-1)![2] as DevelopSettings).lens.profile.distortion).toBe(60);
+    act(() => useStore.getState().setSelection({ ids: new Set([2, 3]), focus: 2, anchor: 2 }));
+    fireEvent.click(screen.getByRole("button", { name: "Aplicar perfil às 2 selecionadas" }));
+    await act(async () => {});
+    expect(apiMock.applyLensProfiles).toHaveBeenCalledWith([2, 3], true, expect.objectContaining({ distortion: 60 }));
   });
 
   it("copiar (sem geometria por omissão), colar, sincronizar com a seleção, cópia virtual, instantâneos", async () => {

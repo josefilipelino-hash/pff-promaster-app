@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { useTranslation } from "react-i18next";
 import { api, events, isMac } from "../../api";
 import { Icon } from "../Icon";
-import { ASPECTS, aspectEntry, cloneSettings, orientAspect, parseAspect, swapAspect, DEFAULT_COPY_BLOCKS, defaultSettings, fitCropToAspect, parseFrame, sameSettings, type Frame } from "../../logic/develop";
+import { ASPECTS, aspectEntry, cloneSettings, defaultLensProfile, orientAspect, parseAspect, swapAspect, DEFAULT_COPY_BLOCKS, defaultSettings, fitCropToAspect, parseFrame, sameSettings, type Frame } from "../../logic/develop";
 import { errorText, useStore } from "../../store";
 import { SETTINGS_BLOCKS, UPRIGHT_MODES, type UprightOutcome, type AutoOptions, type AutoReport, type DevelopSettings, type EditView } from "../../types";
 import { AutoOptionsForm, AutoReportView } from "./AutoPanel";
@@ -1058,6 +1058,56 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
     </div>
   );
 
+  // ---- perfil da objetiva (Lensfun)
+  const prof = settings.lens.profile ?? defaultLensProfile();
+  const toggleProfile = async (on: boolean) => {
+    if (!on) return set("lens.profile", (s) => void (s.lens.profile = { ...prof, enabled: false }), true);
+    try {
+      const p = await api.lensProfile(photoKey);
+      if (!p) return toast("info", t("develop.lensProfileNone"));
+      set("lens.profile", (s) => void (s.lens.profile = { ...p, distortion: prof.distortion, vignetting: prof.vignetting, chromatic: prof.chromatic }), true);
+    } catch (e) {
+      fail(e);
+    }
+  };
+  const profileToSelection = async () => {
+    const keys = [...new Set([photoKey, ...selection.ids])];
+    try {
+      const [n, missing] = await api.applyLensProfiles(keys, prof.enabled, prof);
+      replace(await api.editView(photoKey));
+      toast("info", t("develop.lensProfileApplied", { count: n, missing }));
+    } catch (e) {
+      fail(e);
+    }
+  };
+  const lensProfileUi = (
+    <div className="dev-ai">
+      <label className="small">
+        <input type="checkbox" checked={prof.enabled} onChange={(e) => void toggleProfile(e.target.checked)} /> {t("develop.lensProfileEnable")}
+      </label>
+      {prof.enabled && (
+        <>
+          <p className="small muted">
+            {t("develop.lensProfileName")}: <strong>{prof.name}</strong>
+          </p>
+          <Slider label={t("develop.field.lens.profileDistortion")} value={prof.distortion} min={0} max={200} def={100} onChange={(v, done) => set("lens.profileDistortion", (s) => void (s.lens.profile.distortion = v), done)} />
+          <Slider label={t("develop.field.lens.profileVignetting")} value={prof.vignetting} min={0} max={200} def={100} onChange={(v, done) => set("lens.profileVignetting", (s) => void (s.lens.profile.vignetting = v), done)} />
+          <label className="small">
+            <input type="checkbox" checked={prof.chromatic} onChange={(e) => set("lens.profileChromatic", (s) => void (s.lens.profile.chromatic = e.target.checked), true)} /> {t("develop.lensProfileChromatic")}
+          </label>
+        </>
+      )}
+      {selection.ids.size > 1 && (
+        <div className="dev-row">
+          <button type="button" className="btn small" onClick={() => void profileToSelection()}>
+            {t(prof.enabled ? "develop.lensProfileToSelection" : "develop.lensProfileOffSelection", { count: new Set([photoKey, ...selection.ids]).size })}
+          </button>
+        </div>
+      )}
+      <p className="small muted">{t("develop.lensProfileSource")}</p>
+    </div>
+  );
+
   const idx = order.indexOf(photoKey);
   return (
     <div className="develop">
@@ -1340,6 +1390,7 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
       <DevelopPanel
         settings={settings}
         asShotKelvin={asShot && asShot.key === photoKey ? asShot.k : null}
+        lensProfile={lensProfileUi}
         set={set}
         histogram={frame?.histogram ?? null}
         wbPicking={wbPicking}

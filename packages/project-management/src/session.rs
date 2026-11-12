@@ -24,6 +24,7 @@ pub use momento_image_processing::develop::auto::{
 };
 pub use momento_image_processing::develop::consistency::{MatchOptions, MatchReport};
 pub use momento_image_processing::develop::FaceRegions;
+pub use momento_image_processing::develop::LensProfile;
 pub use momento_image_processing::develop::{
     Quality as RenderQuality, Settings as DevelopSettings,
 };
@@ -597,7 +598,21 @@ impl ProjectSession {
             for &k in keys {
                 let (variant, _) = c.resolve_key(k)?;
                 let base = c.recipe_of(variant)?;
-                let merged = momento_image_processing::develop::merge_blocks(&base, &from, blocks);
+                let mut merged =
+                    momento_image_processing::develop::merge_blocks(&base, &from, blocks);
+                // O perfil da objetiva depende da focal/abertura de cada fotografia: recalculado.
+                if blocks.iter().any(|b| b == "lens") && settings.lens.profile.enabled {
+                    let mut t = DevelopSettings::from_recipe(&merged);
+                    let asset = c.resolve_key(k)?.1;
+                    t.lens.profile = match c
+                        .photo_details(asset)?
+                        .and_then(|d| crate::lensprofile::profile_for(&profile_query(&d)))
+                    {
+                        Some(p) => with_amounts(p, &settings.lens.profile),
+                        None => momento_image_processing::develop::LensProfile::default(),
+                    };
+                    merged = t.to_recipe(&merged);
+                }
                 if merged != base {
                     c.commit_edit(variant, "paste", &merged)?;
                     n += 1;
@@ -606,6 +621,60 @@ impl ProjectSession {
         }
         self.after_edit(keys.to_vec());
         Ok(n)
+    }
+
+    /// Perfil de objetiva (Lensfun) de uma fotografia, pelo EXIF; `None` se a objetiva não
+    /// estiver na base de dados (ou o ficheiro não indicar a objetiva).
+    pub fn lens_profile(
+        &self,
+        key: i64,
+    ) -> CoreResult<Option<momento_image_processing::develop::LensProfile>> {
+        let cat = self.open_catalog()?;
+        let (_, asset) = cat.resolve_key(key)?;
+        Ok(cat
+            .photo_details(asset)?
+            .and_then(|d| crate::lensprofile::profile_for(&profile_query(&d))))
+    }
+
+    /// Ativa (ou desativa) as correções de perfil em várias fotografias: cada uma recebe os
+    /// coeficientes da sua focal e abertura; as intensidades vêm de `template`. Devolve
+    /// (alteradas, sem perfil).
+    pub fn apply_lens_profiles(
+        self: &Arc<Self>,
+        keys: &[i64],
+        enable: bool,
+        template: &momento_image_processing::develop::LensProfile,
+    ) -> CoreResult<(usize, usize)> {
+        let (mut changed, mut missing) = (0, 0);
+        {
+            let mut c = self.catalog();
+            for &k in keys {
+                let (variant, asset) = c.resolve_key(k)?;
+                let base = c.recipe_of(variant)?;
+                let mut s = DevelopSettings::from_recipe(&base);
+                if enable {
+                    match c
+                        .photo_details(asset)?
+                        .and_then(|d| crate::lensprofile::profile_for(&profile_query(&d)))
+                    {
+                        Some(p) => s.lens.profile = with_amounts(p, template),
+                        None => {
+                            missing += 1;
+                            continue;
+                        }
+                    }
+                } else {
+                    s.lens.profile.enabled = false;
+                }
+                let recipe = s.to_recipe(&base);
+                if recipe != base {
+                    c.commit_edit(variant, "lens.profile", &recipe)?;
+                    changed += 1;
+                }
+            }
+        }
+        self.after_edit(keys.to_vec());
+        Ok((changed, missing))
     }
 
     /// Formato de recorte ("4:5", "1.91:1", "original"…) aplicado a cada fotografia: o maior
@@ -1511,4 +1580,28 @@ pub struct UprightOutcome {
     /// Desvio angular médio (graus) das linhas antes e depois.
     pub deviation_before: f32,
     pub deviation_after: f32,
+}
+
+fn profile_query(d: &momento_database::assets::PhotoDetails) -> crate::lensprofile::ProfileQuery {
+    crate::lensprofile::ProfileQuery {
+        camera_make: d.camera_make.clone().unwrap_or_default(),
+        camera_model: d.camera_model.clone().unwrap_or_default(),
+        lens: d.lens.clone().unwrap_or_default(),
+        focal: d.focal_length.map(|f| f as f32),
+        focal35: d.focal_length_35mm.map(|f| f as f32),
+        aperture: d.f_number.map(|f| f as f32),
+    }
+}
+
+/// Coeficientes do perfil desta fotografia com as intensidades escolhidas pelo utilizador.
+fn with_amounts(
+    mut p: momento_image_processing::develop::LensProfile,
+    t: &momento_image_processing::develop::LensProfile,
+) -> momento_image_processing::develop::LensProfile {
+    if t.enabled {
+        p.distortion = t.distortion;
+        p.vignetting = t.vignetting;
+        p.chromatic = t.chromatic;
+    }
+    p
 }

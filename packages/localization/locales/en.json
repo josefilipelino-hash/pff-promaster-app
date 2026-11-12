@@ -657,7 +657,9 @@
         "caRed": "Red/cyan fringe",
         "caBlue": "Blue/yellow fringe",
         "vignetting": "Lens vignetting",
-        "vignettingMidpoint": "Midpoint"
+        "vignettingMidpoint": "Midpoint",
+        "profileDistortion": "Distortion (profile)",
+        "profileVignetting": "Vignetting (profile)"
       },
       "curve": {
         "highlights": "Highlights",
@@ -851,7 +853,18 @@
     "aspectToSelection_other": "Apply format to the {{count}} selected",
     "aspectToSelectionHint": "Each photo gets its own crop, centred on faces (eyes on the upper third) or on its current composition.",
     "aspectApplied_one": "Format applied to {{count}} photo.",
-    "aspectApplied_other": "Format applied to {{count}} photos."
+    "aspectApplied_other": "Format applied to {{count}} photos.",
+    "lensProfileEnable": "Enable profile corrections",
+    "lensProfileName": "Profile",
+    "lensProfileChromatic": "Remove chromatic aberration",
+    "lensProfileNone": "This photo's lens is not in the profile database (Lensfun), or the file does not name the lens.",
+    "lensProfileToSelection_one": "Apply profile to {{count}} photo",
+    "lensProfileToSelection_other": "Apply profile to the {{count}} selected",
+    "lensProfileOffSelection_one": "Disable profile on {{count}} photo",
+    "lensProfileOffSelection_other": "Disable profile on the {{count}} selected",
+    "lensProfileApplied_one": "Profile updated on {{count}} photo ({{missing}} without an available profile).",
+    "lensProfileApplied_other": "Profile updated on {{count}} photos ({{missing}} without an available profile).",
+    "lensProfileSource": "Profiles: Lensfun database (CC BY-SA 3.0)."
   },
   "auto": {
     "intensity": "Intensity",
