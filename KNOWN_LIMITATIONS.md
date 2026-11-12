@@ -83,6 +83,10 @@ medido está no `CHANGELOG.md`. Diferenças conhecidas:
 
 ## 3. Funcionalidades da especificação não implementadas (principais)
 
+- **Reiluminação (spot lights, contraluz, hora do dia):** não incluída na 1.2.1. Existe um
+  protótipo (`develop/relight.rs`, profundidade Depth Anything V2 + malha do rosto) e foi
+  testado o IC-Light; nenhum atingiu um resultado realista e fiável em todas as fotografias,
+  por isso não há nenhum controlo de iluminação na aplicação.
 - **Importação:** deteção automática de cartões/DCIM e dispositivos USB (PTP/MTP),
   renomear na importação, modelos de estrutura de pastas, leitura de IPTC/XMP dos
   ficheiros, PCX/SVG/PDF como entrada, pacotes de codecs instaláveis.
