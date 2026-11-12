@@ -5,6 +5,17 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [1.1.1-personal] — 2026-11-12
+
+### Corrigido
+- **Câmaras mais recentes do que o motor RAW (ex.: Canon EOS C50) apareciam com uma
+  dominante magenta/avermelhada no editor e nas exportações.** A LibRaw 0.22.3 não tem o
+  perfil de cor destes modelos. A aplicação passa a detetá-lo e a calibrar as cores de cada
+  fotografia pela preview JPEG que a própria câmara grava no RAW (matriz 3×3, cinzentos
+  mantidos neutros). Testado com RAW reais (Canon R3, Nikon D810, Sony A7 IV) a simular uma
+  câmara desconhecida: as cores ficam tão próximas das corretas como a própria preview.
+  Nestas câmaras a temperatura é mostrada na escala relativa (sem Kelvin).
+
 ## [1.1.0-personal] — 2026-11-11 — pedidos do utilizador
 
 ### Adicionado

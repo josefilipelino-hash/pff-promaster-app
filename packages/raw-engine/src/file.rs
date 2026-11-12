@@ -89,16 +89,28 @@ pub struct RawInfo {
     /// Cor (sRGB linear, normalizada) da luz do disparo segundo o balanço de brancos da
     /// câmara — o que a câmara considerou "branco". Serve para a temperatura em Kelvin.
     pub as_shot_white: Option<[f32; 3]>,
+    /// A LibRaw tem a matriz de cor deste modelo. Sem ela (câmaras mais recentes do que esta
+    /// versão da LibRaw, ex.: Canon EOS C50) a matriz câmara→sRGB é a identidade e as cores
+    /// saem erradas (dominante magenta/verde) — a edição calibra-a pela preview embutida.
+    pub color_matrix_known: bool,
+}
+
+/// `rgb_cam` identidade (ou vazia) = a LibRaw não conhece a cor deste modelo.
+fn is_identity(m: &[[f32; 4]; 3]) -> bool {
+    (0..3).all(|i| (0..3).all(|c| (m[i][c] - if i == c { 1.0 } else { 0.0 }).abs() < 1e-4))
 }
 
 /// Branco do disparo em sRGB linear: `rgb_cam · (pre_mul / cam_mul)`, normalizado.
 fn as_shot_white(r: &sys::mlr_info) -> Option<[f32; 3]> {
+    if is_identity(&r.rgb_cam) {
+        return None; // sem matriz da câmara, a temperatura não pode ser calculada
+    }
     let colors = r.colors.clamp(0, 4) as usize;
     if colors < 3 {
         return None;
     }
     let mut w = [0f32; 4];
-    for c in 0..colors {
+    for (c, wc) in w.iter_mut().enumerate().take(colors) {
         let cm = if r.cam_mul[c] > 0.0 {
             r.cam_mul[c]
         } else if c == 3 {
@@ -116,14 +128,14 @@ fn as_shot_white(r: &sys::mlr_info) -> Option<[f32; 3]> {
         if cm <= 0.0 || pm <= 0.0 {
             return None;
         }
-        w[c] = pm / cm;
+        *wc = pm / cm;
     }
     let mut s = [0f32; 3];
     for (i, si) in s.iter_mut().enumerate() {
         *si = (0..colors).map(|c| r.rgb_cam[i][c] * w[c]).sum();
     }
     let m = s.iter().copied().fold(0f32, f32::max);
-    if !(m > 0.0) || s.iter().any(|v| !v.is_finite() || *v <= 0.0) {
+    if m.is_nan() || m <= 0.0 || s.iter().any(|v| !v.is_finite() || *v <= 0.0) {
         return None;
     }
     Some(s.map(|v| v / m))
@@ -265,6 +277,7 @@ impl<'a> RawFile<'a> {
             sensor_supported: r.decoder_supported != 0,
             preview,
             as_shot_white: as_shot_white(&r),
+            color_matrix_known: !is_identity(&r.rgb_cam),
         };
         Ok(RawFile { handle, info, _data: data })
     }

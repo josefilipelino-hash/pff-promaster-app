@@ -73,6 +73,15 @@ pub struct Source {
 }
 
 impl Source {
+    /// Aplica uma matriz de cor a todos os níveis (calibração de câmaras sem perfil).
+    pub fn apply_matrix(&mut self, m: &[[f32; 3]; 3]) {
+        for level in &mut self.levels {
+            for p in &mut level.px {
+                *p = super::color::mul3(m, *p).map(|c| c.max(0.0));
+            }
+        }
+    }
+
     /// Temperatura de referência do balanço de brancos desta fonte.
     pub fn wb_reference_k(&self) -> f32 {
         self.as_shot_k.unwrap_or(super::color::WB_REFERENCE_K)

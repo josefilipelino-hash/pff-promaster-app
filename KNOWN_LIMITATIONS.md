@@ -30,6 +30,15 @@ que têm impacto no uso real, por gravidade.
 | Catálogo em disco de rede não suportado (SQLite WAL). | Usar disco local ou externo. |
 | Nomes de ficheiro com mais de 255 bytes falham individualmente. | Erro do sistema mostrado por ficheiro. |
 
+## 2a. Câmaras mais recentes do que o motor RAW (1.1.1)
+
+- A LibRaw 0.22.3 não tem o perfil de cor de modelos lançados depois dela (ex.: **Canon EOS
+  C50**). Nesses ficheiros as cores são **calibradas automaticamente** pela preview JPEG que a
+  câmara grava no RAW: o resultado segue as cores (e o estilo) da própria câmara, não um
+  perfil colorimétrico neutro. A temperatura aparece na escala relativa, sem Kelvin.
+- Se o RAW não tiver preview utilizável, as cores ficam por calibrar (o registo indica-o).
+  A solução definitiva é uma LibRaw mais recente com o perfil desse modelo.
+
 ## 2b. Lightroom e temperatura (1.1)
 
 - **Não é gerado um catálogo `.lrcat`**: é uma base de dados privada da Adobe, sem

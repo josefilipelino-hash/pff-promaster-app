@@ -1,3 +1,11 @@
+# PFF ProMaster 1.1.1-personal
+
+**Correção (1.1.1):** fotografias de câmaras mais recentes do que o motor RAW (ex.: Canon
+EOS C50) já não aparecem com dominante magenta: as cores são calibradas pela preview que a
+própria câmara grava no ficheiro.
+
+---
+
 # PFF ProMaster 1.1.0-personal
 
 **Data:** 2026-11-11 · **Tipo:** versão para uso pessoal (assinatura local *ad-hoc*, sem certificado Apple)

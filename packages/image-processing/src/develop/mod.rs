@@ -9,6 +9,7 @@
 pub const PIPELINE_VERSION: u32 = 3;
 
 pub mod auto;
+pub mod calibrate;
 pub mod color;
 pub mod consistency;
 pub mod curves;

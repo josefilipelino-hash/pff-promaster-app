@@ -321,3 +321,93 @@ fn as_shot_kelvin_of_real_raws() {
     }
     assert!(seen >= 5, "poucos RAW com temperatura: {seen}");
 }
+
+/// Câmara sem perfil de cor na LibRaw (ex.: Canon EOS C50): simulada a partir de RAW reais
+/// com as cores do sensor misturadas; a calibração pela preview embutida recupera as cores.
+/// Com `MOMENTO_SAMPLES_DIR`.
+#[test]
+fn unknown_camera_colors_are_calibrated_from_the_embedded_preview() {
+    use momento_image_processing::develop::calibrate::calibrate_from_preview;
+    use momento_image_processing::develop::color::mul3;
+    let Some(dir) = std::env::var("MOMENTO_SAMPLES_DIR").ok().map(PathBuf::from) else {
+        eprintln!("SALTADO: MOMENTO_SAMPLES_DIR não definido");
+        return;
+    };
+    let registry = momento_project_management::codecs::full_registry();
+    let mut tested = 0;
+    for name in ["Canon EOS R3.cr3", "Nikon D810.nef", "Sony ILCE-7M4 (A7M4).ARW"] {
+        let path = dir.join(name);
+        let Ok(data) = std::fs::read(&path) else { continue };
+        let mut raw = momento_raw_engine::RawFile::open(&data).unwrap();
+        let info = raw.info().clone();
+        assert!(info.color_matrix_known, "{name}: câmara conhecida");
+        let bm = raw.develop_linear(true).unwrap();
+        let truth = momento_image_processing::develop::Source::from_linear16(
+            bm.width,
+            bm.height,
+            &bm.rgb,
+            info.orientation,
+            info.width,
+            info.height,
+        );
+        let t = truth.levels.last().unwrap();
+        // "Câmara desconhecida": cores do sensor misturadas (o branco continua branco).
+        let mix = [[0.62, 0.30, 0.08], [0.20, 0.68, 0.12], [0.06, 0.34, 0.60]];
+        let mut fake = t.clone();
+        for p in &mut fake.px {
+            *p = mul3(&mix, *p);
+        }
+        let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase());
+        let format = momento_image_codecs::detect(&data[..data.len().min(4096)], ext.as_deref())
+            .unwrap()
+            .format;
+        let preview = momento_image_processing::apply_orientation(
+            registry.decode(&data, format, Some(480)).unwrap().image,
+            info.orientation,
+        );
+        let cal = calibrate_from_preview(&fake, &preview).expect("calibra");
+        // Erro de cromaticidade médio face às cores verdadeiras, antes e depois.
+        let chroma = |v: [f32; 3]| {
+            let s = (v[0] + v[1] + v[2]).max(1e-6);
+            v.map(|c| c / s)
+        };
+        // Erro mínimo possível: a própria preview face às cores verdadeiras.
+        let pv = image::imageops::resize(
+            &preview,
+            t.w as u32,
+            t.h as u32,
+            image::imageops::FilterType::Triangle,
+        );
+        let (mut before, mut after, mut floor, mut n) = (0f32, 0f32, 0f32, 0f32);
+        for (i, (f, tr)) in fake.px.iter().zip(&t.px).enumerate().step_by(37) {
+            if tr.iter().sum::<f32>() < 0.02 {
+                continue;
+            }
+            let q = pv.get_pixel((i % t.w) as u32, (i / t.w) as u32).0;
+            let ql = mul3(
+                &momento_image_processing::develop::color::SRGB_TO_REC2020,
+                q.map(|c| momento_image_processing::develop::color::eotf(c as f32 / 255.0)),
+            );
+            let (a, b, c, d) = (chroma(*f), chroma(mul3(&cal.matrix, *f)), chroma(*tr), chroma(ql));
+            before += (0..3).map(|i| (a[i] - c[i]).abs()).sum::<f32>();
+            after += (0..3).map(|i| (b[i] - c[i]).abs()).sum::<f32>();
+            floor += (0..3).map(|i| (d[i] - c[i]).abs()).sum::<f32>();
+            n += 1.0;
+        }
+        eprintln!("{name}: preview face às cores verdadeiras (mínimo) {:.4}", floor / n);
+        eprintln!(
+            "{name}: erro de cor sem calibração {:.4} → calibrado {:.4} ({} amostras)",
+            before / n,
+            after / n,
+            cal.samples
+        );
+        // A preview tem o "estilo" da câmara (um pouco diferente das cores neutras da
+        // LibRaw): há um erro mínimo que nenhuma calibração elimina.
+        assert!(
+            after < before * 0.8 && after < floor * 1.2,
+            "{name}: a calibração tem de aproximar as cores verdadeiras"
+        );
+        tested += 1;
+    }
+    assert!(tested >= 2);
+}

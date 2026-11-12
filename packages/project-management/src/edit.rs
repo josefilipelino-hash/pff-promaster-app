@@ -58,6 +58,11 @@ pub fn load_source(
             );
             // Temperatura do balanço da câmara: a temperatura passa a ser em Kelvin.
             s.as_shot_k = info.as_shot_white.and_then(develop::color::kelvin_of_white);
+            // Câmara que esta LibRaw não conhece (sem matriz de cor, ex.: Canon EOS C50):
+            // calibrar pela preview JPEG que a própria câmara gravou no ficheiro.
+            if !info.color_matrix_known {
+                calibrate_unknown_camera(&mut s, registry, &data, format, src.orientation, asset);
+            }
             Ok(s)
         }) {
             Ok(s) => return Ok(s),
@@ -108,6 +113,41 @@ pub fn load_source(
         }
     }
     Ok(Source::from_srgb(&img, fw, fh))
+}
+
+/// Calibração de cor de um RAW de câmara sem perfil na LibRaw (ver `develop::calibrate`).
+fn calibrate_unknown_camera(
+    s: &mut Source,
+    registry: &CodecRegistry,
+    data: &[u8],
+    format: momento_image_codecs::FileFormat,
+    orientation: u8,
+    asset: AssetId,
+) {
+    let preview = match registry.decode(data, format, Some(480)) {
+        Ok(d) => apply_orientation(d.image, orientation),
+        Err(e) => {
+            tracing::warn!(asset = asset.0, erro = %e, "câmara sem perfil de cor e sem preview: cores por calibrar");
+            return;
+        }
+    };
+    let Some(level) = s.levels.last() else { return };
+    match develop::calibrate::calibrate_from_preview(level, &preview) {
+        Some(c) => {
+            tracing::info!(
+                asset = asset.0,
+                amostras = c.samples,
+                erro_antes = c.error_before,
+                erro_depois = c.error_after,
+                "câmara sem perfil de cor na LibRaw: cores calibradas pela preview embutida"
+            );
+            s.apply_matrix(&c.matrix);
+        }
+        None => tracing::warn!(
+            asset = asset.0,
+            "câmara sem perfil de cor: calibração pela preview impossível"
+        ),
+    }
 }
 
 /// Cabeçalho binário de um frame: largura, altura (u32 LE), histograma 3×256 (u32 LE), RGBA.
