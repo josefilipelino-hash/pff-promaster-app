@@ -91,7 +91,7 @@ pub fn calibrate_from_preview(camera: &Plane, preview: &RgbImage) -> Option<Cali
     let (l0, l1) = raws
         .iter()
         .fold((0f64, 0f64), |(a0, a1), p| (a0 + lum(*p) as f64, a1 + lum(mul3(&m, *p)) as f64));
-    if !(l1 > 0.0) {
+    if l1.is_nan() || l1 <= 0.0 {
         return None;
     }
     let k = (l0 / l1) as f32;
