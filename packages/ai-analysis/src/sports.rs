@@ -172,7 +172,7 @@ pub fn detect(times: &[i64], hints: &MatchHints) -> Option<MatchTimes> {
             let start = m.first.0;
             let head: Vec<i64> =
                 t.iter().copied().filter(|&x| x >= start && x <= start + 6 * 60_000).collect();
-            if let Some(w) = head.windows(2).filter(|w| w[1] - w[0] >= 60_000).last() {
+            if let Some(w) = head.windows(2).rfind(|w| w[1] - w[0] >= 60_000) {
                 m.first.0 = w[1];
             }
         }
