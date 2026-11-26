@@ -32,17 +32,13 @@ que têm impacto no uso real, por gravidade.
 
 ## 2a. Câmaras mais recentes do que o motor RAW (1.1.1)
 
-- A LibRaw 0.22.3 não tem o perfil de cor de modelos lançados depois dela (ex.: **Canon EOS
-  C50**). Nesses ficheiros as cores são **calibradas automaticamente** pela preview JPEG que a
-  câmara grava no RAW: o resultado segue as cores (e o estilo) da própria câmara, não um
-  perfil colorimétrico neutro. A temperatura aparece na escala relativa, sem Kelvin.
-- Sem esse perfil a LibRaw também não aplica o balanço de brancos nem subtrai o nível de
-  preto: a calibração (1.1.4) estima os dois pela preview. Em RAW reais com estes defeitos
-  simulados recupera as cores; **não foi testada com um ficheiro C50 real** (não temos um).
-- Se a calibração não for fiável, a edição usa a própria preview da câmara: cores certas,
-  mas a resolução dessa preview (na C50, 810×540 — exportações ficam pequenas). O registo
-  indica qual dos dois caminhos foi usado. A solução definitiva é uma LibRaw mais recente
-  com o perfil desse modelo.
+- **Canon EOS C50 e EOS R6 Mark III (1.2.2):** já têm o perfil oficial (retroportado da
+  LibRaw atual) — revelação normal, em resolução total. A matriz é a "preliminar" da LibRaw.
+- Outros modelos lançados depois da LibRaw 0.22.3 continuam sem perfil: as cores são
+  **calibradas** pela preview JPEG que a câmara grava no RAW (segue o estilo da câmara; a
+  temperatura fica na escala relativa). Se a calibração não for fiável, a edição usa a
+  própria preview (cores certas, mas com a resolução dessa preview). O registo indica qual
+  dos caminhos foi usado.
 
 ## 2c. Edição face ao Lightroom / Camera Raw (1.2)
 

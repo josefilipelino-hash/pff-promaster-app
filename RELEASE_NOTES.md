@@ -1,3 +1,12 @@
+# PFF ProMaster 1.2.2-personal
+
+**Correção:** Canon EOS C50 sem fotografias vermelhas ao editar — o RAW passa a ser
+revelado com o perfil de cor oficial da C50 (retroportado da LibRaw atual), em resolução total.
+
+Inclui tudo da 1.2.1 (miniaturas corrigidas, editor reorganizado, zoom rápido).
+
+---
+
 # PFF ProMaster 1.2.1-personal
 
 **Correção:** miniaturas esmagadas em "Luz semelhante" e Pessoas. **Editor reorganizado**

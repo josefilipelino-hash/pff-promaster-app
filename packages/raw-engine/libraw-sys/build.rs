@@ -54,5 +54,8 @@ fn main() {
     b.compile("momento_libraw");
 
     println!("cargo:rerun-if-changed=shim");
+    println!("cargo:rerun-if-changed=LibRaw/src");
+    println!("cargo:rerun-if-changed=LibRaw/internal");
+    println!("cargo:rerun-if-changed=LibRaw/libraw");
     println!("cargo:rerun-if-changed=build.rs");
 }

@@ -5,6 +5,19 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [1.2.2-personal] — 2026-11-26
+
+### Corrigido
+- **Canon EOS C50: fotografias vermelhas depois de editar.** A LibRaw incluída (0.22) não
+  conhecia a C50, e as cores eram adivinhadas a partir da pequena preview da câmara.
+  Passa a ter o **suporte oficial da LibRaw atual** (retroportado): matriz de cor, recorte do
+  sensor (6986×4664), nível de preto por canal e balanço de brancos do disparo
+  (ColorData 66). O RAW da C50 é revelado como qualquer outro, em **resolução total** (antes
+  podia ficar limitado à preview de 810×540) e com as cores certas. O mesmo vale para a
+  Canon EOS R6 Mark III (mesmo sensor). Verificado com um CR3 real da C50.
+- A LibRaw passa a ser recompilada quando os seus ficheiros mudam (antes só o `shim`).
+- As edições em cache são refeitas (versão do motor 10).
+
 ## [1.2.1-personal] — 2026-11-12
 
 ### Corrigido
