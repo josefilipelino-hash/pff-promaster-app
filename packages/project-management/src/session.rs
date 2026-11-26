@@ -567,6 +567,26 @@ impl ProjectSession {
         self.commit_edit(key, "reset", &DevelopSettings::default())
     }
 
+    /// Remove a edição de várias fotografias (voltam ao original). Fica um passo "reset" no
+    /// histórico de cada uma (pode ser desfeito); os originais nunca são tocados. Devolve
+    /// quantas tinham edição.
+    pub fn reset_edits(self: &Arc<Self>, keys: &[i64]) -> CoreResult<usize> {
+        let empty = DevelopSettings::default().to_recipe(&EditRecipe::default());
+        let mut n = 0;
+        {
+            let mut c = self.catalog();
+            for &k in keys {
+                let (variant, _) = c.resolve_key(k)?;
+                if c.recipe_of(variant)? != empty {
+                    c.commit_edit(variant, "reset", &empty)?;
+                    n += 1;
+                }
+            }
+        }
+        self.after_edit(keys.to_vec());
+        Ok(n)
+    }
+
     pub fn create_snapshot(&self, key: i64, name: &str) -> CoreResult<EditView> {
         let (variant, _) = self.catalog().resolve_key(key)?;
         self.catalog().create_snapshot(variant, name)?;

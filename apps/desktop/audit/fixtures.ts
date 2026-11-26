@@ -128,6 +128,7 @@ const apiMock = {
   createVirtualCopy: fn(async () => 2 ** 40 + 77),
   deleteVirtualCopy: fn(async () => {}),
   pasteSettings: fn(async (keys: number[]) => keys.length),
+  resetEdits: fn(async (keys: number[]) => keys.length),
   lensProfile: fn(async () => ({ enabled: true, name: "Sony FE 24-70mm f/2.8 GM II", distortion: 100, vignetting: 100, chromatic: true, distModel: 3, dist: [0.0045, -0.0042, 0.0034], distScale: 1.8, tcaModel: 1, tca: [1, 1, 0, 0, 0, 0], vig: [-0.3, -0.1, 0.06], vigScale: 1 })),
   applyLensProfiles: fn(async (keys: number[]) => [keys.length, 0]),
   applyAspect: fn(async (keys: number[]) => keys.length),

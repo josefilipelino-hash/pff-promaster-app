@@ -36,6 +36,7 @@ import { Menu, type MenuEntry } from "./Menu";
 import { shortcutLabel } from "../logic/keys";
 import { Viewer, type ViewerHandle } from "./Viewer";
 import { Icon } from "./Icon";
+import { ResetEditsDialog } from "./ResetEditsDialog";
 
 /** Extensões oferecidas no seletor de ficheiros (a deteção real é feita pelo conteúdo). */
 const BASE_EXTENSIONS = [
@@ -66,6 +67,8 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
   const [fullscreen, setFullscreen] = useState(false);
   /** Menu contextual de fotografias (Fase 14). */
   const [photoMenu, setPhotoMenu] = useState<{ x: number; y: number } | null>(null);
+  // Remover a edição de várias fotografias (com confirmação).
+  const [resetKeys, setResetKeys] = useState<number[] | null>(null);
   const mac = isMac();
 
     const org = useMemo(() => ({ photoPersons: s.photoPersons, photoMoment: s.photoMoment }), [s.photoPersons, s.photoMoment]);
@@ -409,6 +412,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
       { kind: "separator" },
       { label: t("menu.copyEdit"), icon: "copy", disabled: focus === null, onSelect: act({ type: "copyEdit" }), shortcut: shortcutLabel("Mod+Shift+C") },
       { label: t("menu.pasteEdit", { count: n }), icon: "paste", disabled: !st.clipboard || n === 0, onSelect: act({ type: "pasteEdit" }), shortcut: shortcutLabel("Mod+Shift+V") },
+      { label: t("menu.resetEdit", { count: n }), icon: "reset", disabled: n === 0, onSelect: act({ type: "resetEdits" }) },
       { kind: "separator" },
       { label: t("safety.reveal"), icon: "folder", disabled: !ph || (ph.availability ?? "ok") !== "ok" || n !== 1, onSelect: () => focus !== null && api.revealOriginal(focus).catch(fail) },
       { label: t("menu.remove", { count: n }), icon: "trash", danger: true, onSelect: act({ type: "delete" }), shortcut: shortcutLabel("Delete") },
@@ -548,6 +552,11 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
               st.toast("info", t("develop.copied"));
             })
             .catch(fail);
+          return;
+        }
+        case "resetEdits": {
+          const keys = st.viewerId !== null ? [st.viewerId] : targets(st.selection);
+          if (keys.length > 0) setResetKeys(keys);
           return;
         }
         case "pasteEdit": {
@@ -790,6 +799,7 @@ export function ProjectScreen({ onClosed }: { onClosed: () => void }) {
           }}
         />
       )}
+      {resetKeys && <ResetEditsDialog keys={resetKeys} onClose={() => setResetKeys(null)} />}
       {photoMenu && <Menu x={photoMenu.x} y={photoMenu.y} label={t("menu.photo")} entries={photoMenuEntries()} onClose={() => setPhotoMenu(null)} />}
       {s.deleteRequest && <DeleteDialog keys={s.deleteRequest} onClose={() => s.setDeleteRequest(null)} />}
       {s.galleryDialog && <GalleryDialog selected={order.filter((k) => s.selection.ids.has(k))} focus={s.selection.focus} onClose={() => s.setGalleryDialog(false)} />}

@@ -190,6 +190,7 @@ pub fn run() {
             commands::create_virtual_copy,
             commands::delete_virtual_copy,
             commands::paste_settings,
+            commands::reset_edits,
             commands::pick_white_balance,
             commands::auto_straighten,
             commands::upright,

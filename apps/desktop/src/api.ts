@@ -157,6 +157,8 @@ export const api = {
   redoEdit: (key: number) => invoke<EditView>("redo_edit", { key }),
   gotoHistory: (key: number, seq: number) => invoke<EditView>("goto_history", { key, seq }),
   resetEdit: (key: number) => invoke<EditView>("reset_edit", { key }),
+  /** Remove a edição de várias fotografias; devolve quantas tinham edição. */
+  resetEdits: (keys: number[]) => invoke<number>("reset_edits", { keys }),
   createSnapshot: (key: number, name: string) => invoke<EditView>("create_snapshot", { key, name }),
   applySnapshot: (key: number, id: number) => invoke<EditView>("apply_snapshot", { key, id }),
   deleteSnapshot: (key: number, id: number) => invoke<EditView>("delete_snapshot", { key, id }),

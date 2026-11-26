@@ -21,7 +21,8 @@ export type Action =
   | { type: "delete" }
   | { type: "menu" }
   | { type: "copyEdit" }
-  | { type: "pasteEdit" };
+  | { type: "pasteEdit" }
+  | { type: "resetEdits" };
 
 export interface KeyLike {
   key: string;

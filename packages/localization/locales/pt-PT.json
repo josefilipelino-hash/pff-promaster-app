@@ -878,7 +878,14 @@
     "sectionChanged": "Esta secção tem ajustes",
     "zoom": "Zoom",
     "zoomFit": "Ajustar",
-    "zoomHint": "Zoom: duplo clique ou Z alterna entre ajustar e 100 %; roda do rato aproxima no cursor; arraste para deslocar"
+    "zoomHint": "Zoom: duplo clique ou Z alterna entre ajustar e 100 %; roda do rato aproxima no cursor; arraste para deslocar",
+    "resetManyTitle_one": "Remover a edição de {{count}} fotografia?",
+    "resetManyTitle_other": "Remover a edição de {{count}} fotografias?",
+    "resetManyText": "As fotografias voltam ao original, sem ajustes. Os ficheiros originais não são alterados e cada fotografia guarda este passo no histórico (pode ser desfeito no editor).",
+    "resetManyConfirm": "Remover edição",
+    "resetDone_one": "Edição removida de {{count}} fotografia.",
+    "resetDone_other": "Edição removida de {{count}} fotografias.",
+    "resetSelectionHint": "Repor (remove a edição das {{count}} fotografias selecionadas)"
   },
   "auto": {
     "intensity": "Intensidade",
@@ -1843,7 +1850,9 @@
     "remove_other": "Remover {{count}}…",
     "copyEdit": "Copiar edição",
     "pasteEdit_one": "Colar edição na fotografia",
-    "pasteEdit_other": "Colar edição em {{count}} fotografias"
+    "pasteEdit_other": "Colar edição em {{count}} fotografias",
+    "resetEdit_one": "Remover edição",
+    "resetEdit_other": "Remover edição de {{count}} fotografias"
   },
   "privacy": {
     "hint": "Tudo fica neste computador. Aqui pode apagar o que a aplicação gerou sobre este trabalho. Os originais nunca são apagados.",

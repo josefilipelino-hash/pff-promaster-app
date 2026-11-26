@@ -474,6 +474,11 @@ pub async fn reset_edit(state: State<'_, AppState>, key: i64) -> CmdResult<EditV
 }
 
 #[tauri::command]
+pub async fn reset_edits(state: State<'_, AppState>, keys: Vec<i64>) -> CmdResult<usize> {
+    state.session().and_then(|s| s.reset_edits(&keys)).map_err(err)
+}
+
+#[tauri::command]
 pub async fn create_snapshot(
     state: State<'_, AppState>,
     key: i64,

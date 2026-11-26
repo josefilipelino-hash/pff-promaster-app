@@ -878,7 +878,14 @@
     "sectionChanged": "This section has adjustments",
     "zoom": "Zoom",
     "zoomFit": "Fit",
-    "zoomHint": "Zoom: double-click or Z toggles fit and 100%; mouse wheel zooms at the cursor; drag to pan"
+    "zoomHint": "Zoom: double-click or Z toggles fit and 100%; mouse wheel zooms at the cursor; drag to pan",
+    "resetManyTitle_one": "Remove the edit from {{count}} photo?",
+    "resetManyTitle_other": "Remove the edit from {{count}} photos?",
+    "resetManyText": "The photos go back to the original, with no adjustments. Original files are not changed and each photo keeps this step in its history (it can be undone in the editor).",
+    "resetManyConfirm": "Remove edit",
+    "resetDone_one": "Edit removed from {{count}} photo.",
+    "resetDone_other": "Edit removed from {{count}} photos.",
+    "resetSelectionHint": "Reset (removes the edit from the {{count}} selected photos)"
   },
   "auto": {
     "intensity": "Intensity",
@@ -1843,7 +1850,9 @@
     "remove_other": "Remove {{count}}…",
     "copyEdit": "Copy edit",
     "pasteEdit_one": "Paste edit to photo",
-    "pasteEdit_other": "Paste edit to {{count}} photos"
+    "pasteEdit_other": "Paste edit to {{count}} photos",
+    "resetEdit_one": "Remove edit",
+    "resetEdit_other": "Remove edit from {{count}} photos"
   },
   "privacy": {
     "hint": "Everything stays on this computer. Here you can delete what the application generated about this job. Originals are never deleted.",

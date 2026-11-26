@@ -5,6 +5,20 @@ versões seguem [SemVer](https://semver.org/lang/pt-BR/) (0.x = em desenvolvimen
 
 ## [Por lançar]
 
+## [1.2.3-personal] — 2026-11-26
+
+### Novo
+- **Remover a edição de várias fotografias de uma vez:** na grelha, menu da fotografia →
+  "Remover edição de N fotografias"; no editor, **Repor** com várias fotografias selecionadas
+  na tira remove a edição de todas. Pede sempre confirmação; os originais não são tocados e
+  cada fotografia guarda o passo no histórico (pode ser desfeito no editor). Antes só era
+  possível repor a fotografia aberta, uma a uma.
+
+### Verificado
+- Na aplicação real (release, com um CR3 da C50): Copiar abre a janela, Colar aplica noutra
+  fotografia, Ctrl+Z desfaz, Ctrl+Shift+V cola, Repor e Remover edição deixam as fotografias
+  como não editadas.
+
 ## [1.2.2-personal] — 2026-11-26
 
 ### Corrigido

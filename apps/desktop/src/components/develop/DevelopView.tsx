@@ -6,6 +6,7 @@ import { ASPECTS, aspectEntry, cloneSettings, defaultLensProfile, orientAspect, 
 import { errorText, useStore } from "../../store";
 import { SETTINGS_BLOCKS, UPRIGHT_MODES, type UprightOutcome, type AutoOptions, type AutoReport, type DevelopSettings, type EditView } from "../../types";
 import { AutoOptionsForm, AutoReportView } from "./AutoPanel";
+import { ResetEditsDialog } from "../ResetEditsDialog";
 import { CreatePresetDialog, ImportReportDialog, importPresets, PresetList, PresetManager } from "../Presets";
 import { MasksPanel, PortraitPanel, RetouchTools, type BrushSettings, type Tool } from "./LocalPanels";
 import { longDist, newMask, unitScale } from "../../logic/develop";
@@ -721,7 +722,13 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
 
   const undo = () => api.undoEdit(photoKey).then(replace).catch(fail);
   const redo = () => api.redoEdit(photoKey).then(replace).catch(fail);
-  const reset = () => api.resetEdit(photoKey).then(replace).catch(fail);
+  // Com várias fotografias selecionadas (na tira), Repor remove a edição de todas (com
+  // confirmação); só uma: repõe esta, sem perguntar (pode desfazer com Ctrl+Z).
+  const [resetMany, setResetMany] = useState<number[] | null>(null);
+  const reset = () => {
+    if (selection.ids.has(photoKey) && selection.ids.size > 1) return setResetMany([...selection.ids]);
+    return api.resetEdit(photoKey).then(replace).catch(fail);
+  };
 
   // Atalhos do editor.
   useEffect(() => {
@@ -731,7 +738,7 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
       const el = e.target as HTMLInputElement | null;
       const typing = !!el && (el.tagName === "TEXTAREA" || el.tagName === "SELECT" || (el.tagName === "INPUT" && !["range", "checkbox", "radio", "button"].includes(el.type)));
       if (typing) return;
-      if (useStore.getState().helpOpen || dialog) return;
+      if (useStore.getState().helpOpen || dialog || resetMany) return;
       const m = isMac() ? e.metaKey : e.ctrlKey;
       const k = e.key.toLowerCase();
       if (m && k === "z" && !e.shiftKey) return e.preventDefault(), void undo();
@@ -1293,7 +1300,13 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
             <Icon name="redo" />
             <span className="act-label">{t("develop.redo")}</span>
           </button>
-          <button type="button" className="btn small act" onClick={() => void reset()} aria-label={t("develop.reset")} title={t("develop.reset")}>
+          <button
+            type="button"
+            className="btn small act"
+            onClick={() => void reset()}
+            aria-label={t("develop.reset")}
+            title={selection.ids.has(photoKey) && selection.ids.size > 1 ? t("develop.resetSelectionHint", { count: selection.ids.size }) : t("develop.reset")}
+          >
             <Icon name="reset" />
             <span className="act-label">{t("develop.reset")}</span>
           </button>
@@ -1568,6 +1581,13 @@ export function DevelopView({ photoKey, order, onNavigate, filmstrip }: { photoK
           <RetouchTools settings={settings} set={set} tool={tool} setTool={setTool} brush={brush} setBrush={setBrush} busy={autoBusy || localBusy} onDetect={(k) => void retouchOnly(k)} />
         }
       />
+      {resetMany && (
+        <ResetEditsDialog
+          keys={resetMany}
+          onClose={() => setResetMany(null)}
+          onDone={() => void api.editView(photoKey).then(applyView).catch(fail)}
+        />
+      )}
       {dialog === "copy" && (
         <CopyDialog
           title={t("develop.copyTitle")}

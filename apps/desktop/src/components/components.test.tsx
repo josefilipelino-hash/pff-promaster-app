@@ -129,6 +129,7 @@ const apiMock = {
   createVirtualCopy: vi.fn(async () => 2 ** 40 + 77),
   deleteVirtualCopy: vi.fn(async () => {}),
   pasteSettings: vi.fn(async (keys: number[]) => keys.length),
+  resetEdits: vi.fn(async (keys: number[]) => keys.length),
   lensProfile: vi.fn(async () => ({ enabled: true, name: "Sony FE 24-70mm f/2.8 GM II", distortion: 100, vignetting: 100, chromatic: true, distModel: 3, dist: [0.0045, -0.0042, 0.0034], distScale: 1.8, tcaModel: 1, tca: [1, 1, 0, 0, 0, 0], vig: [-0.3, -0.1, 0.06], vigScale: 1 })),
   applyLensProfiles: vi.fn(async (keys: number[]) => [keys.length, 0]),
   nativeSize: vi.fn(async () => [6000, 4000]),
@@ -907,6 +908,19 @@ describe("edição (Fase 5)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Aplicar perfil às 2 selecionadas" }));
     await act(async () => {});
     expect(apiMock.applyLensProfiles).toHaveBeenCalledWith([2, 3], true, expect.objectContaining({ distortion: 60 }));
+  });
+
+  it("Repor no editor: uma fotografia repõe direto; várias selecionadas pede confirmação e remove de todas", async () => {
+    await openDevelop();
+    act(() => useStore.getState().setSelection({ ids: new Set([2]), focus: 2, anchor: 2 }));
+    fireEvent.click(screen.getByRole("button", { name: "Repor" }));
+    await act(async () => {});
+    expect(apiMock.resetEdit).toHaveBeenLastCalledWith(2);
+    act(() => useStore.getState().setSelection({ ids: new Set([2, 3]), focus: 2, anchor: 2 }));
+    fireEvent.click(screen.getByRole("button", { name: "Repor" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Remover a edição de 2 fotografias?" })).getByRole("button", { name: "Remover edição" }));
+    await act(async () => {});
+    expect(apiMock.resetEdits).toHaveBeenLastCalledWith([2, 3]);
   });
 
   it("copiar (sem geometria por omissão), colar, sincronizar com a seleção, cópia virtual, instantâneos", async () => {
@@ -1783,6 +1797,19 @@ describe("UX profissional (Fase 14)", () => {
     expect(apiMock.pasteSettings).toHaveBeenLastCalledWith([3, 4, 5], clip.settings, clip.blocks);
     fireEvent.contextMenu(document.querySelector('[data-id="4"]')!, { clientX: 100, clientY: 100 });
     expect(within(screen.getByRole("menu", { name: "Ações da fotografia" })).getByRole("menuitem", { name: /Colar edição em 3 fotografias/ })).toBeTruthy();
+  });
+
+  it("remover a edição de várias fotografias: na grelha (menu) e no editor (Repor), com confirmação", async () => {
+    await openProj();
+    act(() => useStore.getState().setSelection({ ids: new Set([3, 4, 5]), focus: 3, anchor: 3 }));
+    fireEvent.contextMenu(document.querySelector('[data-id="4"]')!, { clientX: 100, clientY: 100 });
+    fireEvent.click(within(screen.getByRole("menu", { name: "Ações da fotografia" })).getByRole("menuitem", { name: /Remover edição de 3 fotografias/ }));
+    const dlg = screen.getByRole("dialog", { name: "Remover a edição de 3 fotografias?" });
+    expect(apiMock.resetEdits).not.toHaveBeenCalled();
+    fireEvent.click(within(dlg).getByRole("button", { name: "Remover edição" }));
+    await act(async () => {});
+    expect(apiMock.resetEdits).toHaveBeenLastCalledWith([3, 4, 5]);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("barra numa linha: importar e mais num menu; tema escuro por omissão e claro opcional", async () => {

@@ -1,3 +1,11 @@
+# PFF ProMaster 1.2.3-personal
+
+**Novo:** remover a edição de várias fotografias de uma vez (menu da grelha, ou Repor no
+editor com várias selecionadas), com confirmação. Inclui a correção das cores da Canon C50
+(1.2.2).
+
+---
+
 # PFF ProMaster 1.2.2-personal
 
 **Correção:** Canon EOS C50 sem fotografias vermelhas ao editar — o RAW passa a ser
