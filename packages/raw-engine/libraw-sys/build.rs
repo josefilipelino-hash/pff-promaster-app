@@ -1,5 +1,9 @@
 //! Compila a LibRaw (submódulo `LibRaw/`, versão fixada) e a camada `shim/` com o `cc`,
 //! de forma idêntica em macOS (clang), Windows (MSVC) e Linux (gcc/clang).
+//!
+//! `patches/LibRaw/` guarda ficheiros da LibRaw corrigidos por nós (ex.: suporte da Canon EOS
+//! C50 retroportado da LibRaw atual). A LibRaw é copiada para a pasta de compilação e esses
+//! ficheiros substituem os originais — o submódulo fica intacto.
 
 use std::path::{Path, PathBuf};
 
@@ -18,12 +22,31 @@ fn collect(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
+fn copy_tree(from: &Path, to: &Path) {
+    std::fs::create_dir_all(to).expect("criar pasta");
+    for e in std::fs::read_dir(from).expect("ler pasta") {
+        let p = e.expect("entrada").path();
+        let dest = to.join(p.file_name().unwrap());
+        if p.is_dir() {
+            copy_tree(&p, &dest);
+        } else {
+            std::fs::copy(&p, &dest).expect("copiar ficheiro");
+        }
+    }
+}
+
 fn main() {
     let root = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
-    let libraw = root.join("LibRaw");
-    if !libraw.join("libraw/libraw.h").exists() {
+    let original = root.join("LibRaw");
+    if !original.join("libraw/libraw.h").exists() {
         panic!("Código-fonte da LibRaw em falta. Execute: git submodule update --init --recursive");
     }
+    let libraw = PathBuf::from(std::env::var("OUT_DIR").unwrap()).join("LibRaw");
+    let _ = std::fs::remove_dir_all(&libraw);
+    for dir in ["src", "internal", "libraw"] {
+        copy_tree(&original.join(dir), &libraw.join(dir));
+    }
+    copy_tree(&root.join("patches/LibRaw"), &libraw);
     let mut sources = Vec::new();
     collect(&libraw.join("src"), &mut sources);
     sources.sort();
@@ -57,5 +80,6 @@ fn main() {
     println!("cargo:rerun-if-changed=LibRaw/src");
     println!("cargo:rerun-if-changed=LibRaw/internal");
     println!("cargo:rerun-if-changed=LibRaw/libraw");
+    println!("cargo:rerun-if-changed=patches");
     println!("cargo:rerun-if-changed=build.rs");
 }
